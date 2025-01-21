@@ -1,0 +1,4 @@
+[jira]
+base_url = "https://your-jira-instance.atlassian.net"
+username = "your_email@example.com"
+api_token = "your_api_token"

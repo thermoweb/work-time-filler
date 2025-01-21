@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "wtf-lib",
+    "wtf-cli"
+]
