@@ -2,3 +2,14 @@
 base_url = "https://your-jira-instance.atlassian.net"
 username = "your_email@example.com"
 api_token = "your_api_token"
+# Optional: Auto-follow sprints matching this pattern (e.g., "Tech Improvement")
+# Only Active and Future sprints are auto-followed (Closed sprints are ignored)
+# auto_follow_sprint_pattern = "Tech Improvement"
+
+[github]
+# Optional: restrict GitHub event tracking to repos under this organisation
+# organisation = "my-org"
+
+[google]
+credentials_path = "credentials.json"
+token_cache_path = "./wtf_token"

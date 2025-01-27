@@ -1,10 +1,13 @@
 use crate::commands::Command;
-use crate::storage::storage::FileStorage;
+use crate::tasks::jira_tasks::FetchJiraBoard;
+use crate::tasks::Task;
 use async_trait::async_trait;
-use clap::{ArgMatches, Command as ClapCommand};
-use wtf_lib::client::jira_client::JiraClient;
-use wtf_lib::config::Config;
-use wtf_lib::models::jira::JiraBoard;
+use clap::{Arg, ArgAction, ArgMatches, Command as ClapCommand};
+use tabled::settings::object::Columns;
+use tabled::settings::{Alignment, Color, Modify, Style};
+use tabled::{Table, Tabled};
+use wtf_lib::models::data::{Board, BoardType};
+use wtf_lib::services::jira_service::JiraService;
 
 pub struct BoardCommand;
 
@@ -19,6 +22,7 @@ impl Command for BoardCommand {
             Some(("list", sub_matches)) => BoardListCommand.execute(sub_matches).await,
             Some(("fetch", sub_matches)) => BoardFetchCommand.execute(sub_matches).await,
             Some(("add", sub_matches)) => BoardAddCommand.execute(sub_matches).await,
+            Some(("rm", sub_matches)) => BoardRemoveCommand.execute(sub_matches).await,
             _ => eprintln!("Invalid subcommand for 'board'"),
         }
     }
@@ -29,6 +33,7 @@ impl Command for BoardCommand {
             .subcommand(BoardListCommand.clap_command())
             .subcommand(BoardFetchCommand.clap_command())
             .subcommand(BoardAddCommand.clap_command())
+            .subcommand(BoardRemoveCommand.clap_command())
     }
 }
 
@@ -40,16 +45,61 @@ impl Command for BoardListCommand {
         "list"
     }
 
-    async fn execute(&self, _matches: &ArgMatches) {
-        println!("Listing all boards...");
-        match FileStorage::load_data::<JiraBoard>("boards") {
-            Some(boards) => boards.into_iter().for_each(|b| println!("{}", b)),
-            None => println!("No boards found."),
+    async fn execute(&self, matches: &ArgMatches) {
+        let list_all = matches.get_flag("all");
+        let boards = if list_all {
+            println!("Listing all available boards:");
+            JiraService::get_available_boards().unwrap()
+        } else {
+            println!("Listing followed boards:");
+            JiraService::get_followed_boards().unwrap()
+        };
+        if boards.is_empty() {
+            println!("No board found.");
+            return;
         }
+        let board_data = boards.iter().map(|b| BoardInfo::new(b)).collect::<Vec<_>>();
+        let mut table = Table::new(board_data);
+        table.with(Style::modern().remove_horizontal());
+        table.with(
+            Modify::new(Columns::first())
+                .with(Color::BOLD | Color::FG_WHITE)
+                .with(Alignment::center()),
+        );
+        println!("{}", table);
     }
 
     fn clap_command(&self) -> ClapCommand {
-        ClapCommand::new("list").about("List all available boards")
+        ClapCommand::new("list").about("List boards").arg(
+            Arg::new("all")
+                .short('a')
+                .long("all")
+                .help("list all boards")
+                .action(ArgAction::SetTrue),
+        )
+    }
+}
+
+#[derive(Tabled)]
+struct BoardInfo {
+    id: usize,
+    name: String,
+    board_type: String,
+}
+
+impl BoardInfo {
+    fn new(board: &Board) -> Self {
+        let board_type = match &board.board_type {
+            BoardType::Kanban => "Kanban",
+            BoardType::Scrum => "Scrum",
+            BoardType::Simple => "Simple",
+            _ => "Unknown",
+        };
+        Self {
+            id: board.id.clone(),
+            name: board.name.clone(),
+            board_type: board_type.to_string(),
+        }
     }
 }
 
@@ -62,16 +112,7 @@ impl Command for BoardFetchCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let config = match Config::load() {
-            Ok(config) => config,
-            Err(err) => {
-                eprintln!("Error: {}", err);
-                std::process::exit(1);
-            }
-        };
-        let jira_client = JiraClient::new(&config.jira);
-        let boards = jira_client.get_all_boards().await.unwrap();
-        FileStorage::save_data("boards", boards);
+        let _ = FetchJiraBoard::new().execute().await;
     }
 
     fn clap_command(&self) -> ClapCommand {
@@ -88,35 +129,46 @@ impl Command for BoardAddCommand {
     }
 
     async fn execute(&self, matches: &ArgMatches) {
-        let id = matches.get_one::<usize>("id").unwrap();
-
-        let available_board = FileStorage::load_data::<JiraBoard>("boards").unwrap_or(Vec::new());
-
-        let board_to_add = available_board.iter().find(|board| &board.id == id);
-        match board_to_add {
-            Some(board) => {
-                let mut followed_boards =
-                    FileStorage::load_data::<JiraBoard>("followed_boards").unwrap_or(Vec::new());
-                if followed_boards.iter().any(|b| &b.id == id) {
-                    println!("Board with ID {} already in your workspace", id);
-                } else {
-                    followed_boards.push(board.clone());
-                    FileStorage::save_data("followed_boards", followed_boards);
-                    println!("Board '{}' has been added to your workspace", id);
-                }
-            }
-            None => println!("No board with id {} found.", id),
+        let id = matches.get_one::<String>("id").unwrap();
+        match JiraService::follow_board(id) {
+            Ok(_) => println!("Board '{}' followed", id),
+            Err(e) => println!("{}", e),
         }
     }
 
     fn clap_command(&self) -> ClapCommand {
-        ClapCommand::new("add")
-            .about("Fetch data for a specific board")
-            .arg(
-                clap::Arg::new("id")
-                    .required(true)
-                    .value_parser(clap::value_parser!(usize))
-                    .help("The board id"),
-            )
+        ClapCommand::new("add").about("Fetch data").arg(
+            Arg::new("id")
+                .required(true)
+                .value_parser(clap::value_parser!(String))
+                .help("The board id"),
+        )
+    }
+}
+
+struct BoardRemoveCommand;
+
+#[async_trait]
+impl Command for BoardRemoveCommand {
+    fn name(&self) -> &'static str {
+        "rm"
+    }
+
+    async fn execute(&self, matches: &ArgMatches) {
+        let id = matches.get_one::<String>("id").unwrap();
+
+        match JiraService::unfollow_board(id) {
+            Ok(..) => println!("Board '{}' unfollow successfully!", id),
+            Err(e) => println!("{}", e),
+        }
+    }
+
+    fn clap_command(&self) -> ClapCommand {
+        ClapCommand::new("rm").about("Remove specific board").arg(
+            Arg::new("id")
+                .required(true)
+                .value_parser(clap::value_parser!(String))
+                .help("The board id"),
+        )
     }
 }

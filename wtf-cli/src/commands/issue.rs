@@ -1,13 +1,12 @@
 use crate::commands::Command;
-use crate::storage::storage::FileStorage;
+use crate::tasks::jira_tasks::FetchJiraIssues;
+use crate::tasks::Task;
 use async_trait::async_trait;
+use chrono::Utc;
 use clap::{Arg, ArgMatches, Command as ClapCommand};
-use indicatif::{ProgressIterator, ProgressStyle};
-use log::{debug, error, info, warn};
-use wtf_lib::client::jira_client::JiraClient;
-use wtf_lib::config::Config;
+use log::{debug, error, info};
 use wtf_lib::duration::parse_duration;
-use wtf_lib::models::jira::{JiraIssue, JiraSprint};
+use wtf_lib::services::jira_service::{IssueService, JiraService};
 
 pub struct IssueCommand;
 
@@ -50,47 +49,17 @@ impl Command for IssueFetchCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let config = match Config::load() {
-            Ok(config) => config,
-            Err(err) => {
-                eprintln!("Error: {}", err);
-                std::process::exit(1);
-            }
-        };
-
-        let jira_client = JiraClient::new(&config.jira);
-        let sprints = FileStorage::load_data::<JiraSprint>("followed_sprint").unwrap_or(Vec::new());
-
+        let sprints = JiraService::get_followed_sprint();
         if sprints.is_empty() {
             println!("No sprint found.");
             return;
         }
         info!("Found {} sprint(s)", sprints.len());
 
-        let mut issues_to_store = Vec::new();
-        for sprint in sprints {
-            info!("Retrieving issues for sprint {}", sprint);
-            match jira_client.get_all_issues(&sprint).await {
-                Ok(issue_fetcher) => {
-                    if issue_fetcher.len() == 0 {
-                        info!("No issues found.");
-                    } else {
-                        let count = issue_fetcher.len();
-                        let issue_progress_style = ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} issues ({percent}%)")
-                            .unwrap();
-                        for issue in issue_fetcher.progress_with_style(issue_progress_style) {
-                            issues_to_store.push(issue);
-                        }
-                        debug!("{} issues found", count);
-                    }
-                }
-                Err(e) => eprintln!("Error: {:?}", e),
-            }
+        match FetchJiraIssues::new(sprints).execute().await {
+            Ok(()) => info!("Jira issues fetched"),
+            Err(err) => println!("Error: {}", err),
         }
-
-        info!("Storing {} issues", issues_to_store.len());
-        FileStorage::save_data("issues", issues_to_store);
     }
 
     fn clap_command(&self) -> ClapCommand {
@@ -107,10 +76,9 @@ impl Command for IssueListCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        match FileStorage::load_data::<JiraIssue>("issues") {
-            Some(issues) => issues.into_iter().for_each(|b| println!("{}", b)),
-            None => println!("No issue found."),
-        }
+        IssueService::get_all_issues()
+            .into_iter()
+            .for_each(|b| println!("{:?}", b));
     }
 
     fn clap_command(&self) -> ClapCommand {
@@ -134,27 +102,11 @@ impl Command for IssueLogTimeCommand {
         };
         let issue_key = matches.get_one::<String>("issue-key").unwrap();
 
-        match FileStorage::load_data::<JiraIssue>("issues") {
-            Some(issues) => {
-                if let Some(issue) = issues
-                    .iter()
-                    .find(|i| i.key.to_lowercase() == issue_key.to_lowercase())
-                {
-                    let config = match Config::load() {
-                        Ok(config) => config,
-                        Err(err) => {
-                            eprintln!("Error: {}", err);
-                            std::process::exit(1);
-                        }
-                    };
-
-                    let jira_client = JiraClient::new(&config.jira);
-                    match jira_client.add_time_to_issue(issue.clone(), duration).await {
-                        Ok(()) => debug!("Logged '{}' for issue '{}'", duration, issue_key),
-                        Err(e) => error!("Error: {:?}", e),
-                    }
-                } else {
-                    error!("No issue found.")
+        match IssueService::get_by_key(&issue_key) {
+            Some(issue) => {
+                match IssueService::add_time(issue.key.as_str(), duration, Utc::now(), None).await {
+                    Ok(_) => debug!("Logged '{}' for issue '{}'", duration, issue_key),
+                    Err(e) => error!("Error: {:?}", e),
                 }
             }
             None => error!("No issue found."),

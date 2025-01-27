@@ -1,0 +1,94 @@
+GET https://{{jira_base_url}}/rest/api/latest/search/jql?jql=project={{project_key}}&fields=created,summary,status
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/latest/issue/{{issue_key}}/worklog
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/latest/issue/{{issue_key}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/latest/worklog/list
+Authorization:Basic {{token}}
+Content-Type: application/json
+
+###
+GET https://{{jira_base_url}}/rest/api/3/search?expand=all&jql=worklogAuthor%20%3D%20{{user_account_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/search?properties=worklogs&jql=worklogAuthor%3DcurrentUser%28%29%20and%20worklogDate%20%3E%3D%202025-01-29%20and%20worklogDate%20%3C%3D%202025-01-29&startAt=0
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/search/jql?jql=sprint%3D{{sprint_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/search?maxResults=200&expand=all&jql=%28statusCategory%20%21%3D%20Done%20OR%20statusCategoryChangedDate%20%3E%3D%20-14d%29
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/2/issue/{{issue_id}}/worklog/{{worklog_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/2/issue/{{issue_id}}/worklog
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/user/search?query={{user_email}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/user?expand=groups&accountId={{user_account_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/3/user/groups?accountId={{user_account_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/agile/1.0/board
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/agile/latest/board/{{board_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/agile/latest/board/{{board_id}}/issue
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/agile/latest/board/{{board_id}}/sprint?startAt=0
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}//rest/agile/1.0/sprint/{{sprint_id}}
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/latest/worklog/updated
+Authorization:Basic {{token}}
+
+###
+GET https://{{jira_base_url}}/rest/api/2/project/{{project_id}}/issue
+Authorization:Basic {{token}}
+
+###
+POST https://{{jira_base_url}}/rest/api/latest/issue/{{issue_key}}/worklog
+Authorization:Basic {{token}}
+Content-Type: application/json
+
+{
+  "timeSpentSeconds": 3600,
+  "started": "2025-01-29T09:00:00.000+0000",
+  "comment": "Work log comment"
+}
+
+###
+DELETE https://{{jira_base_url}}/rest/api/2/issue/{{issue_id}}/worklog/{{worklog_id}}
+Authorization:Basic {{token}}

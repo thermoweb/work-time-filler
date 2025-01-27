@@ -1,3 +1,16 @@
 /target/
 /config.toml
 .idea
+/http-client.private.env.json
+
+# Google OAuth credentials (keep private)
+google_credentials.json
+credentials.json
+*_credentials.json
+
+# User tokens (never commit)
+google_token.json
+token.json
+*_token.json
+wtf_token
+doc/assets/logo-clean.png

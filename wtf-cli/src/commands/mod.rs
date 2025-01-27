@@ -1,16 +1,27 @@
 pub mod board;
+pub mod config;
+pub mod fetch;
+pub mod github;
+pub mod google;
+pub mod init;
 pub mod issue;
-pub mod log;
+pub mod meeting;
 pub mod sprint;
+pub mod tui;
+pub mod worklog;
 
 use async_trait::async_trait;
 use clap::{ArgMatches, Command as ClapCommand};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use wtf_lib::models::jira::JiraBoard;
 
 pub fn build_app(registry: &CommandRegistry) -> ClapCommand {
-    let mut app = ClapCommand::new("wtf");
+    let mut app = ClapCommand::new("wtf")
+        .arg(clap::Arg::new("debug")
+            .long("debug")
+            .help("Enable debug logging")
+            .action(clap::ArgAction::SetTrue)
+            .global(true));
+            
     for subcommand in registry.commands.values() {
         app = app.subcommand(subcommand.clap_command());
     }
@@ -47,9 +58,4 @@ impl CommandRegistry {
             println!("{} not found", name);
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct AppData {
-    pub boards: Vec<JiraBoard>,
 }

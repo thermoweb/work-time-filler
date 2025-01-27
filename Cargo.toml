@@ -3,3 +3,4 @@ members = [
     "wtf-lib",
     "wtf-cli"
 ]
+resolver = "2"

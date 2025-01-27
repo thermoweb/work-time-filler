@@ -1,5 +1,5 @@
-use std::num::ParseIntError;
 use chrono::Duration;
+use std::num::ParseIntError;
 
 pub enum DurationParserError {
     InvalidFormat,
