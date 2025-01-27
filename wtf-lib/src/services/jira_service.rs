@@ -1,6 +1,8 @@
+use indicatif::{ProgressIterator, ProgressStyle};
+use log::{debug, info};
 use crate::client::jira_client::JiraClient;
-use crate::config::JiraConfig;
-use crate::models::jira::{JiraError, JiraIssue, JiraWorklog};
+use crate::config::{Config, JiraConfig};
+use crate::models::jira::{JiraError, JiraIssue, JiraSprint, JiraWorklog};
 
 pub struct JiraService {
     jira_client: JiraClient,

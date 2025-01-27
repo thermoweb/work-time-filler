@@ -3,8 +3,11 @@ use crate::config::JiraConfig;
 use crate::models::jira::{JiraBoard, JiraError, JiraIssue, JiraSprint, JiraWorklog};
 use base64::engine::general_purpose;
 use base64::Engine;
+use chrono::Duration;
 use log::debug;
 use reqwest::Client;
+use serde::Serialize;
+use crate::models::jira::JiraError::ApiError;
 
 #[derive(Debug, Clone)]
 pub struct JiraClient {
@@ -72,6 +75,29 @@ impl JiraClient {
         Ok(worklogs)
     }
 
+    pub async fn add_time_to_issue(&self, issue: JiraIssue, duration: Duration) -> Result<(), JiraError> {
+        let url = format!("{}/rest/api/latest/issue/{}/worklog", &self.base_url, issue.key);
+        let worklog = Worklog {
+            time_spent: duration.num_seconds(),
+            started: "2025-01-27T14:00:00.000+0000".to_string(),
+            comment: "wtf".to_string(),
+        };
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", &self.auth_header)
+            .json(&worklog)
+            .send()
+            .await
+            .unwrap();
+        if response.status().is_success() {
+            println!("Time logged successfully on issue {}", issue.key);
+            Ok(())
+        } else {
+            Err(ApiError(response.status().to_string()))
+        }
+    }
+
     pub async fn get_issue(&self, issue_id: &str) -> Result<JiraIssue, JiraError> {
         let url = format!("{}/rest/api/3/issue/{}", self.base_url, issue_id);
         let response = self
@@ -118,4 +144,12 @@ impl JiraClient {
         .await?;
         Ok(boards)
     }
+}
+
+#[derive(Serialize)]
+struct Worklog {
+    #[serde(rename = "timeSpentSeconds")]
+    time_spent: i64,
+    started: String,
+    comment: String,
 }
