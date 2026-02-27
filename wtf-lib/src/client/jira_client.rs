@@ -55,6 +55,21 @@ impl JiraClient {
         Ok(fetcher)
     }
 
+    pub async fn get_project_backlog_issues(
+        &self,
+        project_name: &str,
+        start_date: Option<DateTime<Utc>>,
+    ) -> Result<PaginatedIssues<'_>, JiraError> {
+        let start = start_date.unwrap_or(Utc::now());
+        let jql = format!(
+            "project='{}' and sprint is EMPTY and createdDate >= '{}'",
+            project_name,
+            start.format("%Y-%m-%d").to_string()
+        );
+        let fetcher = self.get_issue_fetcher(jql).await?;
+        Ok(fetcher)
+    }
+
     async fn get_issue_fetcher(&self, jql: String) -> Result<PaginatedIssues<'_>, JiraError> {
         let fetcher = PaginatedIssues::initialize(
             &self.client,

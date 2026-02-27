@@ -213,6 +213,7 @@ pub struct Tui {
     pub(super) push_receiver: Option<Receiver<(String, String)>>,
     pub(super) push_progress_receiver: Option<Receiver<String>>,
     pub(super) data_refresh_receiver: Option<Receiver<super::data::TuiData>>,
+    pub(super) update_receiver: Option<Receiver<Option<String>>>,
     
     pub(super) status_clear_time: Option<std::time::Instant>,
     pub(super) should_quit: bool,

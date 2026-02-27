@@ -4,7 +4,7 @@ A powerful TUI (Terminal User Interface) for managing Jira worklogs, integrating
 
 > ⚠️ **BETA SOFTWARE**: WTF is currently in beta (v0.1.x). It's feature-complete and functional, but expect some rough edges. Always review worklogs carefully before pushing to Jira!
 
-![WTF Screenshot](doc/assets/screenshot-sprint-tab.png)
+![WTF Screenshot](doc/assets/screenshot-imputation-wizard.png)
 
 ## ✨ Features
 

@@ -92,19 +92,30 @@ impl Task for FetchJiraIssues {
         for board in JiraService::get_followed_boards()
             .unwrap()
             .iter()
-            .filter(|b| b.board_type == BoardType::Kanban)
+            .filter(|b| b.board_type == BoardType::Kanban || b.board_type == BoardType::Scrum)
             .cloned()
             .collect::<Vec<Board>>()
         {
             if let Some(project_name) = board.project_name {
                 let start_date = Utc::now().checked_sub_months(Months::new(12));
-                match jira_client
-                    .get_project_issues(project_name.as_str(), start_date)
-                    .await
-                {
+                let fetch_result = match board.board_type {
+                    // For Scrum boards, only fetch backlog issues (not in any sprint);
+                    // sprint issues are already fetched above per sprint.
+                    BoardType::Scrum => {
+                        jira_client
+                            .get_project_backlog_issues(project_name.as_str(), start_date)
+                            .await
+                    }
+                    _ => {
+                        jira_client
+                            .get_project_issues(project_name.as_str(), start_date)
+                            .await
+                    }
+                };
+                match fetch_result {
                     Ok(issue_fetcher) => {
                         if issue_fetcher.len() == 0 {
-                            mp.println(format!("No issues found for project '{}'.", project_name))
+                            mp.println(format!("No backlog issues found for project '{}'.", project_name))
                                 .unwrap();
                         } else {
                             let issue_progress =

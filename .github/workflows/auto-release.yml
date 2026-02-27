@@ -1,0 +1,97 @@
+name: Auto Release on Push to Main
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.rs'
+      - 'Cargo.toml'
+      - 'wtf-cli/Cargo.toml'
+      - 'wtf-lib/Cargo.toml'
+
+# Skip if this is the bot's own version-bump commit
+jobs:
+  release:
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read current version
+        id: version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Compute next version
+        id: next
+        run: |
+          VERSION="${{ steps.version.outputs.current }}"
+          # If version has a pre-release suffix like -beta.N, increment N
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-([a-zA-Z]+)\.([0-9]+)$ ]]; then
+            CORE="${BASH_REMATCH[1]}"
+            LABEL="${BASH_REMATCH[2]}"
+            N="${BASH_REMATCH[3]}"
+            NEXT_N=$((N + 1))
+            NEXT_VERSION="${CORE}-${LABEL}.${NEXT_N}"
+            echo "next=$NEXT_VERSION" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "tag=v${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          else
+            # Clean version (e.g. 0.1.0) — tag and release as-is, no bump
+            echo "next=$VERSION" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check tag does not already exist
+        id: check_tag
+        run: |
+          TAG="${{ steps.next.outputs.tag }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump version in Cargo.toml
+        if: steps.check_tag.outputs.skip == 'false' && steps.next.outputs.is_prerelease == 'true'
+        run: |
+          NEXT="${{ steps.next.outputs.next }}"
+          sed -i "s/^version = \".*\"/version = \"${NEXT}\"/" Cargo.toml
+
+      - name: Commit and push version bump
+        if: steps.check_tag.outputs.skip == 'false' && steps.next.outputs.is_prerelease == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml
+          git commit -m "chore: bump version to ${{ steps.next.outputs.next }} [skip ci]"
+          git push
+
+      - name: Create tag
+        if: steps.check_tag.outputs.skip == 'false'
+        run: |
+          git tag "${{ steps.next.outputs.tag }}"
+          git push origin "${{ steps.next.outputs.tag }}"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.next.outputs.tag }}"
+          IS_PRE="${{ steps.next.outputs.is_prerelease }}"
+          if [ "$IS_PRE" = "true" ]; then
+            gh release create "$TAG" --title "$TAG" --generate-notes --prerelease
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi

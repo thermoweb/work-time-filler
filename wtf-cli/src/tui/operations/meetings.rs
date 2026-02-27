@@ -6,6 +6,8 @@ use std::thread;
 
 use regex::Regex;
 
+use wtf_lib::client::jira_client::JiraClient;
+use wtf_lib::models::data::Issue;
 use wtf_lib::services::jira_service::{IssueService, JiraService};
 use wtf_lib::services::meetings_service::MeetingsService;
 
@@ -173,6 +175,62 @@ impl Tui {
             .filter(|m| m.jira_link.is_none())
             .collect();
 
+        // Collect keys referenced in meeting titles/descriptions but not in local cache
+        let mut missing_keys: Vec<String> = Vec::new();
+        for meeting in &unlinked_meetings {
+            let empty_string = String::new();
+            let title = meeting.title.as_ref().unwrap_or(&empty_string);
+            let description = meeting.description.as_ref().unwrap_or(&empty_string);
+            let combined = format!("{} {}", title, description);
+            if let Some(captures) = jira_regex.captures(&combined) {
+                if let Some(issue_key) = captures.get(1) {
+                    let key = issue_key.as_str().to_string();
+                    if !self.data.issues_by_key.contains_key(&key) && !missing_keys.contains(&key) {
+                        missing_keys.push(key);
+                    }
+                }
+            }
+        }
+
+        // Fetch missing issues directly from Jira and save them locally
+        if !missing_keys.is_empty() {
+            logger::log(format!(
+                "🔍 Fetching {} unknown issue(s) from Jira: {}",
+                missing_keys.len(),
+                missing_keys.join(", ")
+            ));
+            let keys = missing_keys.clone();
+            thread::spawn(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let client = JiraClient::create();
+                    for key in &keys {
+                        match client.get_issue(key).await {
+                            Ok(jira_issue) => {
+                                let issue = Issue {
+                                    key: jira_issue.key.clone(),
+                                    id: jira_issue.id,
+                                    created: jira_issue.fields.created,
+                                    status: jira_issue.fields.status.name,
+                                    summary: jira_issue.fields.summary,
+                                };
+                                IssueService::save_issue(&issue);
+                            }
+                            Err(e) => log::warn!("Could not fetch issue {} from Jira: {:?}", key, e),
+                        }
+                    }
+                });
+            })
+            .join()
+            .ok();
+
+            // Reload issues into cache after fetching
+            self.data.issues_by_key = IssueService::get_all_issues()
+                .into_iter()
+                .map(|i| (i.key.clone(), i))
+                .collect();
+        }
+
         for meeting in unlinked_meetings {
             // Try to extract Jira issue key from title or description
             let empty_string = String::new();
@@ -184,9 +242,8 @@ impl Tui {
                 if let Some(issue_key) = captures.get(1) {
                     let key = issue_key.as_str().to_string();
 
-                    // Check if issue exists in our data
+                    // Check if issue exists in our data (now includes freshly fetched ones)
                     if self.data.issues_by_key.contains_key(&key) {
-                        // Link the meeting by updating jira_link field
                         if let Some(mut meeting) =
                             MeetingsService::get_meeting_by_id(meeting.id.clone())
                         {
