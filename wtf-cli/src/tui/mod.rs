@@ -1407,18 +1407,23 @@ impl Tui {
                             {
                                 let session_clone = session.clone();
                                 let jira_issues = session_clone.get_jira_issues();
-                                // For partial, use the suggested time
+                                // For partial, divide the suggested total evenly across issues
+                                let time_per_issue_partial = if jira_issues.len() > 1 {
+                                    suggested_seconds / jira_issues.len() as i64
+                                } else {
+                                    suggested_seconds
+                                };
                                 let created = self.create_worklogs_from_session(
                                     &session_clone,
                                     &jira_issues,
-                                    suggested_seconds,
+                                    time_per_issue_partial,
                                 );
 
                                 // If in wizard mode, track and advance
                                 if let Some(wizard) = &mut self.wizard_state {
                                     wizard.summary.worklogs_from_github += created;
                                     wizard.summary.total_hours +=
-                                        (suggested_seconds * created as i64) as f64 / 3600.0;
+                                        (time_per_issue_partial * created as i64) as f64 / 3600.0;
                                 }
 
                                 self.wizard_advance_github_session();
@@ -1433,13 +1438,16 @@ impl Tui {
                     }
                 }
             }
-            KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Esc => {
-                // Skip - cancel worklog creation
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                // Skip - cancel worklog creation, advance to next session
                 self.worklog_creation_confirmation = None;
                 logger::log("⏭️  Worklog creation skipped".to_string());
-
-                // If in wizard mode, advance to next session
                 self.wizard_advance_github_session();
+            }
+            KeyCode::Esc => {
+                // Cancel wizard
+                self.worklog_creation_confirmation = None;
+                self.wizard_cancel_confirmation = Some(WizardCancelConfirmation);
             }
             _ => {}
         }
@@ -1515,10 +1523,10 @@ impl Tui {
                         }
                     }
                 }
-                KeyCode::Esc => {
+                KeyCode::Char('s') | KeyCode::Char('S') => {
                     self.gap_fill_state = None;
 
-                    // If in wizard mode, skip gap filling and advance to review
+                    // Skip gap filling and advance to review
                     if let Some(wizard) = &mut self.wizard_state {
                         wizard.completed_steps.insert(5); // Step 5 complete (skipped)
                         logger::log(
@@ -1527,6 +1535,12 @@ impl Tui {
                         self.wizard_step_review();
                     } else {
                         logger::log("⏭️  Gap filling cancelled".to_string());
+                    }
+                }
+                KeyCode::Esc => {
+                    self.gap_fill_state = None;
+                    if self.wizard_state.is_some() {
+                        self.wizard_cancel_confirmation = Some(WizardCancelConfirmation);
                     }
                 }
                 KeyCode::Char(c) => {
@@ -1594,11 +1608,10 @@ impl Tui {
                     }
                 }
             }
-            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                // Cancel
+            KeyCode::Char('n') | KeyCode::Char('N') => {
+                // Skip gap filling, advance to review
                 self.gap_fill_confirmation = None;
 
-                // If in wizard, still advance but without filling gaps
                 if let Some(wizard) = &mut self.wizard_state {
                     wizard.completed_steps.insert(5); // Step 5 complete (skipped)
                     logger::log(
@@ -1607,6 +1620,13 @@ impl Tui {
                     self.wizard_step_review();
                 } else {
                     logger::log("⏭️  Gap filling cancelled".to_string());
+                }
+            }
+            KeyCode::Esc => {
+                // Cancel wizard
+                self.gap_fill_confirmation = None;
+                if self.wizard_state.is_some() {
+                    self.wizard_cancel_confirmation = Some(WizardCancelConfirmation);
                 }
             }
             _ => {}
