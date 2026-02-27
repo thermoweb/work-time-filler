@@ -2,12 +2,12 @@ use crate::tasks::google_tasks::GoogleEvent::{Absence, Meeting, Unknown};
 use crate::tasks::Task;
 use chrono::{DateTime, Utc};
 use google_calendar3::api::Event;
-use log::debug;
 use std::collections::HashMap;
 use std::error::Error;
 use wtf_lib::models::data::{Absence as AbsenceEntity, Attendee, Meeting as MeetingEntity};
 use wtf_lib::services::google_service::GoogleService;
 use wtf_lib::services::meetings_service::{AbsenceService, MeetingsService};
+use crate::debug;
 
 pub struct FetchGoogleCalendarTask {
     start: DateTime<Utc>,
@@ -187,11 +187,13 @@ fn from_google(event: Event) -> Option<wtf_lib::models::data::Meeting> {
                 .and_then(|a| a.response_status.clone())
         });
 
-        let attendees = event.attendees.map(|v| {
+        let attendees = event.attendees.clone().map(|v| {
             v.iter()
                 .map(|a| Attendee::from_google(a))
                 .collect::<Vec<Attendee>>()
         });
+
+        debug!("extended properties: {:?}", event.extended_properties);
 
         return Some(wtf_lib::models::data::Meeting {
             id: event.id.unwrap(),
@@ -204,6 +206,7 @@ fn from_google(event: Event) -> Option<wtf_lib::models::data::Meeting> {
             recurrence: event.recurrence,
             logs: HashMap::new(),
             my_response_status,
+            color_id: event.color_id,
         });
     }
     None

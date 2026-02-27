@@ -563,12 +563,14 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
         Ok(Some(GoogleConfig {
             credentials_path,
             token_cache_path,
+            color_labels: std::collections::HashMap::new(),
         }))
     } else {
         warn!("Remember to add credentials file before fetching meetings");
         Ok(Some(GoogleConfig {
             credentials_path,
             token_cache_path,
+            color_labels: std::collections::HashMap::new(),
         }))
     }
 }

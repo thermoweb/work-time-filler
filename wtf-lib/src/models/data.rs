@@ -146,6 +146,8 @@ pub struct Meeting {
     pub logs: HashMap<NaiveDate, String>,
     #[serde(default)]
     pub my_response_status: Option<String>,
+    #[serde(default)]
+    pub color_id: Option<String>,
 }
 
 impl Identifiable for Meeting {

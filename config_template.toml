@@ -13,3 +13,10 @@ api_token = "your_api_token"
 [google]
 credentials_path = "credentials.json"
 token_cache_path = "./wtf_token"
+
+# Optional: Map Google Calendar event colors to Jira issue keys.
+# When a meeting has the matching color, it will be auto-linked to that issue
+# at the highest priority (overrides any key found in the meeting title/description).
+# [google.color_labels]
+# Grape = "INTERNAL-42"
+# Lavender = "MYPROJECT-123"

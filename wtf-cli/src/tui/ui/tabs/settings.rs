@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Alignment, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
     Frame,
@@ -9,10 +9,26 @@ use ratatui::{
 use crate::tui::data::TuiData;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::build_shortcut_help;
-use wtf_lib::config::Config;
+use wtf_lib::config::{Config, GOOGLE_CALENDAR_EVENT_COLORS};
 
-/// Number of editable fields in the settings tab (indices 0..FIELD_COUNT-1)
-pub(in crate::tui) const FIELD_COUNT: usize = 8;
+/// Number of editable fields in the settings tab (indices 0..FIELD_COUNT-1).
+/// 0-7: standard fields, 8-18: Google Calendar color labels (11 colors)
+pub(in crate::tui) const FIELD_COUNT: usize = 19;
+
+/// Terminal display colors for the 11 Google Calendar event colors (same order as GOOGLE_CALENDAR_EVENT_COLORS).
+const GC_TERM_COLORS: [Color; 11] = [
+    Color::LightBlue,  // Lavender
+    Color::Green,      // Sage
+    Color::Magenta,    // Grape
+    Color::LightRed,   // Flamingo
+    Color::Yellow,     // Banana
+    Color::Red,        // Tangerine
+    Color::Cyan,       // Peacock
+    Color::DarkGray,   // Graphite
+    Color::Blue,       // Blueberry
+    Color::DarkGray,   // Basil (no exact dark-green, reuse DarkGray)
+    Color::Red,        // Tomato
+];
 
 /// Get the display value for a field from the config
 pub(in crate::tui) fn get_field_value(field_idx: usize, config: &Config) -> String {
@@ -41,6 +57,15 @@ pub(in crate::tui) fn get_field_value(field_idx: usize, config: &Config) -> Stri
             .map(|g| g.token_cache_path.clone())
             .unwrap_or_default(),
         7 => config.worklog.daily_hours_limit.to_string(),
+        8..=18 => {
+            let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 8];
+            config
+                .google
+                .as_ref()
+                .and_then(|g| g.color_labels.get(color_name))
+                .cloned()
+                .unwrap_or_default()
+        }
         _ => String::new(),
     }
 }
@@ -115,6 +140,47 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
                 Style::default().fg(theme().highlight),
             ),
             Span::styled(format!("{:<28}", label), label_style),
+            Span::styled(value_str, Style::default().fg(value_color)),
+        ]));
+    }
+
+    // Color labels section
+    lines.push(Line::from(vec![Span::styled(
+        " ── Calendar Color Labels ",
+        Style::default()
+            .fg(theme().highlight)
+            .add_modifier(Modifier::BOLD),
+    )]));
+    for (color_idx, color_name) in GOOGLE_CALENDAR_EVENT_COLORS.iter().enumerate() {
+        let field_idx = 8 + color_idx;
+        let is_selected = state.settings_selected_field == field_idx;
+        let indicator = if is_selected { theme().selector } else { theme().unselected_selector };
+
+        let value_str = if state.settings_editing && is_selected {
+            format!("{}_", state.settings_input_buffer)
+        } else {
+            let raw = get_field_value(field_idx, config);
+            if raw.is_empty() { "(not set)".to_string() } else { raw }
+        };
+
+        let value_color = if state.settings_editing && is_selected {
+            theme().info
+        } else if is_selected {
+            theme().fg_primary
+        } else {
+            theme().fg_secondary
+        };
+
+        let label_style = if is_selected {
+            Style::default().fg(theme().fg_primary).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(theme().fg_secondary)
+        };
+
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {}", indicator), Style::default().fg(theme().highlight)),
+            Span::styled("● ", Style::default().fg(GC_TERM_COLORS[color_idx])),
+            Span::styled(format!("{:<26}", color_name), label_style),
             Span::styled(value_str, Style::default().fg(value_color)),
         ]));
     }

@@ -7,6 +7,7 @@ use std::thread;
 use regex::Regex;
 
 use wtf_lib::client::jira_client::JiraClient;
+use wtf_lib::config::GOOGLE_CALENDAR_EVENT_COLORS;
 use wtf_lib::models::data::Issue;
 use wtf_lib::services::jira_service::{IssueService, JiraService};
 use wtf_lib::services::meetings_service::MeetingsService;
@@ -232,7 +233,31 @@ impl Tui {
         }
 
         for meeting in unlinked_meetings {
-            // Try to extract Jira issue key from title or description
+            // Priority 1: color_id mapped to a Jira key in config
+            if let Some(color_id) = &meeting.color_id {
+                if let Ok(idx) = color_id.parse::<usize>() {
+                    if idx >= 1 && idx <= 11 {
+                        let color_name = GOOGLE_CALENDAR_EVENT_COLORS[idx - 1];
+                        if let Some(jira_key) = self
+                            .data
+                            .config
+                            .google
+                            .as_ref()
+                            .and_then(|g| g.color_labels.get(color_name))
+                        {
+                            let key = jira_key.clone();
+                            if let Some(mut m) = MeetingsService::get_meeting_by_id(meeting.id.clone()) {
+                                m.jira_link = Some(key.clone());
+                                MeetingsService::save(&m);
+                                linked_count += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Priority 2: Jira key found in title or description
             let empty_string = String::new();
             let title = meeting.title.as_ref().unwrap_or(&empty_string);
             let description = meeting.description.as_ref().unwrap_or(&empty_string);

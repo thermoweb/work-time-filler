@@ -3,10 +3,18 @@ use config::{Config as ConfigLoader, File};
 use log::debug;
 use regex::Regex;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, fmt, fs};
+
+/// Google Calendar event color names, indexed by (colorId - 1).
+/// colorId "1" → "Lavender", "2" → "Sage", ..., "11" → "Tomato"
+pub const GOOGLE_CALENDAR_EVENT_COLORS: [&str; 11] = [
+    "Lavender", "Sage", "Grape", "Flamingo", "Banana",
+    "Tangerine", "Peacock", "Graphite", "Blueberry", "Basil", "Tomato",
+];
 
 fn get_config_path() -> PathBuf {
     if let Ok(custom_path) = env::var("WTF_CONFIG_HOME") {
@@ -56,6 +64,20 @@ pub struct GithubConfig {
 pub struct GoogleConfig {
     pub credentials_path: String,
     pub token_cache_path: String,
+    /// Maps Google Calendar color name (e.g. "Grape") to a Jira issue key (e.g. "INTERNAL-42").
+    /// Used as highest-priority auto-link source in meetings.
+    #[serde(default)]
+    pub color_labels: HashMap<String, String>,
+}
+
+impl Default for GoogleConfig {
+    fn default() -> Self {
+        Self {
+            credentials_path: String::new(),
+            token_cache_path: String::new(),
+            color_labels: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

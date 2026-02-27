@@ -155,6 +155,7 @@ impl Tui {
                 match status {
                     FetchStatus::Complete => {
                         self.refresh_data();
+                        self.auto_link_meetings();
                         self.fetch_receiver = None;
                         self.status_clear_time = Some(std::time::Instant::now());
                         self.event_bus.publish(AppEvent::FetchComplete(self.data.clone()));
@@ -1953,6 +1954,7 @@ impl Tui {
                     config.google = Some(GoogleConfig {
                         credentials_path: value,
                         token_cache_path: String::new(),
+                        color_labels: std::collections::HashMap::new(),
                     });
                 }
             }
@@ -1963,12 +1965,24 @@ impl Tui {
                     config.google = Some(GoogleConfig {
                         credentials_path: String::new(),
                         token_cache_path: value,
+                        color_labels: std::collections::HashMap::new(),
                     });
                 }
             }
             7 => {
                 if let Ok(hours) = value.parse::<f64>() {
                     config.worklog.daily_hours_limit = hours;
+                }
+            }
+            8..=18 => {
+                use wtf_lib::config::GOOGLE_CALENDAR_EVENT_COLORS;
+                let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 8].to_string();
+                if let Some(ref mut g) = config.google {
+                    if value.is_empty() {
+                        g.color_labels.remove(&color_name);
+                    } else {
+                        g.color_labels.insert(color_name, value);
+                    }
                 }
             }
             _ => {}
