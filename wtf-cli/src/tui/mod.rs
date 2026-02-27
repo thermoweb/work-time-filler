@@ -66,6 +66,14 @@ impl Tui {
         event_bus.subscribe(Box::new(AchievementTracker));
 
 
+        // Spawn async version check — result arrives via channel
+        let (update_sender, update_receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let result = rt.block_on(wtf_lib::utils::version::check_latest_version());
+            let _ = update_sender.send(result);
+        });
+
         Self {
             data: TuiData::collect(),
             current_tab: Tab::Sprints,
@@ -88,6 +96,7 @@ impl Tui {
             push_receiver: None,
             push_progress_receiver: None,
             data_refresh_receiver: None,
+            update_receiver: Some(update_receiver),
             status_clear_time: None,
             should_quit: false,
             log_collector,
@@ -128,6 +137,7 @@ impl Tui {
         self.handle_revert_completion();
         self.handle_push_operations();
         self.handle_data_refresh();
+        self.handle_update_check();
         self.check_and_clear_status_timer();
         self.wizard_update_animation();
         
@@ -233,6 +243,20 @@ impl Tui {
                 self.data = new_data.clone();
                 self.data_refresh_receiver = None;
                 self.event_bus.publish(AppEvent::DataRefreshed(new_data));
+            }
+        }
+    }
+
+    fn handle_update_check(&mut self) {
+        if let Some(receiver) = &self.update_receiver {
+            if let Ok(result) = receiver.try_recv() {
+                self.update_receiver = None;
+                if let Some(tag) = result {
+                    log::info!(
+                        "New version {} available! Update with: cargo install --git https://github.com/thermoweb/work-time-filler --locked wtf-cli --force",
+                        tag
+                    );
+                }
             }
         }
     }
