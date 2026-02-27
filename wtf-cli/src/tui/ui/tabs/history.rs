@@ -228,7 +228,7 @@ fn render_revert_preview(
     use std::collections::HashMap;
 
     let block = Block::default()
-        .title("!! Revert Preview")
+        .title("⚠  Revert Preview")
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::Red).bg(theme().bg_primary));
 

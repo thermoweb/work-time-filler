@@ -261,7 +261,7 @@ fn render_daily_summary(frame: &mut Frame, area: &Rect, data: &TuiData) {
         let total_hours = staged_hours + pushed_hours;
 
         // Warn if total exceeds 10h (with Chronie's wisdom!)
-        let warning_icon = if total_hours > 10.0 { " ⚠️ " } else { "" };
+        let warning_icon = if total_hours > 10.0 { " ⚠ " } else { "" };
         let date_color = if total_hours > 10.0 {
             Color::Red
         } else {
@@ -270,7 +270,7 @@ fn render_daily_summary(frame: &mut Frame, area: &Rect, data: &TuiData) {
 
         // Add Chronie warning to logs for overwork (once per day that exceeds limit)
         if total_hours > 12.0 && !logged_overwork_dates.contains(date) {
-            crate::tui::log_chronie_message("overwork", "⚠️");
+            crate::tui::log_chronie_message("overwork", "⚠");
             logged_overwork_dates.insert(**date);
         }
 
@@ -339,7 +339,7 @@ fn render_daily_summary(frame: &mut Frame, area: &Rect, data: &TuiData) {
         Span::raw(" = total for the day"),
     ]));
     lines.push(Line::from(vec![
-        Span::styled("  ⚠️ ", Style::default().fg(Color::Red)),
+        Span::styled("  ⚠ ", Style::default().fg(Color::Red)),
         Span::raw(" = exceeds 10h"),
     ]));
 
@@ -514,7 +514,7 @@ fn render_worklog_details(
 
     // Otherwise, show individual worklog details as before (full panel)
     let block = Block::default()
-        .title("Details")
+        .title("📋 Details")
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::Cyan).bg(theme().bg_primary));
 

@@ -76,7 +76,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
     
     // Main frame
     let block = Block::default()
-        .title(" Achievements ")
+        .title("🏆 Achievements")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));

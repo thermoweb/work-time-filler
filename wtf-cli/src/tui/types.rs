@@ -216,6 +216,7 @@ pub struct Tui {
     pub(super) update_receiver: Option<Receiver<Option<String>>>,
     
     pub(super) status_clear_time: Option<std::time::Instant>,
+    pub(super) needs_full_clear: bool,
     pub(super) should_quit: bool,
     pub(super) log_collector: std::sync::Arc<crate::logger::CollectingLogger>,
 }
