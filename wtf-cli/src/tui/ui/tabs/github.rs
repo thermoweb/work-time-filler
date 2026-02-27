@@ -143,7 +143,7 @@ fn render_github_sessions_list(
     // Build help text
     let shortcuts = build_shortcut_help(&[("C", " Create Worklog"), ("↑↓", " Navigate")]);
     let mut title_spans = vec![
-        Span::raw("GitHub Sessions ("),
+        Span::raw("💻 GitHub Sessions ("),
         Span::raw(sessions.len().to_string()),
         Span::raw(") | "),
     ];
@@ -176,7 +176,7 @@ fn render_github_session_details(
         let paragraph = Paragraph::new("No session selected")
             .block(
                 Block::default()
-                    .title("Session Details")
+                    .title("💻 Session Details")
                     .borders(Borders::ALL)
                     .border_style(Style::default().fg(theme().border)),
             )
@@ -324,11 +324,10 @@ fn render_github_session_details(
     let paragraph = Paragraph::new(lines)
         .block(
             Block::default()
-                .title("Session Details")
+                .title("💻 Session Details")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(theme().border)),
         )
         .style(Style::default().bg(theme().bg_primary));
-
     frame.render_widget(paragraph, *area);
 }

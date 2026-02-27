@@ -331,7 +331,7 @@ fn render_sprint_details_with_activity(
 
 fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: &TuiData) {
     let block = Block::default()
-        .title("Sprint Details")
+        .title("🏃 Sprint Details")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));

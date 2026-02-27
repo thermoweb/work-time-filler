@@ -218,7 +218,7 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
         ])
     };
 
-    let mut title_spans = vec![Span::raw("Settings | ")];
+    let mut title_spans = vec![Span::raw("⚙ Settings | ")];
     title_spans.extend(shortcuts);
 
     let block = Block::default()

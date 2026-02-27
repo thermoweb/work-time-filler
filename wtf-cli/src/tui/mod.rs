@@ -98,6 +98,7 @@ impl Tui {
             data_refresh_receiver: None,
             update_receiver: Some(update_receiver),
             status_clear_time: None,
+            needs_full_clear: false,
             should_quit: false,
             log_collector,
         }
@@ -286,6 +287,10 @@ impl Tui {
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     ) -> io::Result<()> {
         loop {
+            if self.needs_full_clear {
+                terminal.clear()?;
+                self.needs_full_clear = false;
+            }
             let logs = self.log_collector.get_messages();
             terminal.draw(|f| ui::render(f, self, &logs))?;
 
@@ -294,10 +299,14 @@ impl Tui {
 
             // Poll for keyboard events
             if event::poll(Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
+                match event::read()? {
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
                         self.handle_key(key);
                     }
+                    Event::Resize(_, _) => {
+                        terminal.clear()?;
+                    }
+                    _ => {}
                 }
             }
 
@@ -543,33 +552,42 @@ impl Tui {
             KeyCode::Tab => {
                 let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
                 self.current_tab = self.current_tab.next(has_achievements);
+                self.needs_full_clear = true;
             }
             KeyCode::BackTab => {
                 let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
                 self.current_tab = self.current_tab.previous(has_achievements);
+                self.needs_full_clear = true;
             }
             KeyCode::Char('1') => {
                 self.current_tab = Tab::Sprints;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('2') => {
                 self.current_tab = Tab::Meetings;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('3') => {
                 self.current_tab = Tab::Worklogs;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('4') => {
                 self.current_tab = Tab::GitHub;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('5') => {
                 self.current_tab = Tab::History;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('6') => {
                 self.current_tab = Tab::Settings;
+                self.needs_full_clear = true;
             }
             KeyCode::Char('7') => {
                 // Only allow switching to Achievements if user has unlocked at least one
                 if wtf_lib::services::AchievementService::has_any_unlocked() {
                     self.current_tab = Tab::Achievements;
+                    self.needs_full_clear = true;
                 }
             }
             // Tab-specific navigation and actions
