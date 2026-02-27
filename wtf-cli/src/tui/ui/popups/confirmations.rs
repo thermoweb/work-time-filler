@@ -419,9 +419,7 @@ pub(in crate::tui) fn render_worklog_creation_confirmation(
                 " [S] ",
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ),
-            Span::raw("Skip     - Don't create this worklog  "),
-            Span::styled("[Esc]", Style::default().fg(Color::DarkGray)),
-            Span::raw(" also skips"),
+            Span::raw("Skip     - Don't create this worklog"),
         ]),
         Line::from(""),
         Line::from(vec![
@@ -549,12 +547,12 @@ pub(in crate::tui) fn render_gap_fill_confirmation(frame: &mut Frame, state: &Ga
             "[N]",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         ),
-        Span::raw(" or "),
+        Span::raw(" to skip, "),
         Span::styled(
             "[Esc]",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
         ),
-        Span::raw(" to cancel"),
+        Span::raw(" to cancel wizard"),
     ]));
 
     let block = Block::default()

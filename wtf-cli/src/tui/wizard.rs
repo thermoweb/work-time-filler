@@ -314,12 +314,15 @@ impl Tui {
             duration_seconds
         };
 
-        let requested_hours = time_per_issue as f64 / 3600.0;
+        // Use total session hours for the daily limit check (not per-issue hours).
+        // With multiple issues, time_per_issue * count = duration_seconds, so the
+        // check must use the full session duration to avoid underestimating the total.
+        let total_requested_hours = duration_seconds as f64 / 3600.0;
         let session_date = session.start_time.date_naive();
         let existing_hours = LocalWorklogService::calculate_daily_total(session_date);
 
         // Check if this would exceed daily limit
-        if existing_hours + requested_hours > self.data.daily_hours_limit {
+        if existing_hours + total_requested_hours > self.data.daily_hours_limit {
             // Show confirmation popup
             let first_issue = jira_issues
                 .first()
@@ -337,7 +340,7 @@ impl Tui {
                 },
                 issue_id: first_issue,
                 date: session_date,
-                requested_hours,
+                requested_hours: total_requested_hours,
                 existing_hours,
                 daily_limit: self.data.daily_hours_limit,
                 user_input: String::new(),
