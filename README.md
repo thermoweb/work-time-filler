@@ -32,7 +32,8 @@ A powerful TUI (Terminal User Interface) for managing Jira worklogs, integrating
 ```bash
 cargo install --git https://github.com/thermoweb/work-time-filler.git --locked wtf-cli
 ```
-
+> ⚠️ In case of error related to openssl, consider installing libssl-dev packages: `sudo apt-get install pkg-config libssl-dev`
+> 
 This clones the repo, builds, and installs the `wtf` command in one step!
 
 **Option 2: Clone and install**
@@ -167,6 +168,8 @@ daily_hours_limit = 8.0
 2. Create a project and enable Google Calendar API
 3. Create OAuth 2.0 credentials (Desktop app)
 4. Download as `google_credentials.json`
+
+Note that for this credentials, if it's not in "production" mode, you have to add users to it in order to make it work.
 
 📘 **For Teams:** See [Google OAuth Setup Guide](doc/GOOGLE_OAUTH_SETUP.md) for detailed instructions on sharing OAuth credentials with team members.
 
