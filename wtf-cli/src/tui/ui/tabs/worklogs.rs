@@ -121,11 +121,11 @@ fn render_worklogs_list(
     for (idx, worklog) in visible_worklogs {
         let is_selected = idx == selected_index;
 
-        // Status indicator - using consistent size characters
+        // Status indicator
         let (status_icon, status_color) = match worklog.status {
-            LocalWorklogState::Staged => ("●", Color::Yellow), // Filled circle
-            LocalWorklogState::Pushed => ("✓", Color::Green),  // Checkmark
-            LocalWorklogState::Created => ("○", Color::Gray),  // Hollow circle
+            LocalWorklogState::Staged => ("●", Color::Yellow),
+            LocalWorklogState::Pushed => ("✓", Color::Green),
+            LocalWorklogState::Created => ("○", Color::Gray),
         };
 
         let date_str = format!(
@@ -141,14 +141,12 @@ fn render_worklogs_list(
         );
         let hours = worklog.time_spent_seconds as f64 / 3600.0;
 
-        // Get issue title if available
         let issue_title = data
             .issues_by_key
             .get(&worklog.issue_id)
             .map(|issue| truncate_string(&issue.summary, 40))
             .unwrap_or_else(|| String::from(""));
 
-        // Single line: status, date, time, issue, title, hours
         let line = Line::from(vec![
             Span::styled(
                 if is_selected { theme().selector } else { theme().unselected_selector },

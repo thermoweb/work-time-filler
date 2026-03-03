@@ -1541,10 +1541,10 @@ impl Tui {
                         }
                     }
                 }
-                KeyCode::Char('s') | KeyCode::Char('S') => {
+                KeyCode::Esc => {
                     self.gap_fill_state = None;
 
-                    // Skip gap filling and advance to review
+                    // Esc skips gap filling; use wizard cancel from other steps to abort entirely
                     if let Some(wizard) = &mut self.wizard_state {
                         wizard.completed_steps.insert(5); // Step 5 complete (skipped)
                         logger::log(
@@ -1553,12 +1553,6 @@ impl Tui {
                         self.wizard_step_review();
                     } else {
                         logger::log("⏭️  Gap filling cancelled".to_string());
-                    }
-                }
-                KeyCode::Esc => {
-                    self.gap_fill_state = None;
-                    if self.wizard_state.is_some() {
-                        self.wizard_cancel_confirmation = Some(WizardCancelConfirmation);
                     }
                 }
                 KeyCode::Char(c) => {
@@ -1796,11 +1790,25 @@ impl Tui {
             return;
         }
 
-        // Normal navigation
-        let max_index = if self.data.worklog_history.is_empty() {
+        // Normal navigation — compute sprint entry info using owned values to avoid borrow conflicts
+        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (usize, Vec<String>, Vec<Vec<wtf_lib::models::data::Worklog>>) = {
+            use crate::tui::ui::tabs::history::{jira_only_by_sprint, JIRA_ONLY_VIRTUAL_PREFIX};
+            let entries = jira_only_by_sprint(&self.data);
+            let count = entries.len();
+            let ids: Vec<String> = entries.iter()
+                .map(|(s, _)| format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, s.id))
+                .collect();
+            let wls: Vec<Vec<wtf_lib::models::data::Worklog>> = entries.iter()
+                .map(|(_, wls)| wls.iter().map(|w| (*w).clone()).collect())
+                .collect();
+            (count, ids, wls)
+        };
+        let has_jira_only = jira_only_count > 0;
+
+        let max_index = if self.data.worklog_history.is_empty() && !has_jira_only {
             0
         } else {
-            self.data.worklog_history.len() - 1
+            self.data.worklog_history.len() + jira_only_count - 1
         };
 
         // Handle standard navigation keys first
@@ -1809,22 +1817,41 @@ impl Tui {
         }
 
         // Handle history-specific keys
+        let virtual_entry_idx = self.data.worklog_history.len();
+        let on_virtual_entry = has_jira_only
+            && self.data.ui_state.selected_history_index >= virtual_entry_idx;
+        let virtual_sprint_i = self.data.ui_state.selected_history_index.saturating_sub(virtual_entry_idx);
+        let virtual_id = virtual_ids.get(virtual_sprint_i).cloned();
+
         match key.code {
             KeyCode::Left | KeyCode::Char('h') => {
-                // Collapse current item if expanded
-                if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                if on_virtual_entry {
+                    if let Some(vid) = &virtual_id {
+                        self.data.ui_state.expanded_history_ids.remove(vid);
+                    }
+                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
                     self.data.ui_state.expanded_history_ids.remove(&history.id);
                 }
             }
             KeyCode::Right | KeyCode::Char('l') => {
-                // Expand current item
-                if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                if on_virtual_entry {
+                    if let Some(vid) = virtual_id {
+                        self.data.ui_state.expanded_history_ids.insert(vid);
+                    }
+                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
                     self.data.ui_state.expanded_history_ids.insert(history.id.clone());
                 }
             }
             KeyCode::Enter => {
-                // Toggle expand/collapse
-                if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                if on_virtual_entry {
+                    if let Some(vid) = virtual_id {
+                        if self.data.ui_state.expanded_history_ids.contains(&vid) {
+                            self.data.ui_state.expanded_history_ids.remove(&vid);
+                        } else {
+                            self.data.ui_state.expanded_history_ids.insert(vid);
+                        }
+                    }
+                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
                     if self.data.ui_state.expanded_history_ids.contains(&history.id) {
                         self.data.ui_state.expanded_history_ids.remove(&history.id);
                     } else {
@@ -1833,33 +1860,52 @@ impl Tui {
                 }
             }
             KeyCode::Delete => {
-                // Show revert confirmation (reverts in Jira)
-                if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
-                    self.revert_confirmation_state = Some(RevertConfirmationState {
-                        history_id: history.id.clone(),
-                        user_input: String::new(),
-                        reverting: false,
-                    });
+                // Show revert confirmation (reverts in Jira) — not available for virtual entry
+                if !on_virtual_entry {
+                    if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                        self.revert_confirmation_state = Some(RevertConfirmationState {
+                            history_id: history.id.clone(),
+                            user_input: String::new(),
+                            reverting: false,
+                        });
+                    }
                 }
             }
             KeyCode::Char('D') => {
                 // Delete history from DB without Jira revert (Shift+D)
-                if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
-                    match LocalWorklogService::delete_history_from_db(&history.id) {
-                        Ok(()) => {
-                            logger::log(format!("🗑️ Deleted history entry from database (worklogs remain in Jira)"));
-                            self.refresh_data();
-                        }
-                        Err(e) => {
-                            logger::log(format!("❌ Failed to delete history: {}", e));
+                if !on_virtual_entry {
+                    if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                        match LocalWorklogService::delete_history_from_db(&history.id) {
+                            Ok(()) => {
+                                logger::log(format!("🗑️ Deleted history entry from database (worklogs remain in Jira)"));
+                                self.refresh_data();
+                            }
+                            Err(e) => {
+                                logger::log(format!("❌ Failed to delete history: {}", e));
+                            }
                         }
                     }
                 }
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
-                // Create history for pushed worklogs without history (recovery function)
-                LocalWorklogService::create_history_for_pushed_worklogs();
-                logger::log("📝 Created recovery history for unhistorized pushed worklogs".to_string());
+                if on_virtual_entry {
+                    // Import only this sprint's untracked Jira worklogs as a new local history entry
+                    if let Some(sprint_wls) = sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i) {
+                        let count = LocalWorklogService::create_history_for_jira_only_worklogs(&sprint_wls);
+                        if count > 0 {
+                            logger::log(format!(
+                                "☁ Imported {} Jira worklog(s) into a new history entry",
+                                count
+                            ));
+                        } else {
+                            logger::log("ℹ️  No untracked Jira worklogs to import".to_string());
+                        }
+                    }
+                } else {
+                    // Create history for pushed local worklogs without history (recovery function)
+                    LocalWorklogService::create_history_for_pushed_worklogs();
+                    logger::log("📝 Created recovery history for unhistorized pushed worklogs".to_string());
+                }
                 self.refresh_data();
             }
             KeyCode::PageUp => {

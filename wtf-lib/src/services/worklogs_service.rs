@@ -168,6 +168,61 @@ impl LocalWorklogService {
         );
     }
 
+    /// Import Jira worklogs that have no local counterpart, save them as Pushed LocalWorklogs,
+    /// and group them into a single new history entry so they can be reverted later.
+    /// Returns the number of imported worklogs.
+    pub fn create_history_for_jira_only_worklogs(jira_worklogs: &[Worklog]) -> usize {
+        let local_worklogs = Self::get_all_local_worklogs();
+        let tracked_jira_ids: std::collections::HashSet<String> = local_worklogs
+            .iter()
+            .filter_map(|w| w.worklog_id.clone())
+            .collect();
+
+        let jira_only: Vec<&Worklog> = jira_worklogs
+            .iter()
+            .filter(|w| !tracked_jira_ids.contains(&w.id))
+            .collect();
+
+        if jira_only.is_empty() {
+            debug!("No untracked Jira worklogs to import");
+            return 0;
+        }
+
+        let mut new_ids = Vec::new();
+        for jira_wl in &jira_only {
+            let local_id = Self::generate_md5_id(&jira_wl.issue_id, jira_wl.started);
+            let local_wl = LocalWorklog {
+                id: local_id.clone(),
+                comment: jira_wl
+                    .comment
+                    .clone()
+                    .unwrap_or_else(|| "wtf[jira-import]".to_string()),
+                time_spent_seconds: jira_wl.time_spent_seconds as i64,
+                issue_id: jira_wl.issue_id.clone(),
+                status: LocalWorklogState::Pushed,
+                started: jira_wl.started,
+                meeting_id: None,
+                worklog_id: Some(jira_wl.id.clone()),
+            };
+            if let Err(e) = LOCAL_WORKLOGS_DB.insert(&local_wl) {
+                error!(
+                    "Failed to save imported Jira worklog '{}': {}",
+                    local_wl.id, e
+                );
+            } else {
+                new_ids.push(local_id);
+            }
+        }
+
+        if new_ids.is_empty() {
+            return 0;
+        }
+        let count = new_ids.len();
+        Self::historize(new_ids);
+        debug!("Imported {} Jira-only worklogs into a new history entry", count);
+        count
+    }
+
     pub fn create_new_local_worklogs(
         started: DateTime<Utc>,
         time_spent_seconds: i64,

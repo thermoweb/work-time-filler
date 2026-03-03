@@ -72,6 +72,8 @@ pub struct TuiData {
     pub all_sprints: Vec<Sprint>,
     pub all_meetings: Vec<Meeting>,
     pub all_worklogs: Vec<LocalWorklog>,
+    /// Worklogs synced from Jira (used to surface entries not tracked locally)
+    pub jira_worklogs: Vec<wtf_lib::models::data::Worklog>,
     pub worklog_history: Vec<LocalWorklogHistory>,
     pub github_sessions: Vec<GitHubSession>,
     pub issues_by_key: HashMap<String, Issue>,
@@ -100,6 +102,7 @@ impl TuiData {
         let github_sessions = Self::get_github_sessions_for_sprints(&sprints);
 
         let all_worklogs = LocalWorklogService::get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::get_all_worklogs();
         let worklog_history = LocalWorklogService::get_history();
 
         // Build issue lookup map
@@ -117,6 +120,7 @@ impl TuiData {
             all_sprints: sprints,
             all_meetings,
             all_worklogs,
+            jira_worklogs,
             worklog_history,
             github_sessions,
             issues_by_key,

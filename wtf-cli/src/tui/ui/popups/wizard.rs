@@ -347,19 +347,12 @@ pub(in crate::tui) fn render_wizard(
                     ),
                     Span::raw(" Select  "),
                     Span::styled(
-                        "[S]",
+                        "[Esc]",
                         Style::default()
                             .fg(Color::Yellow)
                             .add_modifier(Modifier::BOLD),
                     ),
-                    Span::raw(" Skip  "),
-                    Span::styled(
-                        "[Esc]",
-                        Style::default()
-                            .fg(Color::Red)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(" Cancel"),
+                    Span::raw(" Skip"),
                 ]));
             } else {
                 lines.push(Line::from("🔧 Preparing gap fill..."));
