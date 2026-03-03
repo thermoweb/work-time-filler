@@ -254,10 +254,10 @@ impl Tui {
             if let Ok(result) = receiver.try_recv() {
                 self.update_receiver = None;
                 if let Some(tag) = result {
-                    log::info!(
-                        "New version {} available! Update with: cargo install --git https://github.com/thermoweb/work-time-filler --locked wtf-cli --force",
+                    logger::log(format!(
+                        "🆕 New version {} available! Update: cargo install --git https://github.com/thermoweb/work-time-filler --locked wtf-cli --force",
                         tag
-                    );
+                    ));
                 }
             }
         }
