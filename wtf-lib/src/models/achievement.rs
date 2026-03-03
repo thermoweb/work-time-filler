@@ -21,6 +21,10 @@ pub enum Achievement {
     AutoLinkMaster,
     /// Log time for a meeting you declined
     DeclinedButLogged,
+    /// Push a worklog started after 10pm or before 6am
+    NightOwl,
+    /// Cover 90%+ of working days in a full calendar quarter
+    QuarterCrunch,
 }
 
 impl Achievement {
@@ -35,6 +39,8 @@ impl Achievement {
             Achievement::GitSquashMaster,
             Achievement::AutoLinkMaster,
             Achievement::DeclinedButLogged,
+            Achievement::NightOwl,
+            Achievement::QuarterCrunch,
         ]
     }
 
@@ -79,11 +85,11 @@ impl Achievement {
             },
             Achievement::GitSquashMaster => AchievementMeta {
                 id: *self,
-                name: "Git Squash Master",
-                description: "Push worklogs 3+ times for the same day",
+                name: "Squash? Never Heard of It",
+                description: "Push worklogs for the same day 3+ separate times",
                 icon: "📚",
                 category: AchievementCategory::Meta,
-                chronie_message: "Perfectionist, are we? Even time travelers need multiple takes! 📚",
+                chronie_message: "Three pushes for the same day? Someone needs to learn about squashing! 📚",
             },
             Achievement::AutoLinkMaster => AchievementMeta {
                 id: *self,
@@ -100,6 +106,22 @@ impl Achievement {
                 icon: "🙅",
                 category: AchievementCategory::Ironic,
                 chronie_message: "Declined the meeting but worked on it anyway? That's dedication... or poor planning! 🙅",
+            },
+            Achievement::NightOwl => AchievementMeta {
+                id: *self,
+                name: "Night Owl",
+                description: "Push worklogs after 10pm or before 6am",
+                icon: "🌙",
+                category: AchievementCategory::Ironic,
+                chronie_message: "Logging work at this hour? Even time anomalies need sleep! 🌙",
+            },
+            Achievement::QuarterCrunch => AchievementMeta {
+                id: *self,
+                name: "Quarter Crunch",
+                description: "Cover 90%+ of working days in a full calendar quarter",
+                icon: "📊",
+                category: AchievementCategory::Consistency,
+                chronie_message: "A whole quarter with barely a gap? You're a time-logging machine! 📊",
             },
         }
     }
@@ -151,6 +173,8 @@ impl Achievement {
             Achievement::GitSquashMaster => "git_squash_master".to_string(),
             Achievement::AutoLinkMaster => "auto_link_master".to_string(),
             Achievement::DeclinedButLogged => "declined_but_logged".to_string(),
+            Achievement::NightOwl => "night_owl".to_string(),
+            Achievement::QuarterCrunch => "quarter_crunch".to_string(),
         }
     }
 }

@@ -240,7 +240,7 @@ pub(in crate::tui) fn render_about_popup(
                 .add_modifier(Modifier::BOLD),
         )]),
         Line::from(vec![Span::styled(
-            "Version 0.1.0",
+            concat!("Version ", env!("CARGO_PKG_VERSION")),
             Style::default().fg(Color::DarkGray),
         )]),
         Line::from(""),

@@ -33,6 +33,16 @@ impl AchievementTracker {
                 if Self::has_declined_meeting_worklog(history_id, tui) {
                     candidates.push(Achievement::DeclinedButLogged);
                 }
+
+                // Night Owl: Check if the push is happening after 10pm or before 6am
+                if Self::has_night_worklog() {
+                    candidates.push(Achievement::NightOwl);
+                }
+
+                // Quarter Crunch: Check if any full calendar quarter now has ≥90% working days covered
+                if Self::completes_quarter_crunch() {
+                    candidates.push(Achievement::QuarterCrunch);
+                }
             }
             AppEvent::RevertComplete => {
                 // The Undoer: First time reverting
@@ -89,24 +99,88 @@ impl AchievementTracker {
     /// Check if the specified push contains 3+ worklogs for the same day
     fn has_multiple_pushes_same_day(history_id: &str) -> bool {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
-        use std::collections::HashMap;
-        
-        // Get the specific history entry directly by ID
-        if let Some(entry) = LocalWorklogService::get_history_by_id(history_id) {
-            // Count how many worklogs per date in THIS push
-            let mut date_counts: HashMap<chrono::NaiveDate, usize> = HashMap::new();
-            
-            for worklog_id in &entry.local_worklogs_id {
-                if let Some(worklog) = LocalWorklogService::get_local_worklog_by_id(worklog_id) {
-                    *date_counts.entry(worklog.started.date_naive()).or_insert(0) += 1;
+        use std::collections::{HashMap, HashSet};
+
+        // Get the dates covered by THIS push
+        let current_entry = match LocalWorklogService::get_history_by_id(history_id) {
+            Some(e) => e,
+            None => return false,
+        };
+        let current_dates: HashSet<chrono::NaiveDate> = current_entry
+            .local_worklogs_id
+            .iter()
+            .filter_map(|wid| LocalWorklogService::get_local_worklog_by_id(wid))
+            .map(|wl| wl.started.date_naive())
+            .collect();
+
+        if current_dates.is_empty() {
+            return false;
+        }
+
+        // Count how many history entries (pushes) cover each date across all history
+        let all_history = LocalWorklogService::get_history();
+        let mut push_counts: HashMap<chrono::NaiveDate, usize> = HashMap::new();
+
+        for entry in &all_history {
+            let dates: HashSet<chrono::NaiveDate> = entry
+                .local_worklogs_id
+                .iter()
+                .filter_map(|wid| LocalWorklogService::get_local_worklog_by_id(wid))
+                .map(|wl| wl.started.date_naive())
+                .collect();
+            for date in dates {
+                *push_counts.entry(date).or_insert(0) += 1;
+            }
+        }
+
+        // Achievement triggers if any date covered by the current push has been pushed 3+ times
+        current_dates.iter().any(|d| push_counts.get(d).copied().unwrap_or(0) >= 3)
+    }
+
+    /// Check if the push is happening after 10pm or before 6am (local time)
+    fn has_night_worklog() -> bool {
+        use chrono::Timelike;
+        let hour = chrono::Local::now().hour();
+        hour >= 22 || hour < 6
+    }
+
+    /// Check if any full calendar quarter has ≥90% of its Mon–Fri days covered by pushed worklogs
+    fn completes_quarter_crunch() -> bool {
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+        use chrono::{Datelike, NaiveDate, Weekday};
+        use std::collections::HashSet;
+
+        // Collect all dates that have at least one pushed worklog
+        let logged_dates: HashSet<NaiveDate> = LocalWorklogService::get_all_local_worklogs()
+            .into_iter()
+            .filter(|w| w.status == wtf_lib::models::data::LocalWorklogState::Pushed)
+            .map(|w| w.started.date_naive())
+            .collect();
+
+        if logged_dates.is_empty() {
+            return false;
+        }
+
+        // Check each of the four calendar quarters in years we have data for
+        let years: HashSet<i32> = logged_dates.iter().map(|d| d.year()).collect();
+        for year in years {
+            for quarter in 1u32..=4 {
+                let (q_start, q_end) = quarter_bounds(year, quarter);
+                let workdays: Vec<NaiveDate> = (0..)
+                    .map(|i| q_start + chrono::Duration::days(i))
+                    .take_while(|d| *d <= q_end)
+                    .filter(|d| !matches!(d.weekday(), Weekday::Sat | Weekday::Sun))
+                    .collect();
+                if workdays.is_empty() {
+                    continue;
+                }
+                let covered = workdays.iter().filter(|d| logged_dates.contains(d)).count();
+                if covered * 100 / workdays.len() >= 90 {
+                    return true;
                 }
             }
-            
-            // Check if any date has 3+ worklogs in this push
-            date_counts.values().any(|&count| count >= 3)
-        } else {
-            false
         }
+        false
     }
     
     /// Check if user has 10+ meetings and all are auto-linked (no unlinked meetings)
@@ -180,4 +254,18 @@ impl EventSubscriber for AchievementTracker {
             }
         }
     }
+}
+
+fn quarter_bounds(year: i32, quarter: u32) -> (chrono::NaiveDate, chrono::NaiveDate) {
+    use chrono::{Datelike, NaiveDate};
+    let start_month = (quarter - 1) * 3 + 1;
+    let start = NaiveDate::from_ymd_opt(year, start_month, 1).unwrap();
+    let end = if quarter == 4 {
+        NaiveDate::from_ymd_opt(year, 12, 31).unwrap()
+    } else {
+        let next_q_start = NaiveDate::from_ymd_opt(year, start_month + 3, 1).unwrap();
+        next_q_start.pred_opt().unwrap()
+    };
+    let _ = end.year(); // use Datelike to suppress unused import warning
+    (start, end)
 }
