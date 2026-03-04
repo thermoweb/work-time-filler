@@ -64,12 +64,12 @@ impl Tui {
         let mut linked_count = 0;
 
         if let Some(wizard) = &mut self.wizard_state {
-            // Get all unlinked meetings
+            // Get all unlinked, non-untracked meetings
             let unlinked_meetings: Vec<_> = self
                 .data
                 .all_meetings
                 .iter()
-                .filter(|m| m.jira_link.is_none())
+                .filter(|m| m.jira_link.is_none() && !wtf_lib::utils::meetings::is_untracked(m, &self.data.config, &self.data.untracked_meeting_ids))
                 .collect();
 
             for meeting in unlinked_meetings {
@@ -122,12 +122,12 @@ impl Tui {
         // Refresh data to see the newly linked meetings
         self.refresh_data();
 
-        // Get unlinked meetings for manual linking step
+        // Get unlinked, non-untracked meetings for manual linking step
         let unlinked_meetings: Vec<_> = self
             .data
             .all_meetings
             .iter()
-            .filter(|m| m.jira_link.is_none())
+            .filter(|m| m.jira_link.is_none() && !wtf_lib::utils::meetings::is_untracked(m, &self.data.config, &self.data.untracked_meeting_ids))
             .cloned()
             .collect();
 

@@ -5,6 +5,7 @@ use crate::tasks::jira_tasks::{
 };
 use crate::tasks::Task;
 use async_trait::async_trait;
+use chrono::{TimeZone, Utc};
 use clap::{Arg, ArgMatches, Command as ClapCommand};
 use indicatif::MultiProgress;
 use log::{debug, info};
@@ -113,6 +114,9 @@ pub async fn fetch_google_meetings(multi_progress: Option<MultiProgress>) -> Res
     let max_date = sprints.iter().filter_map(|s| s.end).max();
 
     if let (Some(min), Some(max)) = (min_date, max_date) {
+        // Expand to full UTC days so meetings at the start/end of sprint day are not missed
+        let min = Utc.from_utc_datetime(&min.date_naive().and_hms_opt(0, 0, 0).unwrap());
+        let max = Utc.from_utc_datetime(&max.date_naive().and_hms_opt(23, 59, 59).unwrap());
         if let Some(mp) = &multi_progress {
             mp.println(format!(
                 "Fetching Google Calendar events from {} to {}...",

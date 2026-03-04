@@ -71,6 +71,7 @@ impl Default for TabUiState {
 pub struct TuiData {
     pub all_sprints: Vec<Sprint>,
     pub all_meetings: Vec<Meeting>,
+    pub untracked_meeting_ids: std::collections::HashSet<String>,
     pub all_worklogs: Vec<LocalWorklog>,
     /// Worklogs synced from Jira (used to surface entries not tracked locally)
     pub jira_worklogs: Vec<wtf_lib::models::data::Worklog>,
@@ -104,6 +105,7 @@ impl TuiData {
         let all_worklogs = LocalWorklogService::get_all_local_worklogs();
         let jira_worklogs = WorklogsService::get_all_worklogs();
         let worklog_history = LocalWorklogService::get_history();
+        let untracked_meeting_ids = MeetingsService::get_all_untracked_ids();
 
         // Build issue lookup map
         let all_issues = IssueService::get_all_issues();
@@ -112,13 +114,14 @@ impl TuiData {
             .map(|issue| (issue.key.clone(), issue))
             .collect();
 
-        let meeting_stats = Self::calculate_meeting_stats(&all_meetings);
+        let meeting_stats = Self::calculate_meeting_stats(&all_meetings, &config, &untracked_meeting_ids);
         let sprint_activities = Self::calculate_all_sprint_activities(&sprints);
         let worklog_wall = Self::calculate_worklog_wall();
 
         TuiData {
             all_sprints: sprints,
             all_meetings,
+            untracked_meeting_ids,
             all_worklogs,
             jira_worklogs,
             worklog_history,
@@ -135,17 +138,21 @@ impl TuiData {
     }
 
     fn get_meetings_for_sprints(sprints: &[Sprint]) -> Vec<Meeting> {
+        use chrono::{TimeZone, Utc};
         let all_meetings = MeetingsService::get_all_meetings();
 
-        // Filter meetings that fall within sprint date ranges
+        // Filter meetings that fall within sprint date ranges, expanded to full UTC days
+        // so meetings at the start/end of the sprint day are not missed.
         all_meetings
             .into_iter()
             .filter(|meeting| {
-                // Check if meeting is within any sprint date range
                 sprints.iter().any(|sprint| {
                     if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                        let meeting_start = meeting.start;
-                        meeting_start >= start && meeting_start <= end
+                        let day_start = Utc
+                            .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+                        let day_end = Utc
+                            .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+                        meeting.start >= day_start && meeting.start <= day_end
                     } else {
                         false
                     }
@@ -173,9 +180,12 @@ impl TuiData {
             .collect()
     }
 
-    fn calculate_meeting_stats(meetings: &[Meeting]) -> MeetingStats {
-        let pending = meetings.iter().filter(|m| m.jira_link.is_none()).count();
-
+    fn calculate_meeting_stats(meetings: &[Meeting], config: &wtf_lib::config::Config, untracked_ids: &std::collections::HashSet<String>) -> MeetingStats {
+        use wtf_lib::utils::meetings::is_untracked;
+        let pending = meetings
+            .iter()
+            .filter(|m| m.jira_link.is_none() && !is_untracked(m, config, untracked_ids))
+            .count();
         MeetingStats { pending }
     }
 

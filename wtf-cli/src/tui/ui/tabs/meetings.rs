@@ -1,4 +1,5 @@
 use chrono::Local;
+use super::settings::GC_TERM_COLORS;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -51,7 +52,13 @@ fn render_meetings_list(
                     .as_ref()
                     .map(|s| s != "declined")
                     .unwrap_or(true);
-                is_unlinked && is_not_declined
+                // Filter out untracked meetings
+                let is_not_untracked = !wtf_lib::utils::meetings::is_untracked(
+                    m,
+                    &data.config,
+                    &data.untracked_meeting_ids,
+                );
+                is_unlinked && is_not_declined && is_not_untracked
             })
             .collect()
     } else {
@@ -116,6 +123,13 @@ fn render_meetings_list(
                 .map(|s| s == "declined")
                 .unwrap_or(false);
 
+            // Check if meeting is untracked
+            let is_untracked = wtf_lib::utils::meetings::is_untracked(
+                meeting,
+                &data.config,
+                &data.untracked_meeting_ids,
+            );
+
             // Jira link or status
             let link_text = if let Some(ref jira_link) = meeting.jira_link {
                 truncate_string(jira_link, 15)
@@ -141,22 +155,25 @@ fn render_meetings_list(
                 base_style = base_style
                     .fg(Color::DarkGray)
                     .add_modifier(Modifier::CROSSED_OUT);
+            } else if is_untracked {
+                base_style = base_style.fg(Color::DarkGray);
             }
 
             // Build the compact line: indicator + date + time + title + link
             lines.push(Line::from(vec![
                 Span::styled(
                     indicator,
-                    if is_declined {
+                    if is_declined || is_untracked {
                         base_style
                     } else {
                         base_style.fg(Color::Yellow)
                     },
                 ),
                 Span::raw(" "),
+                Span::raw(" "),
                 Span::styled(
                     date_str,
-                    if is_declined {
+                    if is_declined || is_untracked {
                         base_style
                     } else {
                         base_style.fg(Color::Cyan)
@@ -165,16 +182,24 @@ fn render_meetings_list(
                 Span::raw(" "),
                 Span::styled(
                     time_str,
-                    if is_declined {
-                        base_style
-                    } else {
-                        base_style.fg(Color::DarkGray)
-                    },
+                    base_style.fg(Color::DarkGray),
                 ),
                 Span::raw("  "),
+                // Colored circle for meetings with a Google Calendar color
+                {
+                    let circle_color = meeting.color_id.as_deref()
+                        .and_then(|cid| cid.parse::<usize>().ok())
+                        .filter(|&idx| idx >= 1 && idx <= 11)
+                        .map(|idx| if is_declined || is_untracked { Color::DarkGray } else { GC_TERM_COLORS[idx - 1] });
+                    if let Some(c) = circle_color {
+                        Span::styled("● ", Style::default().fg(c))
+                    } else {
+                        Span::raw("  ")
+                    }
+                },
                 Span::styled(
                     title,
-                    if is_declined {
+                    if is_declined || is_untracked {
                         base_style
                     } else {
                         base_style.fg(Color::White)
@@ -183,7 +208,7 @@ fn render_meetings_list(
                 Span::raw(" "),
                 Span::styled(
                     format!("[{}]", link_text),
-                    if is_declined {
+                    if is_declined || is_untracked {
                         base_style
                     } else {
                         base_style.fg(link_color)
@@ -207,7 +232,7 @@ fn render_meetings_list(
     };
 
     // Build contextual help text
-    let mut shortcuts_data = vec![("F", "ilter"), ("A", "uto-link")];
+    let mut shortcuts_data = vec![("F", "ilter"), ("A", "uto-link"), ("X", " Untrack")];
     if selected_has_link {
         shortcuts_data.push(("Del", " Unlink"));
     }
@@ -250,7 +275,7 @@ fn render_meeting_details(
     selected_index: usize,
     filter_unlinked_only: bool,
 ) {
-    use chrono::{Datelike, Timelike};
+    use chrono::Local;
 
     // Sort and filter meetings the same way as the list
     let mut sorted_meetings = data.all_meetings.clone();
@@ -268,7 +293,13 @@ fn render_meeting_details(
                     .as_ref()
                     .map(|s| s != "declined")
                     .unwrap_or(true);
-                is_unlinked && is_not_declined
+                // Filter out untracked meetings
+                let is_not_untracked = !wtf_lib::utils::meetings::is_untracked(
+                    m,
+                    &data.config,
+                    &data.untracked_meeting_ids,
+                );
+                is_unlinked && is_not_declined && is_not_untracked
             })
             .collect()
     } else {
@@ -299,6 +330,8 @@ fn render_meeting_details(
     }
 
     let meeting = &filtered_meetings[selected_index];
+    let local_start = meeting.start.with_timezone(&Local);
+    let local_end = meeting.end.with_timezone(&Local);
 
     let mut lines = vec![
         Line::from(vec![
@@ -321,14 +354,7 @@ fn render_meeting_details(
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!(
-                    "{:04}-{:02}-{:02} {:02}:{:02}",
-                    meeting.start.year(),
-                    meeting.start.month(),
-                    meeting.start.day(),
-                    meeting.start.hour(),
-                    meeting.start.minute()
-                ),
+                local_start.format("%Y-%m-%d %H:%M").to_string(),
                 Style::default().fg(Color::White),
             ),
         ]),
@@ -340,14 +366,7 @@ fn render_meeting_details(
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                format!(
-                    "{:04}-{:02}-{:02} {:02}:{:02}",
-                    meeting.end.year(),
-                    meeting.end.month(),
-                    meeting.end.day(),
-                    meeting.end.hour(),
-                    meeting.end.minute()
-                ),
+                local_end.format("%Y-%m-%d %H:%M").to_string(),
                 Style::default().fg(Color::White),
             ),
         ]),

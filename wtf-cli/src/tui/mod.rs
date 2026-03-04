@@ -873,6 +873,18 @@ impl Tui {
                     }
                 }
             }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                // Toggle untracked state for the selected meeting
+                if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {
+                    let now_untracked = MeetingsService::toggle_untracked(&meeting.id);
+                    if now_untracked {
+                        logger::log(format!("🚫 Meeting marked as untracked"));
+                    } else {
+                        logger::log(format!("✅ Meeting unmarked as untracked"));
+                    }
+                    self.refresh_data();
+                }
+            }
             KeyCode::Enter => {
                 // Link selected meeting
                 if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {

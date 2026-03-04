@@ -17,6 +17,8 @@ token_cache_path = "./wtf_token"
 # Optional: Map Google Calendar event colors to Jira issue keys.
 # When a meeting has the matching color, it will be auto-linked to that issue
 # at the highest priority (overrides any key found in the meeting title/description).
+# You can also map a color to "notrack" to automatically untrack all meetings with that color.
 # [google.color_labels]
 # Grape = "INTERNAL-42"
 # Lavender = "MYPROJECT-123"
+# Banana = "notrack"

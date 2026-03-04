@@ -16,7 +16,7 @@ use wtf_lib::config::{Config, GOOGLE_CALENDAR_EVENT_COLORS};
 pub(in crate::tui) const FIELD_COUNT: usize = 19;
 
 /// Terminal display colors for the 11 Google Calendar event colors (same order as GOOGLE_CALENDAR_EVENT_COLORS).
-const GC_TERM_COLORS: [Color; 11] = [
+pub(super) const GC_TERM_COLORS: [Color; 11] = [
     Color::LightBlue,  // Lavender
     Color::Green,      // Sage
     Color::Magenta,    // Grape

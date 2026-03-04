@@ -245,6 +245,10 @@ impl Tui {
                             .as_ref()
                             .and_then(|g| g.color_labels.get(color_name))
                         {
+                            // Skip if the color is mapped to "notrack" — handled by is_untracked
+                            if jira_key == "notrack" {
+                                continue;
+                            }
                             let key = jira_key.clone();
                             if let Some(mut m) = MeetingsService::get_meeting_by_id(meeting.id.clone()) {
                                 m.jira_link = Some(key.clone());

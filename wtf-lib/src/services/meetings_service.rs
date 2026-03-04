@@ -1,7 +1,7 @@
 use crate::models::data::{Absence, Meeting, Sprint, SprintState};
 use crate::services::jira_service::{JiraService, SprintService};
 use crate::storage::database::{GenericDatabase, DATABASE};
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use log::{error, warn};
 use once_cell::sync::Lazy;
 use std::sync::Arc;
@@ -40,6 +40,7 @@ impl MeetingsService {
             .find(|s| matches!(s.state, SprintState::Active))
         {
             if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                let (start, end) = sprint_day_bounds(start, end);
                 return all_meetings
                     .iter()
                     .cloned()
@@ -64,6 +65,7 @@ impl MeetingsService {
 
     pub fn get_meetings_for_sprint(sprint: &Sprint) -> Vec<Meeting> {
         if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+            let (start, end) = sprint_day_bounds(start, end);
             Self::get_meetings_between_dates(start, end)
         } else {
             vec![]
@@ -128,6 +130,52 @@ impl MeetingsService {
     }
 }
 
+// --- Untracked meetings ---
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+struct UntrackedMeeting {
+    meeting_id: String,
+}
+
+impl crate::storage::database::Identifiable for UntrackedMeeting {
+    fn get_id(&self) -> String {
+        self.meeting_id.clone()
+    }
+}
+
+static UNTRACKED_MEETINGS_DATABASE: Lazy<Arc<GenericDatabase<UntrackedMeeting>>> =
+    Lazy::new(|| {
+        Arc::new(
+            GenericDatabase::new(&DATABASE, "untracked_meetings")
+                .expect("could not initialize untracked_meetings database"),
+        )
+    });
+
+impl MeetingsService {
+    pub fn get_all_untracked_ids() -> std::collections::HashSet<String> {
+        UNTRACKED_MEETINGS_DATABASE
+            .get_all()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|u| u.meeting_id)
+            .collect()
+    }
+
+    /// Toggle a meeting's manually-untracked state.
+    /// Returns `true` if it is now untracked, `false` if it was removed.
+    pub fn toggle_untracked(meeting_id: &str) -> bool {
+        let already = UNTRACKED_MEETINGS_DATABASE.get(meeting_id).ok().flatten().is_some();
+        if already {
+            let _ = UNTRACKED_MEETINGS_DATABASE.remove(meeting_id);
+            false
+        } else {
+            let record = UntrackedMeeting { meeting_id: meeting_id.to_string() };
+            let _ = UNTRACKED_MEETINGS_DATABASE.insert(&record);
+            true
+        }
+    }
+}
+
 static ABSENCES_DATABASE: Lazy<Arc<GenericDatabase<Absence>>> = Lazy::new(|| {
     Arc::new(
         GenericDatabase::new(&DATABASE, "absences").expect("could not initialize absence database"),
@@ -142,4 +190,17 @@ impl AbsenceService {
             error!("Failed to save absence '{}': {}", absence.id, e);
         }
     }
+}
+
+/// Expands sprint start to midnight UTC (start-of-day) and sprint end to 23:59:59 UTC (end-of-day)
+/// so that meetings on the sprint start/end day are not missed due to exact sprint timestamps.
+fn sprint_day_bounds(
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+) -> (DateTime<Utc>, DateTime<Utc>) {
+    let start_day = Utc
+        .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+    let end_day = Utc
+        .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+    (start_day, end_day)
 }
