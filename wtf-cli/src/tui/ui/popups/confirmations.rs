@@ -7,9 +7,11 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
-use crate::tui::{GapFillConfirmation, RevertConfirmationState, WorklogCreationConfirmation, WorklogSource};
+use crate::tui::ui_helpers::*;
+use crate::tui::{
+    GapFillConfirmation, RevertConfirmationState, WorklogCreationConfirmation, WorklogSource,
+};
 use wtf_lib::services::worklogs_service::LocalWorklogService;
 
 /// Render unlink confirmation dialog

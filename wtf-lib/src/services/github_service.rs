@@ -127,7 +127,11 @@ impl GitHubService {
             if let Some(ref org) = config.github.organisation {
                 let prefix = format!("{}/", org);
                 all_api_events.retain(|e| e.repo.name.starts_with(&prefix));
-                debug!("After org filter '{}': {} events", org, all_api_events.len());
+                debug!(
+                    "After org filter '{}': {} events",
+                    org,
+                    all_api_events.len()
+                );
             }
         }
 
@@ -182,7 +186,11 @@ impl GitHubService {
             if let Some(ref org) = config.github.organisation {
                 let prefix = format!("{}/", org);
                 all_api_events.retain(|e| e.repo.name.starts_with(&prefix));
-                info!("After org filter '{}': {} events remain", org, all_api_events.len());
+                info!(
+                    "After org filter '{}': {} events remain",
+                    org,
+                    all_api_events.len()
+                );
             }
         }
 

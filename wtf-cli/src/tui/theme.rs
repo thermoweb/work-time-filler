@@ -17,7 +17,7 @@ pub struct Theme {
     pub warning: Color,
     pub error: Color,
     pub info: Color,
-    
+
     // UI element colors
     pub border: Color,
     pub achievement_border: Color,
@@ -45,7 +45,7 @@ impl Theme {
             warning: Color::Yellow,
             error: Color::Red,
             info: Color::Cyan,
-            
+
             // UI element colors
             border: Color::Cyan,
             achievement_border: Color::Yellow,

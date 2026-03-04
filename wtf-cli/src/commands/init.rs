@@ -1,4 +1,5 @@
 use crate::commands::Command;
+use crate::{error, info, success, warn};
 use async_trait::async_trait;
 use clap::{ArgMatches, Command as ClapCommand};
 use inquire::{Confirm, CustomUserError, Password, Select, Text};
@@ -11,7 +12,6 @@ use wtf_lib::config::{
 };
 use wtf_lib::models::data::{Board, Sprint};
 use wtf_lib::services::jira_service::JiraService;
-use crate::{error, info, success, warn};
 
 pub struct InitCommand;
 
@@ -246,12 +246,16 @@ async fn step4_select_boards() -> Result<(), Box<dyn Error>> {
     use crate::tasks::jira_tasks::FetchJiraBoard;
     use crate::tasks::Task;
 
-    FetchJiraBoard::new().without_follow_prompt().execute().await.map_err(|e| {
-        format!(
-            "Failed to connect to Jira: {}\nPlease check your URL, email and API token.",
-            e
-        )
-    })?;
+    FetchJiraBoard::new()
+        .without_follow_prompt()
+        .execute()
+        .await
+        .map_err(|e| {
+            format!(
+                "Failed to connect to Jira: {}\nPlease check your URL, email and API token.",
+                e
+            )
+        })?;
 
     // Now get boards from database
     let boards = wtf_lib::services::jira_service::BoardService::get_all_boards();
@@ -479,7 +483,13 @@ fn step6_configure_github() -> Result<GithubConfig, Box<dyn Error>> {
 
     let org = Text::new("GitHub organisation to track (leave blank to track all repos):")
         .prompt_skippable()?
-        .and_then(|s| if s.trim().is_empty() { None } else { Some(s.trim().to_string()) });
+        .and_then(|s| {
+            if s.trim().is_empty() {
+                None
+            } else {
+                Some(s.trim().to_string())
+            }
+        });
 
     if let Some(ref org_name) = org {
         success!("Will filter events to repos under '{}'", org_name);
@@ -495,7 +505,7 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
 
     // Check if using test environment
     let using_test_env = std::env::var("WTF_CONFIG_HOME").is_ok();
-    
+
     if using_test_env {
         warn!("Note: You're using a test environment (WTF_CONFIG_HOME)");
         info!("   Google Calendar requires OAuth authentication which needs:");
@@ -503,7 +513,7 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
         info!("   - Browser-based OAuth flow");
         info!("   This is complex to set up for testing.");
     }
-    
+
     let enable_google = Confirm::new("Enable Google Calendar integration? (optional)")
         .with_default(false)
         .prompt()?;
@@ -515,13 +525,19 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
 
     // Suggest appropriate default paths based on environment
     let default_creds_path = if using_test_env {
-        format!("{}/google_credentials.json", std::env::var("WTF_CONFIG_HOME").unwrap())
+        format!(
+            "{}/google_credentials.json",
+            std::env::var("WTF_CONFIG_HOME").unwrap()
+        )
     } else {
         "~/.config/wtf/google_credentials.json".to_string()
     };
-    
+
     let default_token_path = if using_test_env {
-        format!("{}/google_token.json", std::env::var("WTF_CONFIG_HOME").unwrap())
+        format!(
+            "{}/google_token.json",
+            std::env::var("WTF_CONFIG_HOME").unwrap()
+        )
     } else {
         "~/.config/wtf/google_token.json".to_string()
     };
@@ -533,11 +549,14 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
     let token_cache_path: String = Text::new("Path to Google token cache:")
         .with_default(&default_token_path)
         .prompt()?;
-    
+
     // Check if credentials file exists
     let creds_path_expanded = shellexpand::tilde(&credentials_path).to_string();
     if !std::path::Path::new(&creds_path_expanded).exists() {
-        warn!("Warning: Credentials file not found at: {}", credentials_path);
+        warn!(
+            "Warning: Credentials file not found at: {}",
+            credentials_path
+        );
         info!("   Download OAuth 2.0 credentials from Google Cloud Console:");
         info!("   https://console.cloud.google.com/apis/credentials");
         info!("   Save as: {}", credentials_path);
@@ -545,7 +564,7 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
         let proceed = Confirm::new("Continue anyway?")
             .with_default(true)
             .prompt()?;
-            
+
         if !proceed {
             warn!("Skipping Google Calendar integration");
             return Ok(None);
@@ -553,7 +572,7 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
     }
 
     success!("Google Calendar configured");
-    
+
     // If credentials exist, trigger OAuth flow now
     if std::path::Path::new(&creds_path_expanded).exists() {
         info!("🔐 Initiating OAuth flow to authorize Google Calendar access...");
@@ -576,9 +595,7 @@ fn step7_configure_google() -> Result<Option<GoogleConfig>, Box<dyn Error>> {
 }
 
 // Step 8: Complete Google OAuth flow
-async fn step8_complete_google_oauth(
-    _google_config: &GoogleConfig,
-) -> Result<(), Box<dyn Error>> {
+async fn step8_complete_google_oauth(_google_config: &GoogleConfig) -> Result<(), Box<dyn Error>> {
     use crate::tasks::google_tasks::FetchGoogleCalendarTask;
     use crate::tasks::Task;
     use chrono::Utc;
@@ -593,13 +610,13 @@ async fn step8_complete_google_oauth(
     println!();
 
     info!("🔄 Fetching Google Calendar meetings to complete OAuth setup...");
-    
+
     // Fetch meetings for the next 2 weeks to trigger OAuth
     let start = Utc::now();
     let end = start + chrono::Duration::days(14);
-    
+
     let task = FetchGoogleCalendarTask::new(start, end);
-    
+
     match task.execute().await {
         Ok(_) => {
             success!("Google Calendar OAuth completed successfully");
@@ -676,7 +693,10 @@ pub async fn run_init_wizard() -> Result<(), Box<dyn Error>> {
         info!("   This is a separate test environment with an empty database.");
         info!("📋 Next steps to populate the test database:");
         info!("  1. Fetch Jira issues for followed sprints:");
-        info!("     WTF_CONFIG_HOME={} cargo run -- fetch issue", config_home);
+        info!(
+            "     WTF_CONFIG_HOME={} cargo run -- fetch issue",
+            config_home
+        );
         info!("  2. Launch the TUI:");
         info!("     WTF_CONFIG_HOME={} cargo run -- tui", config_home);
         info!("💡 Or to use your real config instead, run without WTF_CONFIG_HOME:");

@@ -77,7 +77,11 @@ impl AchievementService {
         for (achievement_id, threshold) in REVOKE_SCHEDULE {
             cache.retain(|u| {
                 if u.achievement.id_string() == *achievement_id {
-                    let version = if u.app_version.is_empty() { "0.0.0" } else { &u.app_version };
+                    let version = if u.app_version.is_empty() {
+                        "0.0.0"
+                    } else {
+                        &u.app_version
+                    };
                     if is_older_than(version, threshold) {
                         revoked.push(u.achievement.id_string());
                         return false; // remove from cache

@@ -217,7 +217,9 @@ impl Tui {
                                 };
                                 IssueService::save_issue(&issue);
                             }
-                            Err(e) => log::warn!("Could not fetch issue {} from Jira: {:?}", key, e),
+                            Err(e) => {
+                                log::warn!("Could not fetch issue {} from Jira: {:?}", key, e)
+                            }
                         }
                     }
                 });
@@ -250,7 +252,9 @@ impl Tui {
                                 continue;
                             }
                             let key = jira_key.clone();
-                            if let Some(mut m) = MeetingsService::get_meeting_by_id(meeting.id.clone()) {
+                            if let Some(mut m) =
+                                MeetingsService::get_meeting_by_id(meeting.id.clone())
+                            {
                                 m.jira_link = Some(key.clone());
                                 MeetingsService::save(&m);
                                 linked_count += 1;

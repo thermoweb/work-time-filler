@@ -15,13 +15,14 @@ use clap::{ArgMatches, Command as ClapCommand};
 use std::collections::HashMap;
 
 pub fn build_app(registry: &CommandRegistry) -> ClapCommand {
-    let mut app = ClapCommand::new("wtf")
-        .arg(clap::Arg::new("debug")
+    let mut app = ClapCommand::new("wtf").arg(
+        clap::Arg::new("debug")
             .long("debug")
             .help("Enable debug logging")
             .action(clap::ArgAction::SetTrue)
-            .global(true));
-            
+            .global(true),
+    );
+
     for subcommand in registry.commands.values() {
         app = app.subcommand(subcommand.clap_command());
     }

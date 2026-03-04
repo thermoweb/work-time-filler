@@ -7,13 +7,13 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 
 /// GitHub tab - list and details extracted from ui.rs
 pub(in crate::tui) fn render_github_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_github_session_index;
-    
+
     render_list_detail_layout(
         frame,
         area,
@@ -84,7 +84,11 @@ fn render_github_sessions_list(
             let repo_parts: Vec<&str> = session.repo.split('/').collect();
             let repo_short = repo_parts.last().unwrap_or(&"unknown");
 
-            let cursor = if is_selected { theme().selector } else { theme().unselected_selector };
+            let cursor = if is_selected {
+                theme().selector
+            } else {
+                theme().unselected_selector
+            };
             let style = if is_selected {
                 Style::default()
                     .fg(Color::Yellow)

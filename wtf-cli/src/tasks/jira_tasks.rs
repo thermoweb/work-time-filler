@@ -115,8 +115,11 @@ impl Task for FetchJiraIssues {
                 match fetch_result {
                     Ok(issue_fetcher) => {
                         if issue_fetcher.len() == 0 {
-                            mp.println(format!("No backlog issues found for project '{}'.", project_name))
-                                .unwrap();
+                            mp.println(format!(
+                                "No backlog issues found for project '{}'.",
+                                project_name
+                            ))
+                            .unwrap();
                         } else {
                             let issue_progress =
                                 mp.add(ProgressBar::new(issue_fetcher.len() as u64));
@@ -208,11 +211,12 @@ impl Task for FetchJiraBoard {
         mp.println(format!("{} boards fetched", boards_added))
             .unwrap();
         let boards = BoardService::get_all_boards();
-        if !self.skip_follow_prompt && boards
-            .iter()
-            .filter(|board| board.followed)
-            .collect::<Vec<_>>()
-            .is_empty()
+        if !self.skip_follow_prompt
+            && boards
+                .iter()
+                .filter(|board| board.followed)
+                .collect::<Vec<_>>()
+                .is_empty()
         {
             let board = Text::new("Board to follow: ")
                 .with_autocomplete(&board_suggestor)

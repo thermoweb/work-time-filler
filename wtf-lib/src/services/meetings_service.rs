@@ -164,12 +164,18 @@ impl MeetingsService {
     /// Toggle a meeting's manually-untracked state.
     /// Returns `true` if it is now untracked, `false` if it was removed.
     pub fn toggle_untracked(meeting_id: &str) -> bool {
-        let already = UNTRACKED_MEETINGS_DATABASE.get(meeting_id).ok().flatten().is_some();
+        let already = UNTRACKED_MEETINGS_DATABASE
+            .get(meeting_id)
+            .ok()
+            .flatten()
+            .is_some();
         if already {
             let _ = UNTRACKED_MEETINGS_DATABASE.remove(meeting_id);
             false
         } else {
-            let record = UntrackedMeeting { meeting_id: meeting_id.to_string() };
+            let record = UntrackedMeeting {
+                meeting_id: meeting_id.to_string(),
+            };
             let _ = UNTRACKED_MEETINGS_DATABASE.insert(&record);
             true
         }
@@ -194,13 +200,8 @@ impl AbsenceService {
 
 /// Expands sprint start to midnight UTC (start-of-day) and sprint end to 23:59:59 UTC (end-of-day)
 /// so that meetings on the sprint start/end day are not missed due to exact sprint timestamps.
-fn sprint_day_bounds(
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
-) -> (DateTime<Utc>, DateTime<Utc>) {
-    let start_day = Utc
-        .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-    let end_day = Utc
-        .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+fn sprint_day_bounds(start: DateTime<Utc>, end: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Utc>) {
+    let start_day = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+    let end_day = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
     (start_day, end_day)
 }

@@ -8,8 +8,8 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 use wtf_lib::models::data::{Sprint, SprintState};
 
 fn render_worklog_wall(frame: &mut Frame, area: &Rect, data: &TuiData) {
@@ -139,7 +139,7 @@ fn hours_to_braille(hours: f64, daily_limit: f64) -> &'static str {
 /// Sprints tab - Split view with details and activity
 pub(in crate::tui) fn render_sprints_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_sprint_index;
-    
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -246,7 +246,11 @@ fn render_sprint_list_expanded(
             "Closed".to_string()
         };
 
-        let indicator = if is_selected { theme().selector } else { theme().unselected_selector };
+        let indicator = if is_selected {
+            theme().selector
+        } else {
+            theme().unselected_selector
+        };
         let base_style = if is_selected {
             Style::default().add_modifier(Modifier::BOLD)
         } else {

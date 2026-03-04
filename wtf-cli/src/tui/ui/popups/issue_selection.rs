@@ -6,8 +6,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 use crate::tui::{GapFillState, IssueSelectionState};
 
 /// Render issue selection popup

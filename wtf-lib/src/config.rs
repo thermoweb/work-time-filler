@@ -12,8 +12,17 @@ use std::{env, fmt, fs};
 /// Google Calendar event color names, indexed by (colorId - 1).
 /// colorId "1" → "Lavender", "2" → "Sage", ..., "11" → "Tomato"
 pub const GOOGLE_CALENDAR_EVENT_COLORS: [&str; 11] = [
-    "Lavender", "Sage", "Grape", "Flamingo", "Banana",
-    "Tangerine", "Peacock", "Graphite", "Blueberry", "Basil", "Tomato",
+    "Lavender",
+    "Sage",
+    "Grape",
+    "Flamingo",
+    "Banana",
+    "Tangerine",
+    "Peacock",
+    "Graphite",
+    "Blueberry",
+    "Basil",
+    "Tomato",
 ];
 
 fn get_config_path() -> PathBuf {

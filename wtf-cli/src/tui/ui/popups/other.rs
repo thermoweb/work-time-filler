@@ -6,8 +6,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::tui::SprintFollowState;
 use crate::tui::theme::theme;
+use crate::tui::SprintFollowState;
 
 pub(in crate::tui) fn render_sprint_follow_popup(frame: &mut Frame, state: &SprintFollowState) {
     let area = frame.area();

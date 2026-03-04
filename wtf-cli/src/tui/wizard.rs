@@ -14,7 +14,11 @@ use super::{get_branding_text, Tui};
 impl Tui {
     pub(super) fn launch_wizard(&mut self) {
         // Get the selected sprint
-        if let Some(sprint) = self.data.all_sprints.get(self.data.ui_state.selected_sprint_index) {
+        if let Some(sprint) = self
+            .data
+            .all_sprints
+            .get(self.data.ui_state.selected_sprint_index)
+        {
             // Check if sprint has date range
             if sprint.start.is_none() || sprint.end.is_none() {
                 logger::log("⚠️  Chronie says: Sprint has no date range!".to_string());
@@ -69,7 +73,14 @@ impl Tui {
                 .data
                 .all_meetings
                 .iter()
-                .filter(|m| m.jira_link.is_none() && !wtf_lib::utils::meetings::is_untracked(m, &self.data.config, &self.data.untracked_meeting_ids))
+                .filter(|m| {
+                    m.jira_link.is_none()
+                        && !wtf_lib::utils::meetings::is_untracked(
+                            m,
+                            &self.data.config,
+                            &self.data.untracked_meeting_ids,
+                        )
+                })
                 .collect();
 
             for meeting in unlinked_meetings {
@@ -127,7 +138,14 @@ impl Tui {
             .data
             .all_meetings
             .iter()
-            .filter(|m| m.jira_link.is_none() && !wtf_lib::utils::meetings::is_untracked(m, &self.data.config, &self.data.untracked_meeting_ids))
+            .filter(|m| {
+                m.jira_link.is_none()
+                    && !wtf_lib::utils::meetings::is_untracked(
+                        m,
+                        &self.data.config,
+                        &self.data.untracked_meeting_ids,
+                    )
+            })
             .cloned()
             .collect();
 

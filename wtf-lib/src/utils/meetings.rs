@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::config::Config;
 use crate::models::data::Meeting;
+use std::collections::HashSet;
 
 const UNTRACK_KEYWORD: &str = "#untrack";
 const NOTRACK_COLOR_VALUE: &str = "notrack";
@@ -18,7 +18,12 @@ pub fn is_untracked(meeting: &Meeting, config: &Config, manual_ids: &HashSet<Str
     if meeting.title.as_deref().map(has_keyword).unwrap_or(false) {
         return true;
     }
-    if meeting.description.as_deref().map(has_keyword).unwrap_or(false) {
+    if meeting
+        .description
+        .as_deref()
+        .map(has_keyword)
+        .unwrap_or(false)
+    {
         return true;
     }
 

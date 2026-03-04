@@ -7,8 +7,8 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 use wtf_lib::models::data::{Sprint, Worklog};
 use wtf_lib::services::worklogs_service::LocalWorklogService;
 
@@ -86,7 +86,11 @@ fn render_history_list(
     let sprint_entries = jira_only_by_sprint(data);
     let has_jira_only = !sprint_entries.is_empty();
 
-    let shortcuts = build_shortcut_help(&[("→", " Expand"), ("Del", "ete"), ("C", "reate recovery / import")]);
+    let shortcuts = build_shortcut_help(&[
+        ("→", " Expand"),
+        ("Del", "ete"),
+        ("C", "reate recovery / import"),
+    ]);
     let mut title_spans = vec![
         Span::raw("📜 History ("),
         Span::raw(history.len().to_string()),
@@ -146,7 +150,11 @@ fn render_history_list(
         };
 
         let expand_icon = if is_expanded { "🔽" } else { "🔸" };
-        let selection_icon = if is_selected { theme().selector } else { theme().unselected_selector };
+        let selection_icon = if is_selected {
+            theme().selector
+        } else {
+            theme().unselected_selector
+        };
 
         let date_str = format!(
             "{:04}-{:02}-{:02} {:02}:{:02}",
@@ -226,19 +234,37 @@ fn render_history_list(
         let total_seconds: u64 = sprint_wls.iter().map(|w| w.time_spent_seconds).sum();
         let total_hours = total_seconds as f64 / 3600.0;
         let expand_icon = if is_expanded { "🔽" } else { "🔸" };
-        let selection_icon = if is_selected { theme().selector } else { theme().unselected_selector };
+        let selection_icon = if is_selected {
+            theme().selector
+        } else {
+            theme().unselected_selector
+        };
 
         lines.push(Line::from(vec![
             Span::raw(selection_icon),
             Span::raw(expand_icon),
             Span::raw(" "),
-            Span::styled("☁", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "☁",
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" "),
-            Span::styled(truncate_string(&sprint.name, 30), Style::default().fg(Color::Blue)),
+            Span::styled(
+                truncate_string(&sprint.name, 30),
+                Style::default().fg(Color::Blue),
+            ),
             Span::raw(" • "),
-            Span::styled(format!("{} WL", sprint_wls.len()), Style::default().fg(Color::White)),
+            Span::styled(
+                format!("{} WL", sprint_wls.len()),
+                Style::default().fg(Color::White),
+            ),
             Span::raw(" • "),
-            Span::styled(format!("{:.1}h", total_hours), Style::default().fg(Color::Cyan)),
+            Span::styled(
+                format!("{:.1}h", total_hours),
+                Style::default().fg(Color::Cyan),
+            ),
             Span::raw("  "),
             Span::styled("[C] import", Style::default().fg(Color::DarkGray)),
         ]));
@@ -256,7 +282,10 @@ fn render_history_list(
                     Span::raw(" "),
                     Span::styled(wl.issue_id.clone(), Style::default().fg(Color::Cyan)),
                     Span::raw(" • "),
-                    Span::styled(format!("{:.1}h", hours), Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{:.1}h", hours),
+                        Style::default().fg(Color::DarkGray),
+                    ),
                 ]));
             }
             if total_count > visible_count {
@@ -608,7 +637,12 @@ fn render_jira_only_details(
     let mut lines = vec![
         Line::from(vec![
             Span::raw("These Jira worklogs are not tracked locally. "),
-            Span::styled("[C]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[C]",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" to create a revertable history entry."),
         ]),
         Line::from(""),
@@ -616,18 +650,26 @@ fn render_jira_only_details(
             Span::raw("Total: "),
             Span::styled(
                 format!("{} worklogs  •  {:.1}h", sprint_wls.len(), total_hours),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),
         Line::from(vec![Span::styled(
             "By Issue:",
-            Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
         )]),
     ];
 
     let mut issue_sorted: Vec<_> = by_issue.iter().collect();
-    issue_sorted.sort_by(|a, b| b.1.0.partial_cmp(&a.1.0).unwrap_or(std::cmp::Ordering::Equal));
+    issue_sorted.sort_by(|a, b| {
+        b.1 .0
+            .partial_cmp(&a.1 .0)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     for (issue_id, (hours, count)) in issue_sorted.iter().take(10) {
         lines.push(Line::from(vec![
             Span::raw("  "),

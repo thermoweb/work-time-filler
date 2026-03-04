@@ -1,7 +1,7 @@
-use once_cell::sync::OnceCell;
-use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, Ordering};
 use log::{Log, Metadata, Record};
+use once_cell::sync::OnceCell;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// Global debug flag
 static DEBUG_MODE: AtomicBool = AtomicBool::new(false);
@@ -158,7 +158,7 @@ impl Log for LogBridge {
             log::Level::Debug => "🔍",
             log::Level::Trace => "🔬",
         };
-        
+
         let message = format!("{} {}", level_prefix, record.args());
         self.logger.log(message);
     }
@@ -170,11 +170,11 @@ impl Log for LogBridge {
 pub fn init_logger_with_log_bridge(logger: Arc<dyn Logger>) {
     // Initialize our custom logger
     GLOBAL_LOGGER.set(logger.clone()).ok();
-    
+
     // Initialize the log crate to use our bridge
     let bridge = LogBridge { logger };
     log::set_boxed_logger(Box::new(bridge)).ok();
-    
+
     // Set log level based on debug mode
     let level = if is_debug_enabled() {
         log::LevelFilter::Debug

@@ -7,7 +7,11 @@ use super::super::{types::GapFillState, Tui};
 impl Tui {
     pub(in crate::tui) fn handle_fill_gaps(&mut self) {
         // Get the selected sprint
-        if let Some(sprint) = self.data.all_sprints.get(self.data.ui_state.selected_sprint_index) {
+        if let Some(sprint) = self
+            .data
+            .all_sprints
+            .get(self.data.ui_state.selected_sprint_index)
+        {
             // Check if sprint has date range
             if sprint.start.is_none() || sprint.end.is_none() {
                 logger::log("⚠️  Cannot fill gaps: Sprint has no date range".to_string());

@@ -8,15 +8,15 @@ use ratatui::{
 
 use crate::tui::data::TuiData;
 use crate::tui::theme::theme;
-use wtf_lib::Achievement;
 use wtf_lib::services::AchievementService;
+use wtf_lib::Achievement;
 
 /// Wrap text to exactly 2 lines, fitting within given width
 fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
     let mut words: Vec<&str> = text.split_whitespace().collect();
     let mut line1 = String::new();
     let mut line2 = String::new();
-    
+
     // Fill first line
     while !words.is_empty() {
         let word = words[0];
@@ -25,7 +25,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
         } else {
             format!("{} {}", line1, word)
         };
-        
+
         if test_line.len() <= width {
             line1 = test_line;
             words.remove(0);
@@ -33,7 +33,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
             break;
         }
     }
-    
+
     // Fill second line with remaining words
     while !words.is_empty() {
         let word = words[0];
@@ -42,7 +42,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
         } else {
             format!("{} {}", line2, word)
         };
-        
+
         if test_line.len() <= width {
             line2 = test_line;
             words.remove(0);
@@ -56,7 +56,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
             break;
         }
     }
-    
+
     // Add dot at the end if text fits completely
     if words.is_empty() && !line2.is_empty() && line2.len() < width {
         if !line2.ends_with('.') {
@@ -67,13 +67,13 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
             line1.push('.');
         }
     }
-    
+
     (line1, line2)
 }
 
 pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
     let scroll_offset = data.ui_state.achievements_scroll_offset;
-    
+
     // Main frame
     let block = Block::default()
         .title("🏆 Achievements")
@@ -88,41 +88,41 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Min(0),     // Content
-            Constraint::Length(1),  // Footer for page indicator
+            Constraint::Length(3), // Header
+            Constraint::Min(0),    // Content
+            Constraint::Length(1), // Footer for page indicator
         ])
         .split(inner);
 
     // Header with stats
     let unlocked_count = AchievementService::unlock_count();
     let total_count = Achievement::all().len();
-    
-    let header = Paragraph::new(vec![
-        Line::from(vec![
-            Span::styled("Completed: ", Style::default().fg(Color::Gray)),
-            Span::styled(
-                format!("{} / {}", unlocked_count, total_count),
-                Style::default()
-                    .fg(Color::Yellow)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-    ])
+
+    let header = Paragraph::new(vec![Line::from(vec![
+        Span::styled("Completed: ", Style::default().fg(Color::Gray)),
+        Span::styled(
+            format!("{} / {}", unlocked_count, total_count),
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ])])
     .alignment(Alignment::Center);
-    
+
     frame.render_widget(header, chunks[0]);
 
     // Calculate how many columns can fit based on terminal width
     let content_area = chunks[1];
     let achievement_width = 37; // Width per achievement (35 + 2 for spacing)
     let max_columns = (content_area.width / achievement_width).max(1) as usize;
-    
+
     // Achievement list with proper Block widgets
     let all_achievements = Achievement::all();
     let unlocked = AchievementService::get_all_unlocked();
-    let unlocked_map: std::collections::HashMap<_, _> =
-        unlocked.iter().map(|u| (u.achievement, u.unlocked_at)).collect();
+    let unlocked_map: std::collections::HashMap<_, _> = unlocked
+        .iter()
+        .map(|u| (u.achievement, u.unlocked_at))
+        .collect();
 
     // Sort achievements: unlocked first, then locked
     let mut sorted_achievements = all_achievements.clone();
@@ -138,34 +138,34 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
     let achievement_height = 6;
     let achievements_per_column = (content_area.height / achievement_height).max(1) as usize;
     let total_visible = (achievements_per_column * max_columns).max(1);
-    
+
     // Clamp scroll offset to valid range
     let max_scroll = sorted_achievements.len().saturating_sub(total_visible);
     let clamped_scroll_offset = scroll_offset.min(max_scroll);
-    
+
     // Apply scroll offset
     let start_index = clamped_scroll_offset;
     let end_index = (start_index + total_visible).min(sorted_achievements.len());
     let visible_achievements = &sorted_achievements[start_index..end_index];
-    
+
     // Render achievements in columns (newspaper style: fill column, then next column)
     let text_width = 33; // 35 - 2 for borders
     for (display_index, achievement) in visible_achievements.iter().enumerate() {
         // Calculate column and row
         let col = display_index / achievements_per_column;
         let row = display_index % achievements_per_column;
-        
+
         // Calculate position
         let x_offset = col as u16 * achievement_width;
         let y_offset = row as u16 * achievement_height;
-        
+
         let achievement_area = Rect {
             x: content_area.x + x_offset,
             y: content_area.y + y_offset,
             width: 35,
             height: achievement_height,
         };
-        
+
         let meta = achievement.meta();
         let is_unlocked = unlocked_map.contains_key(achievement);
 
@@ -243,7 +243,11 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
 
             let rows = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Min(0)])
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
                 .split(inner);
 
             let lock_cols = Layout::default()
@@ -275,13 +279,13 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
             );
         }
     }
-    
+
     // Footer with pagination info
     let footer_area = chunks[2];
     if sorted_achievements.len() > total_visible && total_visible > 0 {
         let current_page = (clamped_scroll_offset / total_visible) + 1;
         let total_pages = (sorted_achievements.len() + total_visible - 1) / total_visible;
-        
+
         let footer_text = format!(
             "Page {}/{} | Showing {}-{} of {} | ←→ to scroll",
             current_page,
@@ -290,11 +294,11 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
             end_index,
             sorted_achievements.len()
         );
-        
+
         let footer = Paragraph::new(footer_text)
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center);
-        
+
         frame.render_widget(footer, footer_area);
     }
 }

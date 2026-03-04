@@ -66,11 +66,15 @@ fn is_newer(candidate: &str, current: &str) -> bool {
     }
     // Same core version: stable > pre-release (semver spec)
     match (cp, rp) {
-        (None, None) => false,         // identical
-        (None, Some(_)) => true,       // candidate is stable, current is pre-release
-        (Some(_), None) => false,      // candidate is pre-release, current is stable
+        (None, None) => false,    // identical
+        (None, Some(_)) => true,  // candidate is stable, current is pre-release
+        (Some(_), None) => false, // candidate is pre-release, current is stable
         (Some((cl, cn)), Some((rl, rn))) => {
-            if cl != rl { cl > rl } else { cn > rn }
+            if cl != rl {
+                cl > rl
+            } else {
+                cn > rn
+            }
         }
     }
 }

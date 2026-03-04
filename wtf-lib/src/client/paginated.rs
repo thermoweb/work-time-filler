@@ -114,7 +114,11 @@ where
                 eprintln!(
                     "Failed to deserialize paginated response: {:?}\nBody: {}",
                     err,
-                    if text.len() > 500 { &text[..500] } else { &text }
+                    if text.len() > 500 {
+                        &text[..500]
+                    } else {
+                        &text
+                    }
                 );
                 // Treat as empty last page — let the caller handle "no results" gracefully
                 self.current_items = Some(vec![]);

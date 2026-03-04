@@ -8,8 +8,8 @@ use ratatui::{
 };
 
 use super::data::TuiData;
-use super::{FetchStatus, Tab};
 use super::theme::theme;
+use super::{FetchStatus, Tab};
 
 mod popups;
 pub(in crate::tui) mod tabs;
@@ -24,7 +24,7 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
 
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(0)  // Ensure no margin
+        .margin(0) // Ensure no margin
         .constraints([
             Constraint::Length(3), // Tab bar
             Constraint::Min(0),    // Content
@@ -51,7 +51,7 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
 
 fn render_tab_bar(frame: &mut Frame, area: &Rect, current_tab: Tab) {
     let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
-    
+
     let mut tabs = vec![
         ("1", "Sprints", Tab::Sprints),
         ("2", "Meetings", Tab::Meetings),
@@ -122,7 +122,12 @@ fn render_logs_panel(frame: &mut Frame, area: &Rect, logs: &[String]) {
         .rev()
         .take(max_logs)
         .rev()
-        .map(|log| Line::from(Span::styled(log.clone(), Style::default().fg(theme().fg_secondary))))
+        .map(|log| {
+            Line::from(Span::styled(
+                log.clone(),
+                Style::default().fg(theme().fg_secondary),
+            ))
+        })
         .collect();
 
     let paragraph = Paragraph::new(recent_logs).alignment(Alignment::Left);
@@ -135,24 +140,22 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(20),  // Left: app version (enough for "WTF (0.1.0-beta.0)")
-            Constraint::Min(0),      // Center: status/shortcuts
+            Constraint::Length(20), // Left: app version (enough for "WTF (0.1.0-beta.0)")
+            Constraint::Min(0),     // Center: status/shortcuts
         ])
         .split(*area);
-    
+
     // Render app name and version on the left
     let version = env!("CARGO_PKG_VERSION");
-    let app_info = Paragraph::new(Line::from(vec![
-        Span::styled(
-            format!("WTF ({})", version),
-            Style::default().fg(theme().fg_muted),
-        ),
-    ]))
+    let app_info = Paragraph::new(Line::from(vec![Span::styled(
+        format!("WTF ({})", version),
+        Style::default().fg(theme().fg_muted),
+    )]))
     .alignment(Alignment::Left)
     .style(Style::default().bg(theme().bg_primary));
-    
+
     frame.render_widget(app_info, chunks[0]);
-    
+
     // Render status/shortcuts in the center
     let content = match fetch_status {
         FetchStatus::Fetching(message) => {
@@ -188,9 +191,14 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
         FetchStatus::Error(err) => Line::from(vec![
             Span::styled(
                 "✗ ",
-                Style::default().fg(theme().error).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(theme().error)
+                    .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(format!("Error: {}", err), Style::default().fg(theme().error)),
+            Span::styled(
+                format!("Error: {}", err),
+                Style::default().fg(theme().error),
+            ),
         ]),
         FetchStatus::Idle => {
             // Show normal footer with last sync time

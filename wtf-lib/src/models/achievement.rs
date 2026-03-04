@@ -1,6 +1,6 @@
+use crate::storage::database::Identifiable;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::storage::database::Identifiable;
 
 /// Achievement identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -125,20 +125,24 @@ impl Achievement {
             },
         }
     }
-    
+
     /// Load secret achievement metadata from PNG
     fn load_secret_meta(secret_id: &str, achievement: Achievement) -> AchievementMeta {
         use crate::utils::branding::AppBranding;
-        
+
         if let Ok(branding) = AppBranding::load() {
             if let Some(secrets) = &branding.secrets {
                 if let Some(secret_achievement) = secrets.achievements.get(secret_id) {
                     // Leak strings to get 'static lifetime (they live for program duration anyway)
-                    let name: &'static str = Box::leak(secret_achievement.name.clone().into_boxed_str());
-                    let description: &'static str = Box::leak(secret_achievement.description.clone().into_boxed_str());
-                    let icon: &'static str = Box::leak(secret_achievement.icon.clone().into_boxed_str());
-                    let chronie_message: &'static str = Box::leak(secret_achievement.chronie_message.clone().into_boxed_str());
-                    
+                    let name: &'static str =
+                        Box::leak(secret_achievement.name.clone().into_boxed_str());
+                    let description: &'static str =
+                        Box::leak(secret_achievement.description.clone().into_boxed_str());
+                    let icon: &'static str =
+                        Box::leak(secret_achievement.icon.clone().into_boxed_str());
+                    let chronie_message: &'static str =
+                        Box::leak(secret_achievement.chronie_message.clone().into_boxed_str());
+
                     return AchievementMeta {
                         id: achievement,
                         name,
@@ -150,7 +154,7 @@ impl Achievement {
                 }
             }
         }
-        
+
         // Fallback if PNG not loaded
         AchievementMeta {
             id: achievement,
@@ -161,7 +165,7 @@ impl Achievement {
             chronie_message: "You found a secret!",
         }
     }
-    
+
     /// Get unique string identifier for database storage
     pub fn id_string(&self) -> String {
         match self {

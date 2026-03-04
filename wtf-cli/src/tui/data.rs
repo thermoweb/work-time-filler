@@ -114,7 +114,8 @@ impl TuiData {
             .map(|issue| (issue.key.clone(), issue))
             .collect();
 
-        let meeting_stats = Self::calculate_meeting_stats(&all_meetings, &config, &untracked_meeting_ids);
+        let meeting_stats =
+            Self::calculate_meeting_stats(&all_meetings, &config, &untracked_meeting_ids);
         let sprint_activities = Self::calculate_all_sprint_activities(&sprints);
         let worklog_wall = Self::calculate_worklog_wall();
 
@@ -180,7 +181,11 @@ impl TuiData {
             .collect()
     }
 
-    fn calculate_meeting_stats(meetings: &[Meeting], config: &wtf_lib::config::Config, untracked_ids: &std::collections::HashSet<String>) -> MeetingStats {
+    fn calculate_meeting_stats(
+        meetings: &[Meeting],
+        config: &wtf_lib::config::Config,
+        untracked_ids: &std::collections::HashSet<String>,
+    ) -> MeetingStats {
         use wtf_lib::utils::meetings::is_untracked;
         let pending = meetings
             .iter()

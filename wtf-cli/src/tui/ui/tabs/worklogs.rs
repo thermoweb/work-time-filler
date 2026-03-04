@@ -7,15 +7,15 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 use wtf_lib::models::data::LocalWorklogState;
 
 /// Worklogs tab - Split view with list and details
 pub(in crate::tui) fn render_worklogs_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_worklog_index;
     let filter_staged_only = data.ui_state.filter_staged_only;
-    
+
     render_list_detail_layout(
         frame,
         area,
@@ -149,7 +149,11 @@ fn render_worklogs_list(
 
         let line = Line::from(vec![
             Span::styled(
-                if is_selected { theme().selector } else { theme().unselected_selector },
+                if is_selected {
+                    theme().selector
+                } else {
+                    theme().unselected_selector
+                },
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),

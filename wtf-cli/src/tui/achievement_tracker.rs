@@ -1,7 +1,7 @@
-use crate::tui::types::{AppEvent, EventSubscriber, Tui};
-use wtf_lib::Achievement;
-use wtf_lib::services::AchievementService;
 use crate::logger;
+use crate::tui::types::{AppEvent, EventSubscriber, Tui};
+use wtf_lib::services::AchievementService;
+use wtf_lib::Achievement;
 
 /// Achievement tracker that listens to app events and unlocks achievements
 pub struct AchievementTracker;
@@ -11,24 +11,24 @@ impl AchievementTracker {
     /// Returns a list of achievements that meet their unlock conditions
     fn check_unlock_candidates(event: &AppEvent, has_wizard: bool, tui: &Tui) -> Vec<Achievement> {
         let mut candidates = Vec::new();
-        
+
         match event {
             AppEvent::PushComplete { history_id } => {
                 // Wizard completion achievement
                 if has_wizard {
                     candidates.push(Achievement::ChroniesApprentice);
                 }
-                
+
                 // Timeline Fixer: Check if any worklog in THIS push is >60 days old
                 if Self::has_old_worklog_in_push(history_id) {
                     candidates.push(Achievement::TimelineFixer);
                 }
-                
+
                 // Git Squash Master: Check if this push results in 3+ times for same day
                 if Self::has_multiple_pushes_same_day(history_id) {
                     candidates.push(Achievement::GitSquashMaster);
                 }
-                
+
                 // Declined But Logged: Check if any worklog is linked to a declined meeting
                 if Self::has_declined_meeting_worklog(history_id, tui) {
                     candidates.push(Achievement::DeclinedButLogged);
@@ -69,19 +69,19 @@ impl AchievementTracker {
             }
             _ => {}
         }
-        
+
         candidates
     }
-    
+
     /// Check if the specified push contains worklogs more than 60 days old
     fn has_old_worklog_in_push(history_id: &str) -> bool {
-        use wtf_lib::services::worklogs_service::LocalWorklogService;
         use chrono::Utc;
-        
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+
         // Get the specific history entry directly by ID
         if let Some(entry) = LocalWorklogService::get_history_by_id(history_id) {
             let sixty_days_ago = Utc::now() - chrono::Duration::days(60);
-            
+
             // Check each worklog in this push, fetching them one by one
             // Early exit as soon as we find one >60 days old
             for worklog_id in &entry.local_worklogs_id {
@@ -92,14 +92,14 @@ impl AchievementTracker {
                 }
             }
         }
-        
+
         false
     }
-    
+
     /// Check if the specified push contains 3+ worklogs for the same day
     fn has_multiple_pushes_same_day(history_id: &str) -> bool {
-        use wtf_lib::services::worklogs_service::LocalWorklogService;
         use std::collections::{HashMap, HashSet};
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Get the dates covered by THIS push
         let current_entry = match LocalWorklogService::get_history_by_id(history_id) {
@@ -134,7 +134,9 @@ impl AchievementTracker {
         }
 
         // Achievement triggers if any date covered by the current push has been pushed 3+ times
-        current_dates.iter().any(|d| push_counts.get(d).copied().unwrap_or(0) >= 3)
+        current_dates
+            .iter()
+            .any(|d| push_counts.get(d).copied().unwrap_or(0) >= 3)
     }
 
     /// Check if the push is happening after 10pm or before 6am (local time)
@@ -146,9 +148,9 @@ impl AchievementTracker {
 
     /// Check if any full calendar quarter has ≥90% of its Mon–Fri days covered by pushed worklogs
     fn completes_quarter_crunch() -> bool {
-        use wtf_lib::services::worklogs_service::LocalWorklogService;
         use chrono::{Datelike, NaiveDate, Weekday};
         use std::collections::HashSet;
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Collect all dates that have at least one pushed worklog
         let logged_dates: HashSet<NaiveDate> = LocalWorklogService::get_all_local_worklogs()
@@ -182,26 +184,26 @@ impl AchievementTracker {
         }
         false
     }
-    
+
     /// Check if user has 10+ meetings and all are auto-linked (no unlinked meetings)
     fn has_perfect_auto_linking(tui: &Tui) -> bool {
         let all_meetings = &tui.data.all_meetings;
-        
+
         // Need at least 10 meetings
         if all_meetings.len() < 10 {
             return false;
         }
-        
+
         // Check if ALL meetings are linked (none have jira_link = None)
         let all_linked = all_meetings.iter().all(|m| m.jira_link.is_some());
-        
+
         all_linked
     }
-    
+
     /// Check if the specified push contains a worklog linked to a declined meeting
     fn has_declined_meeting_worklog(history_id: &str, tui: &Tui) -> bool {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
-        
+
         // Get the specific history entry directly by ID
         if let Some(entry) = LocalWorklogService::get_history_by_id(history_id) {
             // Check each worklog in this push
@@ -210,14 +212,16 @@ impl AchievementTracker {
                     // Check if worklog has a meeting link
                     if let Some(meeting_id) = &worklog.meeting_id {
                         // Find the meeting in tui data
-                        if let Some(meeting) = tui.data.all_meetings.iter().find(|m| &m.id == meeting_id) {
+                        if let Some(meeting) =
+                            tui.data.all_meetings.iter().find(|m| &m.id == meeting_id)
+                        {
                             // Check if the meeting was declined
                             let is_declined = meeting
                                 .my_response_status
                                 .as_ref()
                                 .map(|s| s == "declined")
                                 .unwrap_or(false);
-                            
+
                             if is_declined {
                                 return true;
                             }
@@ -226,18 +230,22 @@ impl AchievementTracker {
                 }
             }
         }
-        
+
         false
     }
-    
+
     /// Handle unlocking an achievement (log + publish event)
     fn handle_unlock(achievement: Achievement, tui: &mut Tui) {
         let meta = achievement.meta();
-        logger::log(format!("🏆 Achievement Unlocked: {} {}", meta.icon, meta.name));
+        logger::log(format!(
+            "🏆 Achievement Unlocked: {} {}",
+            meta.icon, meta.name
+        ));
         logger::log(format!("   {}", meta.chronie_message));
-        
+
         // Publish event for potential UI notification
-        tui.event_bus.publish(AppEvent::AchievementUnlocked { achievement });
+        tui.event_bus
+            .publish(AppEvent::AchievementUnlocked { achievement });
     }
 }
 
@@ -246,7 +254,7 @@ impl EventSubscriber for AchievementTracker {
         // Check all achievements to see if any should be unlocked
         let has_wizard = tui.wizard_state.is_some();
         let candidates = Self::check_unlock_candidates(event, has_wizard, tui);
-        
+
         for achievement in candidates {
             // Try to unlock - returns true only if newly unlocked
             if AchievementService::unlock(achievement) {

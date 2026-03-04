@@ -38,7 +38,7 @@ async fn main() {
 
     let app = commands::build_app(&registry);
     let matches = app.get_matches();
-    
+
     // Check for global --debug flag
     if matches.get_flag("debug") {
         logger::enable_debug();
@@ -46,7 +46,7 @@ async fn main() {
 
     // Determine which command will run
     let command_name = matches.subcommand_name().unwrap_or(TuiCommand.name());
-    
+
     // Initialize env_logger for CLI commands (not for TUI)
     // TUI initializes its own log bridge in Tui::new()
     if command_name != TuiCommand.name() {

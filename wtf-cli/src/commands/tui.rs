@@ -13,11 +13,13 @@ impl Command for TuiCommand {
 
     async fn execute(&self, matches: &ArgMatches) {
         // Reset achievements if flag is set (only check if flag exists in matches)
-        if matches.try_contains_id("reset_achievements").unwrap_or(false) 
-            && matches.get_flag("reset_achievements") 
+        if matches
+            .try_contains_id("reset_achievements")
+            .unwrap_or(false)
+            && matches.get_flag("reset_achievements")
         {
             use wtf_lib::services::AchievementService;
-            
+
             println!("🗑️  Resetting all achievements...");
             if let Err(e) = AchievementService::reset_all() {
                 eprintln!("❌ Failed to reset achievements: {}", e);
@@ -40,7 +42,9 @@ impl Command for TuiCommand {
                 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
                 let _ = enable_raw_mode();
                 loop {
-                    if let Ok(Event::Key(_)) = read() { break; }
+                    if let Ok(Event::Key(_)) = read() {
+                        break;
+                    }
                 }
                 let _ = disable_raw_mode();
             }
@@ -60,7 +64,7 @@ impl Command for TuiCommand {
                 clap::Arg::new("reset_achievements")
                     .long("reset-achievements")
                     .help("Reset all achievements before starting")
-                    .action(clap::ArgAction::SetTrue)
+                    .action(clap::ArgAction::SetTrue),
             )
     }
 }

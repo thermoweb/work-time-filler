@@ -7,8 +7,8 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::{GapFillState, WizardState, WizardStep};
 use crate::tui::theme::theme;
+use crate::tui::{GapFillState, WizardState, WizardStep};
 
 pub(in crate::tui) fn render_wizard(
     frame: &mut Frame,
@@ -592,4 +592,3 @@ pub(in crate::tui) fn render_wizard_cancel_confirmation(frame: &mut Frame) {
 
     frame.render_widget(paragraph, popup_area);
 }
-

@@ -26,12 +26,15 @@ impl InstalledFlowDelegate for TuiInstalledFlowDelegate {
     ) -> Pin<Box<dyn Future<Output = Result<String, String>> + Send + 'a>> {
         Box::pin(async move {
             info!("🌐 Opening browser for authentication: {}", url);
-            
+
             // Automatically open URL in default browser
             if let Err(e) = open::that(url) {
-                error!("Failed to open browser automatically: {}. Please open the URL manually.", e);
+                error!(
+                    "Failed to open browser automatically: {}. Please open the URL manually.",
+                    e
+                );
             }
-            
+
             // Return empty string - the HTTPRedirect method handles the callback
             Ok(String::new())
         })
@@ -121,7 +124,8 @@ impl GoogleService {
 
         // Build authenticator with custom delegate
         let expanded_token_path = expand_path(&google_config.token_cache_path);
-        let auth = InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
+        let auth =
+            InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
                 .persist_tokens_to_disk(expanded_token_path)
                 .flow_delegate(Box::new(TuiInstalledFlowDelegate))
                 .build()

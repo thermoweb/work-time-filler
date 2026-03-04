@@ -17,17 +17,17 @@ pub(in crate::tui) const FIELD_COUNT: usize = 19;
 
 /// Terminal display colors for the 11 Google Calendar event colors (same order as GOOGLE_CALENDAR_EVENT_COLORS).
 pub(super) const GC_TERM_COLORS: [Color; 11] = [
-    Color::LightBlue,  // Lavender
-    Color::Green,      // Sage
-    Color::Magenta,    // Grape
-    Color::LightRed,   // Flamingo
-    Color::Yellow,     // Banana
-    Color::Red,        // Tangerine
-    Color::Cyan,       // Peacock
-    Color::DarkGray,   // Graphite
-    Color::Blue,       // Blueberry
-    Color::DarkGray,   // Basil (no exact dark-green, reuse DarkGray)
-    Color::Red,        // Tomato
+    Color::LightBlue, // Lavender
+    Color::Green,     // Sage
+    Color::Magenta,   // Grape
+    Color::LightRed,  // Flamingo
+    Color::Yellow,    // Banana
+    Color::Red,       // Tangerine
+    Color::Cyan,      // Peacock
+    Color::DarkGray,  // Graphite
+    Color::Blue,      // Blueberry
+    Color::DarkGray,  // Basil (no exact dark-green, reuse DarkGray)
+    Color::Red,       // Tomato
 ];
 
 /// Get the display value for a field from the config
@@ -41,11 +41,7 @@ pub(in crate::tui) fn get_field_value(field_idx: usize, config: &Config) -> Stri
             .auto_follow_sprint_pattern
             .clone()
             .unwrap_or_default(),
-        4 => config
-            .github
-            .organisation
-            .clone()
-            .unwrap_or_default(),
+        4 => config.github.organisation.clone().unwrap_or_default(),
         5 => config
             .google
             .as_ref()
@@ -99,7 +95,11 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
         }
 
         let is_selected = state.settings_selected_field == *field_idx;
-        let indicator = if is_selected { theme().selector } else { theme().unselected_selector };
+        let indicator = if is_selected {
+            theme().selector
+        } else {
+            theme().unselected_selector
+        };
 
         let value_str: String = if state.settings_editing && is_selected {
             format!("{}_", state.settings_input_buffer)
@@ -154,13 +154,21 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
     for (color_idx, color_name) in GOOGLE_CALENDAR_EVENT_COLORS.iter().enumerate() {
         let field_idx = 8 + color_idx;
         let is_selected = state.settings_selected_field == field_idx;
-        let indicator = if is_selected { theme().selector } else { theme().unselected_selector };
+        let indicator = if is_selected {
+            theme().selector
+        } else {
+            theme().unselected_selector
+        };
 
         let value_str = if state.settings_editing && is_selected {
             format!("{}_", state.settings_input_buffer)
         } else {
             let raw = get_field_value(field_idx, config);
-            if raw.is_empty() { "(not set)".to_string() } else { raw }
+            if raw.is_empty() {
+                "(not set)".to_string()
+            } else {
+                raw
+            }
         };
 
         let value_color = if state.settings_editing && is_selected {
@@ -172,13 +180,18 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
         };
 
         let label_style = if is_selected {
-            Style::default().fg(theme().fg_primary).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(theme().fg_primary)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme().fg_secondary)
         };
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {}", indicator), Style::default().fg(theme().highlight)),
+            Span::styled(
+                format!(" {}", indicator),
+                Style::default().fg(theme().highlight),
+            ),
             Span::styled("● ", Style::default().fg(GC_TERM_COLORS[color_idx])),
             Span::styled(format!("{:<26}", color_name), label_style),
             Span::styled(value_str, Style::default().fg(value_color)),

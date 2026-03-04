@@ -73,7 +73,7 @@ impl AppBranding {
             }
         })
     }
-    
+
     /// Get all available category names (for debugging)
     pub fn get_category_names(&self) -> Vec<&str> {
         self.categories.keys().map(|k| k.as_str()).collect()
@@ -169,29 +169,38 @@ mod tests {
         let startup_msgs = branding.get_all("startup");
         assert!(!startup_msgs.is_empty(), "No startup messages found");
     }
-    
+
     #[test]
     fn test_secrets_load() {
         let branding = AppBranding::load().expect("Failed to load branding");
         assert!(branding.secrets.is_some(), "No secrets found in PNG");
-        
+
         let secrets = branding.secrets.as_ref().unwrap();
-        
+
         // Verify chronie sequence exists
-        assert!(secrets.sequences.contains_key("chronie"), "Chronie sequence not found");
+        assert!(
+            secrets.sequences.contains_key("chronie"),
+            "Chronie sequence not found"
+        );
         let chronie_seq = &secrets.sequences["chronie"];
         assert_eq!(chronie_seq.keys, vec!["c", "h", "r", "o", "n", "i", "e"]);
         assert_eq!(chronie_seq.achievement, "secret_chronie_friend");
-        
+
         // Verify achievement exists
-        assert!(secrets.achievements.contains_key("secret_chronie_friend"), "Chronie achievement not found");
+        assert!(
+            secrets.achievements.contains_key("secret_chronie_friend"),
+            "Chronie achievement not found"
+        );
         let achievement = &secrets.achievements["secret_chronie_friend"];
         assert_eq!(achievement.name, "Chronie's Friend");
         assert_eq!(achievement.icon, "🧙");
         assert!(!achievement.chronie_message.is_empty());
-        
+
         println!("✅ Secret sequence: {:?}", chronie_seq.keys);
-        println!("✅ Secret achievement: {} {}", achievement.icon, achievement.name);
+        println!(
+            "✅ Secret achievement: {} {}",
+            achievement.icon, achievement.name
+        );
         println!("✅ Chronie says: {}", achievement.chronie_message);
     }
 }

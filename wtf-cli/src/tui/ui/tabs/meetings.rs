@@ -1,5 +1,5 @@
-use chrono::Local;
 use super::settings::GC_TERM_COLORS;
+use chrono::Local;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -9,15 +9,15 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::ui_helpers::*;
 use crate::tui::theme::theme;
+use crate::tui::ui_helpers::*;
 use wtf_lib::config::Config;
 
 /// Render meetings tab with list and details
 pub(in crate::tui) fn render_meetings_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_meeting_index;
     let filter_unlinked_only = data.ui_state.filter_unlinked_only;
-    
+
     render_list_detail_layout(
         frame,
         area,
@@ -145,7 +145,10 @@ fn render_meetings_list(
 
             // Selection indicator and style
             let (indicator, mut base_style) = if is_selected {
-                (theme().selector, Style::default().add_modifier(Modifier::BOLD))
+                (
+                    theme().selector,
+                    Style::default().add_modifier(Modifier::BOLD),
+                )
             } else {
                 (theme().unselected_selector, Style::default())
             };
@@ -180,17 +183,22 @@ fn render_meetings_list(
                     },
                 ),
                 Span::raw(" "),
-                Span::styled(
-                    time_str,
-                    base_style.fg(Color::DarkGray),
-                ),
+                Span::styled(time_str, base_style.fg(Color::DarkGray)),
                 Span::raw("  "),
                 // Colored circle for meetings with a Google Calendar color
                 {
-                    let circle_color = meeting.color_id.as_deref()
+                    let circle_color = meeting
+                        .color_id
+                        .as_deref()
                         .and_then(|cid| cid.parse::<usize>().ok())
                         .filter(|&idx| idx >= 1 && idx <= 11)
-                        .map(|idx| if is_declined || is_untracked { Color::DarkGray } else { GC_TERM_COLORS[idx - 1] });
+                        .map(|idx| {
+                            if is_declined || is_untracked {
+                                Color::DarkGray
+                            } else {
+                                GC_TERM_COLORS[idx - 1]
+                            }
+                        });
                     if let Some(c) = circle_color {
                         Span::styled("● ", Style::default().fg(c))
                     } else {

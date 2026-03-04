@@ -141,7 +141,8 @@ pub async fn fetch_google_meetings(multi_progress: Option<MultiProgress>) -> Res
             }
         }
     } else {
-        let error_msg = "No followed sprints found. Cannot determine date range for Google Calendar fetch.";
+        let error_msg =
+            "No followed sprints found. Cannot determine date range for Google Calendar fetch.";
         if let Some(mp) = &multi_progress {
             mp.println(error_msg).ok();
             mp.println("Please follow at least one sprint first.").ok();

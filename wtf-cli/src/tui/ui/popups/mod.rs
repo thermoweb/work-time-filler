@@ -1,37 +1,28 @@
 // Popup rendering modules organized by functionality
 
-mod wizard;
-mod issue_selection;
 mod confirmations;
+mod issue_selection;
 mod other;
+mod wizard;
 
 use ratatui::Frame;
 
 // Re-export individual functions for direct use if needed
-pub(in crate::tui) use wizard::{
-    render_wizard,
-    render_wizard_cancel_confirmation,
-};
+pub(in crate::tui) use wizard::{render_wizard, render_wizard_cancel_confirmation};
 
 pub(in crate::tui) use issue_selection::{
-    render_issue_selection_popup,
-    render_gap_fill_issue_selection,
+    render_gap_fill_issue_selection, render_issue_selection_popup,
 };
 
 pub(in crate::tui) use confirmations::{
-    render_unlink_confirmation,
-    render_revert_confirmation,
+    render_gap_fill_confirmation, render_revert_confirmation, render_unlink_confirmation,
     render_worklog_creation_confirmation,
-    render_gap_fill_confirmation,
 };
 
-pub(in crate::tui) use other::{
-    render_sprint_follow_popup,
-    render_about_popup,
-};
+pub(in crate::tui) use other::{render_about_popup, render_sprint_follow_popup};
 
 /// Render all active popups in the correct priority order
-/// 
+///
 /// Popup rendering priority (bottom to top):
 /// 1. Wizard (if active)
 /// 2. Various confirmations and selections

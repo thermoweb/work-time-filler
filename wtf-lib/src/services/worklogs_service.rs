@@ -219,7 +219,10 @@ impl LocalWorklogService {
         }
         let count = new_ids.len();
         Self::historize(new_ids);
-        debug!("Imported {} Jira-only worklogs into a new history entry", count);
+        debug!(
+            "Imported {} Jira-only worklogs into a new history entry",
+            count
+        );
         count
     }
 

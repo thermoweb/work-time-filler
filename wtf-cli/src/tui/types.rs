@@ -18,30 +18,40 @@ pub enum AppEvent {
     // Fetch events
     FetchComplete(TuiData),
     FetchError(String),
-    
+
     // Push events
-    PushComplete { history_id: String },
-    PushProgress { current: usize, total: usize, message: String },
+    PushComplete {
+        history_id: String,
+    },
+    PushProgress {
+        current: usize,
+        total: usize,
+        message: String,
+    },
     PushError(String),
-    
+
     // Revert events
     RevertComplete,
     RevertError(String),
-    
+
     // Data events
     DataRefreshed(TuiData),
-    
+
     // Status events
     StatusMessageTimeout,
-    
+
     // UI events
     AboutPopupOpened,
-    
+
     // Achievement events
-    AchievementUnlocked { achievement: wtf_lib::Achievement },
-    
+    AchievementUnlocked {
+        achievement: wtf_lib::Achievement,
+    },
+
     // Secret sequence events
-    SecretSequenceTriggered { sequence_name: String },
+    SecretSequenceTriggered {
+        sequence_name: String,
+    },
 }
 
 /// Trait for components that react to events
@@ -71,13 +81,13 @@ impl EventBus {
             history: Vec::new(),
         }
     }
-    
+
     /// Publish an event (can be called from anywhere, including background threads)
     pub fn publish(&mut self, event: AppEvent) {
         self.history.push(event.clone());
         self.pending_events.push_back(event);
     }
-    
+
     /// Process all pending events
     pub fn process_events(&mut self, tui: &mut Tui) {
         while let Some(event) = self.pending_events.pop_front() {
@@ -86,18 +96,18 @@ impl EventBus {
             }
         }
     }
-    
+
     /// Register a subscriber
     pub fn subscribe(&mut self, subscriber: Box<dyn EventSubscriber>) {
         self.subscribers.push(subscriber);
     }
-    
+
     /// Debug helpers
     #[allow(dead_code)]
     pub fn pending_count(&self) -> usize {
         self.pending_events.len()
     }
-    
+
     #[allow(dead_code)]
     pub fn subscriber_count(&self) -> usize {
         self.subscribers.len()
@@ -145,7 +155,7 @@ impl Tab {
 
         tabs
     }
-    
+
     pub fn next(self, has_achievements: bool) -> Self {
         let tabs = Self::available_tabs(has_achievements);
         let current_index = tabs.iter().position(|&t| t == self).unwrap_or(0);
@@ -172,7 +182,7 @@ impl Tab {
         data: &super::data::TuiData,
     ) {
         use super::ui::tabs;
-        
+
         match self {
             Tab::Sprints => tabs::sprints::render_sprints_tab(frame, area, data),
             Tab::Meetings => tabs::meetings::render_meetings_tab(frame, area, data),
@@ -200,13 +210,13 @@ pub struct Tui {
     pub(crate) show_about_popup: bool,
     pub(crate) about_image: Option<image::DynamicImage>,
     pub(crate) fetch_status: FetchStatus,
-    
-    // EventBus - Centralized event system  
+
+    // EventBus - Centralized event system
     pub(crate) event_bus: EventBus,
-    
+
     // Key sequence tracking for secret achievements
     pub(crate) key_sequence_buffer: VecDeque<String>,
-    
+
     // Channel receivers for async operations (bridge to EventBus)
     pub(super) fetch_receiver: Option<Receiver<FetchStatus>>,
     pub(super) revert_receiver: Option<Receiver<Result<(), String>>>,
@@ -214,7 +224,7 @@ pub struct Tui {
     pub(super) push_progress_receiver: Option<Receiver<String>>,
     pub(super) data_refresh_receiver: Option<Receiver<super::data::TuiData>>,
     pub(super) update_receiver: Option<Receiver<Option<String>>>,
-    
+
     pub(super) status_clear_time: Option<std::time::Instant>,
     pub(super) needs_full_clear: bool,
     pub(super) should_quit: bool,

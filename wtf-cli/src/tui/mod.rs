@@ -1,12 +1,12 @@
+mod achievement_tracker;
 pub mod data;
 mod helpers;
 mod operations;
+pub mod theme;
 mod types;
 pub mod ui;
 mod ui_helpers;
 mod wizard;
-mod achievement_tracker;
-pub mod theme;
 
 // Re-export types for public API
 pub use types::*;
@@ -14,7 +14,7 @@ pub use types::*;
 use achievement_tracker::AchievementTracker;
 
 // Import custom logger macros
-use crate::{info, error};
+use crate::{error, info};
 
 use crossterm::{
     event::{
@@ -52,7 +52,9 @@ impl Tui {
     pub fn new() -> Self {
         // Initialize collecting logger for TUI mode and bridge to log crate
         let log_collector = collecting_logger();
-        logger::init_logger_with_log_bridge(log_collector.clone() as std::sync::Arc<dyn crate::logger::Logger>);
+        logger::init_logger_with_log_bridge(
+            log_collector.clone() as std::sync::Arc<dyn crate::logger::Logger>
+        );
 
         // Chronie's startup greeting (only if ChroniesApprentice is unlocked)
         log_chronie_message("startup", "🧙 Chronie:");
@@ -67,7 +69,6 @@ impl Tui {
         let mut event_bus = EventBus::new();
         event_bus.subscribe(Box::new(wizard::WizardEventHandler));
         event_bus.subscribe(Box::new(AchievementTracker));
-
 
         // Spawn async version check — result arrives via channel
         let (update_sender, update_receiver) = std::sync::mpsc::channel();
@@ -144,7 +145,7 @@ impl Tui {
         self.handle_update_check();
         self.check_and_clear_status_timer();
         self.wizard_update_animation();
-        
+
         // Process EventBus events (temporarily take ownership to avoid borrow issues)
         let mut event_bus = std::mem::replace(&mut self.event_bus, EventBus::new());
         event_bus.process_events(self);
@@ -162,7 +163,8 @@ impl Tui {
                         self.auto_link_meetings();
                         self.fetch_receiver = None;
                         self.status_clear_time = Some(std::time::Instant::now());
-                        self.event_bus.publish(AppEvent::FetchComplete(self.data.clone()));
+                        self.event_bus
+                            .publish(AppEvent::FetchComplete(self.data.clone()));
                     }
                     FetchStatus::Error(err) => {
                         self.fetch_receiver = None;
@@ -208,7 +210,8 @@ impl Tui {
                 info!("{}", msg);
                 self.refresh_data();
                 self.status_clear_time = Some(std::time::Instant::now());
-                self.event_bus.publish(AppEvent::PushComplete { history_id });
+                self.event_bus
+                    .publish(AppEvent::PushComplete { history_id });
             }
         }
 
@@ -278,7 +281,7 @@ impl Tui {
             if clear_time.elapsed() > timeout {
                 self.fetch_status = FetchStatus::Idle;
                 self.status_clear_time = None;
-                
+
                 // New way: Publish event
                 self.event_bus.publish(AppEvent::StatusMessageTimeout);
             }
@@ -326,17 +329,20 @@ impl Tui {
         use arboard::Clipboard;
         use std::thread;
         use std::time::Duration;
-        
+
         // Get logs from collector
         let logs = self.log_collector.get_messages();
         let content = logs.join("\n");
-        
+
         // Copy to clipboard
         match Clipboard::new() {
             Ok(mut clipboard) => {
                 match clipboard.set_text(&content) {
                     Ok(_) => {
-                        logger::log(format!("📋 Logs copied to clipboard! ({} lines)", logs.len()));
+                        logger::log(format!(
+                            "📋 Logs copied to clipboard! ({} lines)",
+                            logs.len()
+                        ));
                         // Keep clipboard alive for a bit so clipboard manager can grab it
                         // This is necessary on X11/Wayland systems
                         thread::sleep(Duration::from_millis(100));
@@ -355,16 +361,16 @@ impl Tui {
     fn handle_key(&mut self, key: KeyEvent) {
         // Track key sequences globally (for secret achievements)
         // Skip tracking if we're in input mode (wizard, gap fill, issue selection)
-        let in_input_mode = self.wizard_state.is_some() 
-            || self.gap_fill_state.is_some() 
+        let in_input_mode = self.wizard_state.is_some()
+            || self.gap_fill_state.is_some()
             || self.issue_selection_state.is_some()
             || self.sprint_follow_state.is_some()
             || (self.current_tab == Tab::Settings && self.data.ui_state.settings_editing);
-        
+
         if !in_input_mode {
             self.track_key_sequence(&key);
         }
-        
+
         // Revert confirmation popup takes highest priority
         if self.revert_confirmation_state.is_some() {
             self.handle_history_key(key);
@@ -507,17 +513,17 @@ impl Tui {
         // About popup - global key that works anywhere
         if key.code == KeyCode::Char('h') || key.code == KeyCode::Char('H') {
             self.show_about_popup = !self.show_about_popup;
-            
+
             // Publish event when About popup is opened
             if self.show_about_popup {
                 self.event_bus.publish(AppEvent::AboutPopupOpened);
-                
+
                 // Process events immediately to trigger achievement
                 let mut event_bus = std::mem::take(&mut self.event_bus);
                 event_bus.process_events(self);
                 self.event_bus = event_bus;
             }
-            
+
             return;
         }
 
@@ -528,7 +534,11 @@ impl Tui {
         }
 
         // Export logs to clipboard - Ctrl+L key
-        if key.code == KeyCode::Char('l') && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+        if key.code == KeyCode::Char('l')
+            && key
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
             self.export_logs();
             return;
         }
@@ -622,8 +632,11 @@ impl Tui {
                 // The render function will clamp the offset to valid range
                 match key.code {
                     KeyCode::Left | KeyCode::PageUp => {
-                        self.data.ui_state.achievements_scroll_offset = 
-                            self.data.ui_state.achievements_scroll_offset.saturating_sub(1);
+                        self.data.ui_state.achievements_scroll_offset = self
+                            .data
+                            .ui_state
+                            .achievements_scroll_offset
+                            .saturating_sub(1);
                     }
                     KeyCode::Right | KeyCode::PageDown => {
                         let total_achievements = wtf_lib::Achievement::all().len();
@@ -637,7 +650,8 @@ impl Tui {
                     }
                     KeyCode::End => {
                         // Set to high value, render will clamp
-                        self.data.ui_state.achievements_scroll_offset = wtf_lib::Achievement::all().len();
+                        self.data.ui_state.achievements_scroll_offset =
+                            wtf_lib::Achievement::all().len();
                     }
                     _ => {}
                 }
@@ -769,7 +783,11 @@ impl Tui {
         let max_index = self.data.all_sprints.len().saturating_sub(1);
 
         // Handle standard navigation keys first
-        if helpers::handle_list_navigation(key, &mut self.data.ui_state.selected_sprint_index, max_index) {
+        if helpers::handle_list_navigation(
+            key,
+            &mut self.data.ui_state.selected_sprint_index,
+            max_index,
+        ) {
             return;
         }
 
@@ -840,7 +858,11 @@ impl Tui {
         let max_index = meetings.len().saturating_sub(1);
 
         // Handle standard navigation keys first
-        if helpers::handle_list_navigation(key, &mut self.data.ui_state.selected_meeting_index, max_index) {
+        if helpers::handle_list_navigation(
+            key,
+            &mut self.data.ui_state.selected_meeting_index,
+            max_index,
+        ) {
             return;
         }
 
@@ -892,10 +914,12 @@ impl Tui {
                 }
             }
             KeyCode::PageUp => {
-                self.data.ui_state.selected_meeting_index = self.data.ui_state.selected_meeting_index.saturating_sub(10);
+                self.data.ui_state.selected_meeting_index =
+                    self.data.ui_state.selected_meeting_index.saturating_sub(10);
             }
             KeyCode::PageDown => {
-                self.data.ui_state.selected_meeting_index = (self.data.ui_state.selected_meeting_index + 10).min(max_index);
+                self.data.ui_state.selected_meeting_index =
+                    (self.data.ui_state.selected_meeting_index + 10).min(max_index);
             }
             _ => {}
         }
@@ -926,7 +950,11 @@ impl Tui {
         }
 
         // Handle standard navigation keys first
-        if helpers::handle_list_navigation(key, &mut self.data.ui_state.selected_worklog_index, max_index) {
+        if helpers::handle_list_navigation(
+            key,
+            &mut self.data.ui_state.selected_worklog_index,
+            max_index,
+        ) {
             return;
         }
 
@@ -969,10 +997,12 @@ impl Tui {
                 }
             }
             KeyCode::PageUp => {
-                self.data.ui_state.selected_worklog_index = self.data.ui_state.selected_worklog_index.saturating_sub(10);
+                self.data.ui_state.selected_worklog_index =
+                    self.data.ui_state.selected_worklog_index.saturating_sub(10);
             }
             KeyCode::PageDown => {
-                self.data.ui_state.selected_worklog_index = (self.data.ui_state.selected_worklog_index + 10).min(max_index);
+                self.data.ui_state.selected_worklog_index =
+                    (self.data.ui_state.selected_worklog_index + 10).min(max_index);
             }
             _ => {}
         }
@@ -1009,8 +1039,11 @@ impl Tui {
 
         match key.code {
             KeyCode::Up => {
-                self.data.ui_state.selected_github_session_index =
-                    self.data.ui_state.selected_github_session_index.saturating_sub(1);
+                self.data.ui_state.selected_github_session_index = self
+                    .data
+                    .ui_state
+                    .selected_github_session_index
+                    .saturating_sub(1);
             }
             KeyCode::Down => {
                 if self.data.ui_state.selected_github_session_index < max_index {
@@ -1024,8 +1057,11 @@ impl Tui {
                 self.data.ui_state.selected_github_session_index = max_index;
             }
             KeyCode::PageUp => {
-                self.data.ui_state.selected_github_session_index =
-                    self.data.ui_state.selected_github_session_index.saturating_sub(10);
+                self.data.ui_state.selected_github_session_index = self
+                    .data
+                    .ui_state
+                    .selected_github_session_index
+                    .saturating_sub(10);
             }
             KeyCode::PageDown => {
                 self.data.ui_state.selected_github_session_index =
@@ -1806,14 +1842,20 @@ impl Tui {
         }
 
         // Normal navigation — compute sprint entry info using owned values to avoid borrow conflicts
-        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (usize, Vec<String>, Vec<Vec<wtf_lib::models::data::Worklog>>) = {
+        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (
+            usize,
+            Vec<String>,
+            Vec<Vec<wtf_lib::models::data::Worklog>>,
+        ) = {
             use crate::tui::ui::tabs::history::{jira_only_by_sprint, JIRA_ONLY_VIRTUAL_PREFIX};
             let entries = jira_only_by_sprint(&self.data);
             let count = entries.len();
-            let ids: Vec<String> = entries.iter()
+            let ids: Vec<String> = entries
+                .iter()
                 .map(|(s, _)| format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, s.id))
                 .collect();
-            let wls: Vec<Vec<wtf_lib::models::data::Worklog>> = entries.iter()
+            let wls: Vec<Vec<wtf_lib::models::data::Worklog>> = entries
+                .iter()
                 .map(|(_, wls)| wls.iter().map(|w| (*w).clone()).collect())
                 .collect();
             (count, ids, wls)
@@ -1827,15 +1869,23 @@ impl Tui {
         };
 
         // Handle standard navigation keys first
-        if helpers::handle_list_navigation(key, &mut self.data.ui_state.selected_history_index, max_index) {
+        if helpers::handle_list_navigation(
+            key,
+            &mut self.data.ui_state.selected_history_index,
+            max_index,
+        ) {
             return;
         }
 
         // Handle history-specific keys
         let virtual_entry_idx = self.data.worklog_history.len();
-        let on_virtual_entry = has_jira_only
-            && self.data.ui_state.selected_history_index >= virtual_entry_idx;
-        let virtual_sprint_i = self.data.ui_state.selected_history_index.saturating_sub(virtual_entry_idx);
+        let on_virtual_entry =
+            has_jira_only && self.data.ui_state.selected_history_index >= virtual_entry_idx;
+        let virtual_sprint_i = self
+            .data
+            .ui_state
+            .selected_history_index
+            .saturating_sub(virtual_entry_idx);
         let virtual_id = virtual_ids.get(virtual_sprint_i).cloned();
 
         match key.code {
@@ -1844,7 +1894,11 @@ impl Tui {
                     if let Some(vid) = &virtual_id {
                         self.data.ui_state.expanded_history_ids.remove(vid);
                     }
-                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                } else if let Some(history) = self
+                    .data
+                    .worklog_history
+                    .get(self.data.ui_state.selected_history_index)
+                {
                     self.data.ui_state.expanded_history_ids.remove(&history.id);
                 }
             }
@@ -1853,8 +1907,15 @@ impl Tui {
                     if let Some(vid) = virtual_id {
                         self.data.ui_state.expanded_history_ids.insert(vid);
                     }
-                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
-                    self.data.ui_state.expanded_history_ids.insert(history.id.clone());
+                } else if let Some(history) = self
+                    .data
+                    .worklog_history
+                    .get(self.data.ui_state.selected_history_index)
+                {
+                    self.data
+                        .ui_state
+                        .expanded_history_ids
+                        .insert(history.id.clone());
                 }
             }
             KeyCode::Enter => {
@@ -1866,18 +1927,34 @@ impl Tui {
                             self.data.ui_state.expanded_history_ids.insert(vid);
                         }
                     }
-                } else if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
-                    if self.data.ui_state.expanded_history_ids.contains(&history.id) {
+                } else if let Some(history) = self
+                    .data
+                    .worklog_history
+                    .get(self.data.ui_state.selected_history_index)
+                {
+                    if self
+                        .data
+                        .ui_state
+                        .expanded_history_ids
+                        .contains(&history.id)
+                    {
                         self.data.ui_state.expanded_history_ids.remove(&history.id);
                     } else {
-                        self.data.ui_state.expanded_history_ids.insert(history.id.clone());
+                        self.data
+                            .ui_state
+                            .expanded_history_ids
+                            .insert(history.id.clone());
                     }
                 }
             }
             KeyCode::Delete => {
                 // Show revert confirmation (reverts in Jira) — not available for virtual entry
                 if !on_virtual_entry {
-                    if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                    if let Some(history) = self
+                        .data
+                        .worklog_history
+                        .get(self.data.ui_state.selected_history_index)
+                    {
                         self.revert_confirmation_state = Some(RevertConfirmationState {
                             history_id: history.id.clone(),
                             user_input: String::new(),
@@ -1889,7 +1966,11 @@ impl Tui {
             KeyCode::Char('D') => {
                 // Delete history from DB without Jira revert (Shift+D)
                 if !on_virtual_entry {
-                    if let Some(history) = self.data.worklog_history.get(self.data.ui_state.selected_history_index) {
+                    if let Some(history) = self
+                        .data
+                        .worklog_history
+                        .get(self.data.ui_state.selected_history_index)
+                    {
                         match LocalWorklogService::delete_history_from_db(&history.id) {
                             Ok(()) => {
                                 logger::log(format!("🗑️ Deleted history entry from database (worklogs remain in Jira)"));
@@ -1905,8 +1986,11 @@ impl Tui {
             KeyCode::Char('c') | KeyCode::Char('C') => {
                 if on_virtual_entry {
                     // Import only this sprint's untracked Jira worklogs as a new local history entry
-                    if let Some(sprint_wls) = sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i) {
-                        let count = LocalWorklogService::create_history_for_jira_only_worklogs(&sprint_wls);
+                    if let Some(sprint_wls) =
+                        sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i)
+                    {
+                        let count =
+                            LocalWorklogService::create_history_for_jira_only_worklogs(&sprint_wls);
                         if count > 0 {
                             logger::log(format!(
                                 "☁ Imported {} Jira worklog(s) into a new history entry",
@@ -1919,15 +2003,19 @@ impl Tui {
                 } else {
                     // Create history for pushed local worklogs without history (recovery function)
                     LocalWorklogService::create_history_for_pushed_worklogs();
-                    logger::log("📝 Created recovery history for unhistorized pushed worklogs".to_string());
+                    logger::log(
+                        "📝 Created recovery history for unhistorized pushed worklogs".to_string(),
+                    );
                 }
                 self.refresh_data();
             }
             KeyCode::PageUp => {
-                self.data.ui_state.selected_history_index = self.data.ui_state.selected_history_index.saturating_sub(10);
+                self.data.ui_state.selected_history_index =
+                    self.data.ui_state.selected_history_index.saturating_sub(10);
             }
             KeyCode::PageDown => {
-                self.data.ui_state.selected_history_index = (self.data.ui_state.selected_history_index + 10).min(max_index);
+                self.data.ui_state.selected_history_index =
+                    (self.data.ui_state.selected_history_index + 10).min(max_index);
             }
             _ => {}
         }
@@ -1963,7 +2051,7 @@ impl Tui {
     }
 
     fn handle_settings_key(&mut self, key: KeyEvent) {
-        use crate::tui::ui::tabs::settings::{FIELD_COUNT, get_field_value};
+        use crate::tui::ui::tabs::settings::{get_field_value, FIELD_COUNT};
 
         if self.data.ui_state.settings_editing {
             match key.code {
@@ -2042,10 +2130,7 @@ impl Tui {
                 config.jira.auto_follow_sprint_pattern =
                     if value.is_empty() { None } else { Some(value) }
             }
-            4 => {
-                config.github.organisation =
-                    if value.is_empty() { None } else { Some(value) }
-            }
+            4 => config.github.organisation = if value.is_empty() { None } else { Some(value) },
             5 => {
                 if let Some(ref mut g) = config.google {
                     g.credentials_path = value;
@@ -2096,7 +2181,8 @@ impl Tui {
         match self.data.config.save() {
             Ok(()) => {
                 self.data.ui_state.settings_dirty = false;
-                self.data.ui_state.settings_status = Some("✓ Settings saved successfully".to_string());
+                self.data.ui_state.settings_status =
+                    Some("✓ Settings saved successfully".to_string());
                 logger::log("⚙️  Settings saved".to_string());
             }
             Err(e) => {
@@ -2128,7 +2214,7 @@ impl Tui {
     // ============================================================================
     // Key Sequence Tracking (for secret achievements)
     // ============================================================================
-    
+
     fn track_key_sequence(&mut self, key: &KeyEvent) {
         // Convert key to string representation
         let key_str = match key.code {
@@ -2142,75 +2228,74 @@ impl Tui {
             }
             _ => return, // Ignore other keys
         };
-        
+
         self.track_key_str(key_str);
     }
-    
+
     fn track_key_str(&mut self, key_str: &str) {
         // Add key to buffer
         self.key_sequence_buffer.push_back(key_str.to_string());
-        
+
         // Keep buffer size limited (max 20 keys for longest sequences)
         if self.key_sequence_buffer.len() > 20 {
             self.key_sequence_buffer.pop_front();
         }
-        
+
         // Check for known sequences
         self.check_key_sequences();
     }
-    
+
     fn check_key_sequences(&mut self) {
         // Load sequences from PNG metadata (use local APP_BRANDING)
         let Some(branding) = APP_BRANDING.as_ref() else {
             return;
         };
-        
+
         let Some(secrets) = &branding.secrets else {
             return;
         };
-        
+
         // Check each sequence from PNG
         for (name, sequence_def) in &secrets.sequences {
             let keys: Vec<&str> = sequence_def.keys.iter().map(|s| s.as_str()).collect();
-            
+
             if self.matches_sequence(&keys) {
                 // Publish event
-                self.event_bus.publish(AppEvent::SecretSequenceTriggered { 
-                    sequence_name: name.clone() 
+                self.event_bus.publish(AppEvent::SecretSequenceTriggered {
+                    sequence_name: name.clone(),
                 });
-                
+
                 // Log for debugging
                 logger::log(format!("🔓 Secret sequence detected: {}", name));
-                
+
                 // Clear buffer to avoid re-triggering
                 self.key_sequence_buffer.clear();
-                
+
                 // Process events immediately
                 let mut event_bus = std::mem::take(&mut self.event_bus);
                 event_bus.process_events(self);
                 self.event_bus = event_bus;
-                
+
                 break;
             }
         }
     }
-    
+
     fn matches_sequence(&self, sequence: &[&str]) -> bool {
         if self.key_sequence_buffer.len() < sequence.len() {
             return false;
         }
-        
+
         // Check if last N keys match the sequence
         let start = self.key_sequence_buffer.len() - sequence.len();
-        let recent_keys: Vec<String> = self.key_sequence_buffer
+        let recent_keys: Vec<String> = self
+            .key_sequence_buffer
             .iter()
             .skip(start)
             .cloned()
             .collect();
-        
-        recent_keys.iter()
-            .zip(sequence.iter())
-            .all(|(a, b)| a == b)
+
+        recent_keys.iter().zip(sequence.iter()).all(|(a, b)| a == b)
     }
 
     fn load_logo_image() -> Option<image::DynamicImage> {
@@ -2229,7 +2314,7 @@ pub fn get_branding_text(category: &str) -> Option<String> {
         let categories = branding.get_category_names();
         crate::logger::debug(format!("Available branding categories: {:?}", categories));
         crate::logger::debug(format!("Looking for category: '{}'", category));
-        
+
         branding.get_text(category).map(|s| s.to_string())
     } else {
         crate::logger::debug("APP_BRANDING is None!".to_string());
@@ -2242,24 +2327,24 @@ pub fn get_branding_text(category: &str) -> Option<String> {
 pub fn get_chronie_message(category: &str) -> Option<String> {
     use wtf_lib::models::achievement::Achievement;
     use wtf_lib::services::achievement_service::AchievementService;
-    
+
     // Map message categories to required achievements
     let required_achievement = match category {
         // Friend-tier messages (require secret achievement)
         "secret" | "friend" => Achievement::ChroniesFriend,
-        
+
         // Apprentice-tier messages (require wizard completion)
         "startup" | "random" | "overwork" | "wizard_complete" => Achievement::ChroniesApprentice,
-        
+
         // Default: require apprentice level
         _ => Achievement::ChroniesApprentice,
     };
-    
+
     // Check if user has unlocked the required achievement
     if !AchievementService::is_unlocked(required_achievement) {
         return None;
     }
-    
+
     // User has unlocked Chronie! Get the message
     get_branding_text(category)
 }
@@ -2269,17 +2354,19 @@ pub fn get_chronie_message(category: &str) -> Option<String> {
 pub fn log_chronie_message(category: &str, prefix: &str) {
     use wtf_lib::models::achievement::Achievement;
     use wtf_lib::services::achievement_service::AchievementService;
-    
+
     // Debug: Check what's happening
     let required = match category {
         "secret" | "friend" => Achievement::ChroniesFriend,
         _ => Achievement::ChroniesApprentice,
     };
-    
+
     let is_unlocked = AchievementService::is_unlocked(required);
-    crate::logger::debug(format!("Chronie check - category: {}, required: {:?}, unlocked: {}", 
-        category, required, is_unlocked));
-    
+    crate::logger::debug(format!(
+        "Chronie check - category: {}, required: {:?}, unlocked: {}",
+        category, required, is_unlocked
+    ));
+
     if let Some(msg) = get_chronie_message(category) {
         crate::logger::log(format!("{} {}", prefix, msg));
     } else {
