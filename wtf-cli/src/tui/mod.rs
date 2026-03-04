@@ -59,8 +59,9 @@ impl Tui {
         // Chronie's startup greeting (only if ChroniesApprentice is unlocked)
         log_chronie_message("startup", "🧙 Chronie:");
 
-        // Revoke any achievements that were incorrectly unlocked in older versions
-        wtf_lib::services::AchievementService::run_revoke_schedule();
+        // Initialize achievement service and run revoke schedule
+        let achievement_service = wtf_lib::services::achievement_service::AchievementService::production();
+        achievement_service.run_revoke_schedule();
 
         // Load logo image for About popup
         let about_image = Self::load_logo_image();
@@ -80,6 +81,7 @@ impl Tui {
 
         Self {
             data: TuiData::collect(),
+            achievement_service,
             current_tab: Tab::Sprints,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
@@ -563,12 +565,12 @@ impl Tui {
             }
             // Tab switching
             KeyCode::Tab => {
-                let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
+                let has_achievements = self.achievement_service.has_any_unlocked();
                 self.current_tab = self.current_tab.next(has_achievements);
                 self.needs_full_clear = true;
             }
             KeyCode::BackTab => {
-                let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
+                let has_achievements = self.achievement_service.has_any_unlocked();
                 self.current_tab = self.current_tab.previous(has_achievements);
                 self.needs_full_clear = true;
             }
@@ -598,7 +600,7 @@ impl Tui {
             }
             KeyCode::Char('7') => {
                 // Only allow switching to Achievements if user has unlocked at least one
-                if wtf_lib::services::AchievementService::has_any_unlocked() {
+                if self.achievement_service.has_any_unlocked() {
                     self.current_tab = Tab::Achievements;
                     self.needs_full_clear = true;
                 }
@@ -2328,24 +2330,16 @@ pub fn get_chronie_message(category: &str) -> Option<String> {
     use wtf_lib::models::achievement::Achievement;
     use wtf_lib::services::achievement_service::AchievementService;
 
-    // Map message categories to required achievements
     let required_achievement = match category {
-        // Friend-tier messages (require secret achievement)
         "secret" | "friend" => Achievement::ChroniesFriend,
-
-        // Apprentice-tier messages (require wizard completion)
         "startup" | "random" | "overwork" | "wizard_complete" => Achievement::ChroniesApprentice,
-
-        // Default: require apprentice level
         _ => Achievement::ChroniesApprentice,
     };
 
-    // Check if user has unlocked the required achievement
-    if !AchievementService::is_unlocked(required_achievement) {
+    if !AchievementService::production().is_unlocked(required_achievement) {
         return None;
     }
 
-    // User has unlocked Chronie! Get the message
     get_branding_text(category)
 }
 
@@ -2355,13 +2349,12 @@ pub fn log_chronie_message(category: &str, prefix: &str) {
     use wtf_lib::models::achievement::Achievement;
     use wtf_lib::services::achievement_service::AchievementService;
 
-    // Debug: Check what's happening
     let required = match category {
         "secret" | "friend" => Achievement::ChroniesFriend,
         _ => Achievement::ChroniesApprentice,
     };
 
-    let is_unlocked = AchievementService::is_unlocked(required);
+    let is_unlocked = AchievementService::production().is_unlocked(required);
     crate::logger::debug(format!(
         "Chronie check - category: {}, required: {:?}, unlocked: {}",
         category, required, is_unlocked

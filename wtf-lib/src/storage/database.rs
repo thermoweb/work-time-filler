@@ -43,6 +43,12 @@ impl Database {
         Ok(Self { db })
     }
 
+    #[cfg(test)]
+    pub fn temporary() -> Self {
+        let db = sled::Config::new().temporary(true).open().expect("temp sled db");
+        Self { db }
+    }
+
     fn get_tree(&self, collection: &str) -> Result<Tree, Box<dyn Error + Send + Sync>> {
         Ok(self.db.open_tree(collection)?)
     }

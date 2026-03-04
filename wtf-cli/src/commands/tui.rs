@@ -21,7 +21,7 @@ impl Command for TuiCommand {
             use wtf_lib::services::AchievementService;
 
             println!("🗑️  Resetting all achievements...");
-            if let Err(e) = AchievementService::reset_all() {
+            if let Err(e) = AchievementService::production().reset_all() {
                 eprintln!("❌ Failed to reset achievements: {}", e);
                 return;
             }

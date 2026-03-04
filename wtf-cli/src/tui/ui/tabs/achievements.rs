@@ -8,7 +8,6 @@ use ratatui::{
 
 use crate::tui::data::TuiData;
 use crate::tui::theme::theme;
-use wtf_lib::services::AchievementService;
 use wtf_lib::Achievement;
 
 /// Wrap text to exactly 2 lines, fitting within given width
@@ -95,7 +94,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
         .split(inner);
 
     // Header with stats
-    let unlocked_count = AchievementService::unlock_count();
+    let unlocked_count = data.unlocked_achievements.len();
     let total_count = Achievement::all().len();
 
     let header = Paragraph::new(vec![Line::from(vec![
@@ -118,7 +117,7 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
 
     // Achievement list with proper Block widgets
     let all_achievements = Achievement::all();
-    let unlocked = AchievementService::get_all_unlocked();
+    let unlocked = data.unlocked_achievements.clone();
     let unlocked_map: std::collections::HashMap<_, _> = unlocked
         .iter()
         .map(|u| (u.achievement, u.unlocked_at))

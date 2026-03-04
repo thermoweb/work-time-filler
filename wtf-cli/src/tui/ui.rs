@@ -34,7 +34,7 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
         .split(frame.area());
 
     // Render tab bar
-    render_tab_bar(frame, &main_chunks[0], tui.current_tab);
+    render_tab_bar(frame, &main_chunks[0], tui);
 
     // Render current tab content
     tui.current_tab.render(frame, &main_chunks[1], &tui.data);
@@ -49,8 +49,8 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
     popups::render_all(frame, tui);
 }
 
-fn render_tab_bar(frame: &mut Frame, area: &Rect, current_tab: Tab) {
-    let has_achievements = wtf_lib::services::AchievementService::has_any_unlocked();
+fn render_tab_bar(frame: &mut Frame, area: &Rect, tui: &super::Tui) {
+    let has_achievements = tui.achievement_service.has_any_unlocked();
 
     let mut tabs = vec![
         ("1", "Sprints", Tab::Sprints),
@@ -68,7 +68,7 @@ fn render_tab_bar(frame: &mut Frame, area: &Rect, current_tab: Tab) {
     let tab_titles: Vec<Span> = tabs
         .iter()
         .flat_map(|(num, name, tab)| {
-            let is_active = *tab == current_tab;
+            let is_active = *tab == tui.current_tab;
             vec![
                 Span::raw(" "),
                 Span::styled(

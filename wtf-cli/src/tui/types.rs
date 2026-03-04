@@ -4,6 +4,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::Receiver;
 
 use wtf_lib::models::data::Meeting;
+use wtf_lib::services::achievement_service::AchievementService;
 
 use super::data::TuiData;
 
@@ -197,6 +198,7 @@ impl Tab {
 
 pub struct Tui {
     pub(crate) data: super::data::TuiData,
+    pub(crate) achievement_service: AchievementService,
     pub(crate) current_tab: Tab,
     pub(crate) revert_confirmation_state: Option<RevertConfirmationState>,
     pub(crate) worklog_creation_confirmation: Option<WorklogCreationConfirmation>,

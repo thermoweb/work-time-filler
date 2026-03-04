@@ -1,6 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use std::collections::HashMap;
 use wtf_lib::config::Config;
+use wtf_lib::models::achievement::AchievementUnlock;
 use wtf_lib::models::data::{
     GitHubSession, Issue, LocalWorklog, LocalWorklogHistory, Meeting, Sprint,
 };
@@ -85,6 +86,7 @@ pub struct TuiData {
     pub daily_hours_limit: f64,
     pub config: Config,
     pub ui_state: TabUiState,
+    pub unlocked_achievements: Vec<AchievementUnlock>,
 }
 
 impl TuiData {
@@ -118,6 +120,7 @@ impl TuiData {
             Self::calculate_meeting_stats(&all_meetings, &config, &untracked_meeting_ids);
         let sprint_activities = Self::calculate_all_sprint_activities(&sprints);
         let worklog_wall = Self::calculate_worklog_wall();
+        let unlocked_achievements = wtf_lib::services::achievement_service::AchievementService::production().get_all_unlocked();
 
         TuiData {
             all_sprints: sprints,
@@ -135,6 +138,7 @@ impl TuiData {
             daily_hours_limit: config.worklog.daily_hours_limit,
             config,
             ui_state,
+            unlocked_achievements,
         }
     }
 

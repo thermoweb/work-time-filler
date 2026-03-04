@@ -1,7 +1,6 @@
 use crate::models::achievement::{Achievement, AchievementUnlock};
 use crate::storage::database::{GenericDatabase, DATABASE};
 use log::error;
-use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
 // Achievements that should be revoked if unlocked before a given version.
@@ -10,68 +9,70 @@ const REVOKE_SCHEDULE: &[(&str, &str)] = &[
     ("git_squash_master", "0.1.0-beta.3"), // trigger was wrong before beta.3
 ];
 
-// Lazy database handle
-static ACHIEVEMENTS_DATABASE: Lazy<GenericDatabase<AchievementUnlock>> = Lazy::new(|| {
-    GenericDatabase::new(&DATABASE, "achievements").unwrap_or_else(|e| {
-        panic!("Failed to initialize achievements database: {}", e);
-    })
-});
-
-// In-memory cache for quick access
-static ACHIEVEMENT_CACHE: Lazy<Mutex<Vec<AchievementUnlock>>> = Lazy::new(|| {
-    let unlocks = ACHIEVEMENTS_DATABASE.get_all().unwrap_or_else(|e| {
-        error!("Failed to load achievements from database: {}", e);
-        Vec::new()
-    });
-    Mutex::new(unlocks)
-});
-
-pub struct AchievementService;
+pub struct AchievementService {
+    db: GenericDatabase<AchievementUnlock>,
+    cache: Mutex<Vec<AchievementUnlock>>,
+}
 
 impl AchievementService {
-    /// Check if an achievement is unlocked
-    pub fn is_unlocked(achievement: Achievement) -> bool {
-        ACHIEVEMENT_CACHE
+    /// Create a service from any database handle. Use this in tests with a temp DB.
+    pub fn new(db: GenericDatabase<AchievementUnlock>) -> Self {
+        let unlocks = db.get_all().unwrap_or_else(|e| {
+            error!("Failed to load achievements from database: {}", e);
+            Vec::new()
+        });
+        Self {
+            db,
+            cache: Mutex::new(unlocks),
+        }
+    }
+
+    /// Create a service backed by the production sled database.
+    pub fn production() -> Self {
+        let db = GenericDatabase::new(&DATABASE, "achievements").unwrap_or_else(|e| {
+            panic!("Failed to initialize achievements database: {}", e);
+        });
+        Self::new(db)
+    }
+
+    /// Check if an achievement is unlocked.
+    pub fn is_unlocked(&self, achievement: Achievement) -> bool {
+        self.cache
             .lock()
             .unwrap()
             .iter()
             .any(|u| u.achievement == achievement)
     }
 
-    /// Unlock an achievement
-    /// Returns true if newly unlocked, false if already unlocked
-    pub fn unlock(achievement: Achievement) -> bool {
-        let mut cache = ACHIEVEMENT_CACHE.lock().unwrap();
+    /// Unlock an achievement.
+    /// Returns true if newly unlocked, false if already unlocked.
+    pub fn unlock(&self, achievement: Achievement) -> bool {
+        let mut cache = self.cache.lock().unwrap();
 
-        // Check if already unlocked
         if cache.iter().any(|u| u.achievement == achievement) {
             return false;
         }
 
-        // Create unlock record
         let unlock = AchievementUnlock {
             achievement,
             unlocked_at: chrono::Utc::now(),
             app_version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
-        // Save to database
-        if let Err(e) = ACHIEVEMENTS_DATABASE.insert(&unlock) {
+        if let Err(e) = self.db.insert(&unlock) {
             error!("Failed to save achievement unlock: {}", e);
             return false;
         }
 
-        // Update cache
         cache.push(unlock);
-
         true
     }
 
     /// Revoke achievements that were unlocked before a bugfix version.
     /// Should be called once at app startup.
-    pub fn run_revoke_schedule() {
+    pub fn run_revoke_schedule(&self) {
         use crate::utils::version::is_older_than;
-        let mut cache = ACHIEVEMENT_CACHE.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
         let mut revoked = Vec::new();
 
         for (achievement_id, threshold) in REVOKE_SCHEDULE {
@@ -84,16 +85,15 @@ impl AchievementService {
                     };
                     if is_older_than(version, threshold) {
                         revoked.push(u.achievement.id_string());
-                        return false; // remove from cache
+                        return false;
                     }
                 }
                 true
             });
         }
 
-        // Persist removals to DB
         for id in &revoked {
-            if let Err(e) = ACHIEVEMENTS_DATABASE.remove(id) {
+            if let Err(e) = self.db.remove(id) {
                 error!("Failed to revoke achievement '{}': {}", id, e);
             }
         }
@@ -103,33 +103,27 @@ impl AchievementService {
         }
     }
 
-    /// Get all unlocked achievements
-    pub fn get_all_unlocked() -> Vec<AchievementUnlock> {
-        ACHIEVEMENT_CACHE.lock().unwrap().clone()
+    /// Get all unlocked achievements.
+    pub fn get_all_unlocked(&self) -> Vec<AchievementUnlock> {
+        self.cache.lock().unwrap().clone()
     }
 
-    /// Get count of unlocked achievements
-    pub fn unlock_count() -> usize {
-        ACHIEVEMENT_CACHE.lock().unwrap().len()
+    /// Get count of unlocked achievements.
+    pub fn unlock_count(&self) -> usize {
+        self.cache.lock().unwrap().len()
     }
 
-    /// Check if any achievements are unlocked (for tab visibility)
-    pub fn has_any_unlocked() -> bool {
-        Self::unlock_count() > 0
+    /// Check if any achievements are unlocked (for tab visibility).
+    pub fn has_any_unlocked(&self) -> bool {
+        self.unlock_count() > 0
     }
 
-    /// Reset all achievements (for testing)
-    /// Deletes all achievement records from database and clears cache
-    pub fn reset_all() -> Result<(), String> {
-        // Clear database
-        ACHIEVEMENTS_DATABASE
+    /// Clear all achievement records. Useful for resetting state.
+    pub fn reset_all(&self) -> Result<(), String> {
+        self.db
             .clear()
             .map_err(|e| format!("Failed to clear achievements database: {}", e))?;
-
-        // Clear cache
-        let mut cache = ACHIEVEMENT_CACHE.lock().unwrap();
-        cache.clear();
-
+        self.cache.lock().unwrap().clear();
         Ok(())
     }
 }
@@ -138,9 +132,103 @@ impl AchievementService {
 mod tests {
     use super::*;
 
+    fn temp_service() -> AchievementService {
+        let tmp_db = crate::storage::database::Database::temporary();
+        let db = GenericDatabase::new(&tmp_db, "achievements").expect("temp achievements db");
+        AchievementService::new(db)
+    }
+
     #[test]
-    fn test_unlock_count() {
-        let count = AchievementService::unlock_count();
-        assert!(count >= 0);
+    fn test_unlock_new_achievement() {
+        let svc = temp_service();
+        assert!(svc.unlock(Achievement::ChroniesApprentice));
+        assert!(svc.is_unlocked(Achievement::ChroniesApprentice));
+    }
+
+    #[test]
+    fn test_unlock_idempotent() {
+        let svc = temp_service();
+        assert!(svc.unlock(Achievement::ChroniesApprentice));
+        assert!(!svc.unlock(Achievement::ChroniesApprentice)); // second call returns false
+        assert_eq!(svc.unlock_count(), 1);
+    }
+
+    #[test]
+    fn test_is_unlocked_false_initially() {
+        let svc = temp_service();
+        assert!(!svc.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(!svc.has_any_unlocked());
+    }
+
+    #[test]
+    fn test_unlock_multiple_achievements() {
+        let svc = temp_service();
+        svc.unlock(Achievement::ChroniesApprentice);
+        svc.unlock(Achievement::NightOwl);
+        assert_eq!(svc.unlock_count(), 2);
+        assert!(svc.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(svc.is_unlocked(Achievement::NightOwl));
+    }
+
+    #[test]
+    fn test_reset_all() {
+        let svc = temp_service();
+        svc.unlock(Achievement::ChroniesApprentice);
+        svc.unlock(Achievement::NightOwl);
+        assert_eq!(svc.unlock_count(), 2);
+        svc.reset_all().unwrap();
+        assert_eq!(svc.unlock_count(), 0);
+        assert!(!svc.has_any_unlocked());
+    }
+
+    #[test]
+    fn test_revoke_schedule_removes_old_achievement() {
+        let svc = temp_service();
+        // Manually insert an unlock with an old version
+        let old_unlock = AchievementUnlock {
+            achievement: Achievement::GitSquashMaster,
+            unlocked_at: chrono::Utc::now(),
+            app_version: "0.1.0-beta.1".to_string(), // older than threshold 0.1.0-beta.3
+        };
+        svc.db.insert(&old_unlock).unwrap();
+        svc.cache.lock().unwrap().push(old_unlock);
+
+        svc.run_revoke_schedule();
+
+        assert!(!svc.is_unlocked(Achievement::GitSquashMaster));
+        assert_eq!(svc.unlock_count(), 0);
+    }
+
+    #[test]
+    fn test_revoke_schedule_keeps_new_achievement() {
+        let svc = temp_service();
+        let new_unlock = AchievementUnlock {
+            achievement: Achievement::GitSquashMaster,
+            unlocked_at: chrono::Utc::now(),
+            app_version: "0.1.0-beta.4".to_string(), // newer than threshold
+        };
+        svc.db.insert(&new_unlock).unwrap();
+        svc.cache.lock().unwrap().push(new_unlock);
+
+        svc.run_revoke_schedule();
+
+        assert!(svc.is_unlocked(Achievement::GitSquashMaster));
+    }
+
+    #[test]
+    fn test_persistence_across_instances() {
+        let tmp_db = crate::storage::database::Database::temporary();
+
+        {
+            let db = GenericDatabase::new(&tmp_db, "achievements").unwrap();
+            let svc = AchievementService::new(db);
+            svc.unlock(Achievement::ChroniesApprentice);
+        }
+
+        // New instance from same DB should load persisted data
+        let db2 = GenericDatabase::new(&tmp_db, "achievements").unwrap();
+        let svc2 = AchievementService::new(db2);
+        assert!(svc2.is_unlocked(Achievement::ChroniesApprentice));
+        assert_eq!(svc2.unlock_count(), 1);
     }
 }

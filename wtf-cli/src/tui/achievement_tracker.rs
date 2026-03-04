@@ -1,6 +1,5 @@
 use crate::logger;
 use crate::tui::types::{AppEvent, EventSubscriber, Tui};
-use wtf_lib::services::AchievementService;
 use wtf_lib::Achievement;
 
 /// Achievement tracker that listens to app events and unlocks achievements
@@ -243,6 +242,9 @@ impl AchievementTracker {
         ));
         logger::log(format!("   {}", meta.chronie_message));
 
+        // Sync the TuiData snapshot so the achievements tab reflects immediately
+        tui.data.unlocked_achievements = tui.achievement_service.get_all_unlocked();
+
         // Publish event for potential UI notification
         tui.event_bus
             .publish(AppEvent::AchievementUnlocked { achievement });
@@ -257,7 +259,7 @@ impl EventSubscriber for AchievementTracker {
 
         for achievement in candidates {
             // Try to unlock - returns true only if newly unlocked
-            if AchievementService::unlock(achievement) {
+            if tui.achievement_service.unlock(achievement) {
                 Self::handle_unlock(achievement, tui);
             }
         }
