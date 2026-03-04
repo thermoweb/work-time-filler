@@ -49,6 +49,12 @@ impl Database {
 }
 
 #[derive(Clone)]
+/// Generic sled-backed store using **bincode** for serialization.
+///
+/// ⚠️  **Schema evolution warning**: bincode serializes structs field-by-field with no
+/// field names or defaults. Adding, removing, or reordering fields in a stored struct
+/// **will corrupt existing records** (they will be silently dropped on next load).
+/// Always write a startup migration in the relevant service when changing a stored struct.
 pub struct GenericDatabase<T: CollectionItem> {
     tree: Tree,
     _marker: PhantomData<T>,

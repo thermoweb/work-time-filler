@@ -4,6 +4,12 @@ use log::error;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
+// Achievements that should be revoked if unlocked before a given version.
+// Format: (achievement_id, revoke_if_version_less_than)
+const REVOKE_SCHEDULE: &[(&str, &str)] = &[
+    ("git_squash_master", "0.1.0-beta.3"), // trigger was wrong before beta.3
+];
+
 // Lazy database handle
 static ACHIEVEMENTS_DATABASE: Lazy<GenericDatabase<AchievementUnlock>> = Lazy::new(|| {
     GenericDatabase::new(&DATABASE, "achievements").unwrap_or_else(|e| {
@@ -46,6 +52,7 @@ impl AchievementService {
         let unlock = AchievementUnlock {
             achievement,
             unlocked_at: chrono::Utc::now(),
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
         // Save to database
@@ -58,6 +65,38 @@ impl AchievementService {
         cache.push(unlock);
 
         true
+    }
+
+    /// Revoke achievements that were unlocked before a bugfix version.
+    /// Should be called once at app startup.
+    pub fn run_revoke_schedule() {
+        use crate::utils::version::is_older_than;
+        let mut cache = ACHIEVEMENT_CACHE.lock().unwrap();
+        let mut revoked = Vec::new();
+
+        for (achievement_id, threshold) in REVOKE_SCHEDULE {
+            cache.retain(|u| {
+                if u.achievement.id_string() == *achievement_id {
+                    let version = if u.app_version.is_empty() { "0.0.0" } else { &u.app_version };
+                    if is_older_than(version, threshold) {
+                        revoked.push(u.achievement.id_string());
+                        return false; // remove from cache
+                    }
+                }
+                true
+            });
+        }
+
+        // Persist removals to DB
+        for id in &revoked {
+            if let Err(e) = ACHIEVEMENTS_DATABASE.remove(id) {
+                error!("Failed to revoke achievement '{}': {}", id, e);
+            }
+        }
+
+        if !revoked.is_empty() {
+            log::info!("Revoked {} achievement(s): {:?}", revoked.len(), revoked);
+        }
     }
 
     /// Get all unlocked achievements

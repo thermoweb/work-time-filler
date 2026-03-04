@@ -207,6 +207,8 @@ pub enum AchievementCategory {
 pub struct AchievementUnlock {
     pub achievement: Achievement,
     pub unlocked_at: DateTime<Utc>,
+    #[serde(default)]
+    pub app_version: String,
 }
 
 impl Identifiable for AchievementUnlock {
@@ -244,6 +246,7 @@ impl AchievementData {
         self.unlocks.push(AchievementUnlock {
             achievement,
             unlocked_at: Utc::now(),
+            app_version: String::new(),
         });
         true
     }

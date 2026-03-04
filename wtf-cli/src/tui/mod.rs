@@ -57,6 +57,9 @@ impl Tui {
         // Chronie's startup greeting (only if ChroniesApprentice is unlocked)
         log_chronie_message("startup", "🧙 Chronie:");
 
+        // Revoke any achievements that were incorrectly unlocked in older versions
+        wtf_lib::services::AchievementService::run_revoke_schedule();
+
         // Load logo image for About popup
         let about_image = Self::load_logo_image();
 
