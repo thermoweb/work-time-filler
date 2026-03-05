@@ -33,3 +33,28 @@ jobs:
 
       - name: Format check
         run: cargo fmt --all -- --check
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
+
+      - name: Run coverage (wtf-lib only)
+        run: cargo tarpaulin --out Lcov --output-dir coverage/ --workspace --exclude-files 'wtf-cli/*'
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          fail_ci_if_error: false
