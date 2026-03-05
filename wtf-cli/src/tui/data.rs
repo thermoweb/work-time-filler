@@ -167,7 +167,7 @@ impl TuiData {
     }
 
     fn get_github_sessions_for_sprints(sprints: &[Sprint]) -> Vec<GitHubSession> {
-        let all_sessions = GitHubService::get_all_sessions().unwrap_or_default();
+        let all_sessions = GitHubService::production().get_all_sessions().unwrap_or_default();
 
         // Filter sessions that fall within sprint date ranges
         all_sessions

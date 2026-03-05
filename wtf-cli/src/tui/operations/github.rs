@@ -47,7 +47,7 @@ impl Tui {
                 }
 
                 // Sync events and sessions
-                match GitHubService::sync_events_for_sprints(&sprints) {
+                match GitHubService::production().sync_events_for_sprints(&sprints) {
                     Ok((events_count, sessions_count)) => {
                         logger::log(format!(
                             "✅ Synced {} events, {} sessions",

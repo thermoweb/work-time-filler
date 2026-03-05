@@ -4,56 +4,63 @@ use crate::models::data::{GitHubEvent, GitHubSession, Sprint};
 use crate::storage::database::{GenericDatabase, DATABASE};
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use log::{debug, info, warn};
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::Arc;
 
-static GITHUB_EVENTS_DB: Lazy<Arc<GenericDatabase<GitHubEvent>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "github_events")
-            .expect("could not initialize github events database"),
-    )
-});
-
-static GITHUB_SESSIONS_DB: Lazy<Arc<GenericDatabase<GitHubSession>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "github_sessions")
-            .expect("could not initialize github sessions database"),
-    )
-});
-
-pub struct GitHubService;
+pub struct GitHubService {
+    events_db: GenericDatabase<GitHubEvent>,
+    sessions_db: GenericDatabase<GitHubSession>,
+}
 
 impl GitHubService {
+    pub fn new(
+        events_db: GenericDatabase<GitHubEvent>,
+        sessions_db: GenericDatabase<GitHubSession>,
+    ) -> Self {
+        Self {
+            events_db,
+            sessions_db,
+        }
+    }
+
+    /// Create a service backed by the production sled database.
+    pub fn production() -> Self {
+        let events_db = GenericDatabase::new(&DATABASE, "github_events")
+            .expect("could not initialize github events database");
+        let sessions_db = GenericDatabase::new(&DATABASE, "github_sessions")
+            .expect("could not initialize github sessions database");
+        Self::new(events_db, sessions_db)
+    }
+
     /// Check if GitHub CLI is available and configured
     pub fn is_configured() -> bool {
         GitHubClient::is_available()
     }
 
     /// Save a GitHub event to the database
-    pub fn save_event(event: &GitHubEvent) {
-        if let Err(e) = GITHUB_EVENTS_DB.insert(event) {
+    pub fn save_event(&self, event: &GitHubEvent) {
+        if let Err(e) = self.events_db.insert(event) {
             warn!("Failed to save GitHub event '{}': {}", event.id, e);
         }
     }
 
     /// Save a GitHub session to the database
-    pub fn save_session(session: &GitHubSession) {
-        if let Err(e) = GITHUB_SESSIONS_DB.insert(session) {
+    pub fn save_session(&self, session: &GitHubSession) {
+        if let Err(e) = self.sessions_db.insert(session) {
             warn!("Failed to save GitHub session '{}': {}", session.id, e);
         }
     }
 
     /// Get all GitHub sessions
-    pub fn get_all_sessions() -> Result<Vec<GitHubSession>, String> {
-        GITHUB_SESSIONS_DB
+    pub fn get_all_sessions(&self) -> Result<Vec<GitHubSession>, String> {
+        self.sessions_db
             .get_all()
             .map_err(|e| format!("Failed to get sessions: {}", e))
     }
 
     /// Get GitHub sessions for a specific date
-    pub fn get_sessions_by_date(date: NaiveDate) -> Result<Vec<GitHubSession>, String> {
-        let all = GITHUB_SESSIONS_DB
+    pub fn get_sessions_by_date(&self, date: NaiveDate) -> Result<Vec<GitHubSession>, String> {
+        let all = self
+            .sessions_db
             .get_all()
             .map_err(|e| format!("Failed to get sessions: {}", e))?;
 
@@ -62,10 +69,12 @@ impl GitHubService {
 
     /// Get GitHub sessions for a date range
     pub fn get_sessions_by_date_range(
+        &self,
         from: NaiveDate,
         to: NaiveDate,
     ) -> Result<Vec<GitHubSession>, String> {
-        let all = GITHUB_SESSIONS_DB
+        let all = self
+            .sessions_db
             .get_all()
             .map_err(|e| format!("Failed to get sessions: {}", e))?;
 
@@ -76,15 +85,16 @@ impl GitHubService {
     }
 
     /// Get all GitHub events
-    pub fn get_all_events() -> Result<Vec<GitHubEvent>, String> {
-        GITHUB_EVENTS_DB
+    pub fn get_all_events(&self) -> Result<Vec<GitHubEvent>, String> {
+        self.events_db
             .get_all()
             .map_err(|e| format!("Failed to get events: {}", e))
     }
 
     /// Get GitHub events for a specific date
-    pub fn get_events_by_date(date: NaiveDate) -> Result<Vec<GitHubEvent>, String> {
-        let all = GITHUB_EVENTS_DB
+    pub fn get_events_by_date(&self, date: NaiveDate) -> Result<Vec<GitHubEvent>, String> {
+        let all = self
+            .events_db
             .get_all()
             .map_err(|e| format!("Failed to get events: {}", e))?;
 
@@ -139,7 +149,7 @@ impl GitHubService {
     }
 
     /// Fetch GitHub events for all followed sprints and save to database
-    pub fn sync_events_for_sprints(sprints: &[Sprint]) -> Result<(usize, usize), String> {
+    pub fn sync_events_for_sprints(&self, sprints: &[Sprint]) -> Result<(usize, usize), String> {
         if !Self::is_configured() {
             return Err("GitHub CLI is not installed or configured. Please install gh CLI and run 'gh auth login'".to_string());
         }
@@ -151,7 +161,6 @@ impl GitHubService {
         let mut all_api_events = Vec::new();
 
         for sprint in sprints {
-            // Skip future sprints or sprints without start date
             let sprint_start = match sprint.start {
                 Some(start) if start <= Utc::now() => start,
                 _ => continue,
@@ -209,18 +218,18 @@ impl GitHubService {
                 jira_issues: jira_issues.join(","),
                 date: api_event.created_at.date_naive(),
             };
-            Self::save_event(&db_event);
+            self.save_event(&db_event);
             events_saved += 1;
         }
 
         // Calculate and save sessions
-        let sessions = Self::calculate_and_save_sessions(&all_api_events);
+        let sessions = self.calculate_and_save_sessions(&all_api_events);
 
         Ok((events_saved, sessions))
     }
 
     /// Calculate work sessions from API events and save to database
-    fn calculate_and_save_sessions(api_events: &[APIGitHubEvent]) -> usize {
+    fn calculate_and_save_sessions(&self, api_events: &[APIGitHubEvent]) -> usize {
         let mut sessions_by_day: HashMap<String, Vec<TempSession>> = HashMap::new();
 
         for event in api_events {
@@ -249,7 +258,6 @@ impl GitHubService {
             let mut merged: Vec<TempSession> = Vec::new();
             for session in sessions.drain(..) {
                 if let Some(last) = merged.last_mut() {
-                    // If within 2 hours, merge into existing session
                     if session.start_time.signed_duration_since(last.end_time) < Duration::hours(2)
                     {
                         last.end_time = session.end_time;
@@ -267,13 +275,12 @@ impl GitHubService {
                 merged.push(session);
             }
 
-            // Save merged sessions to database
             for temp_session in merged {
                 let duration = temp_session
                     .end_time
                     .signed_duration_since(temp_session.start_time)
                     .num_seconds()
-                    .max(15 * 60); // Minimum 15 minutes
+                    .max(15 * 60);
 
                 let db_session = GitHubSession::new(
                     temp_session.start_time,
@@ -285,7 +292,7 @@ impl GitHubService {
                     temp_session.event_ids,
                 );
 
-                Self::save_session(&db_session);
+                self.save_session(&db_session);
                 sessions_saved += 1;
             }
         }
@@ -293,7 +300,7 @@ impl GitHubService {
         sessions_saved
     }
 
-    /// Group events by day and calculate work sessions (for backward compatibility)
+    /// Group events by day and calculate work sessions (no DB access)
     pub fn calculate_work_sessions(events: &[APIGitHubEvent]) -> HashMap<String, Vec<WorkSession>> {
         let mut sessions_by_day: HashMap<String, Vec<WorkSession>> = HashMap::new();
 
@@ -315,14 +322,12 @@ impl GitHubService {
                 .push(session);
         }
 
-        // Merge nearby events into sessions (within 2 hours)
         for (_date, sessions) in sessions_by_day.iter_mut() {
             sessions.sort_by(|a, b| a.start_time.cmp(&b.start_time));
 
             let mut merged: Vec<WorkSession> = Vec::new();
             for session in sessions.drain(..) {
                 if let Some(last) = merged.last_mut() {
-                    // If within 2 hours, merge into existing session
                     if session.start_time.signed_duration_since(last.end_time) < Duration::hours(2)
                     {
                         last.end_time = session.end_time;
@@ -344,7 +349,6 @@ impl GitHubService {
         sessions_by_day
     }
 
-    /// Get a human-readable description of an event (for API events)
     fn get_event_description_from_api(event: &APIGitHubEvent) -> String {
         match event.event_type.as_str() {
             "PushEvent" => {
@@ -388,7 +392,6 @@ impl GitHubService {
         }
     }
 
-    /// Get a human-readable description of an event (deprecated - for backward compat)
     fn get_event_description(event: &APIGitHubEvent) -> String {
         Self::get_event_description_from_api(event)
     }

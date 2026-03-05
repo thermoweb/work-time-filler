@@ -41,7 +41,7 @@ impl Task for FetchGithubEventsTask {
         ));
 
         // Sync events and sessions to database
-        let (events_saved, sessions_saved) = GitHubService::sync_events_for_sprints(&sprints)?;
+        let (events_saved, sessions_saved) = GitHubService::production().sync_events_for_sprints(&sprints)?;
 
         if events_saved == 0 {
             logger::log("No GitHub events found in sprint date ranges.".to_string());
@@ -54,7 +54,7 @@ impl Task for FetchGithubEventsTask {
         ));
 
         // Get sessions from database to display summary
-        let all_sessions = GitHubService::get_all_sessions()?;
+        let all_sessions = GitHubService::production().get_all_sessions()?;
         let mut sessions_by_day: std::collections::HashMap<String, Vec<_>> =
             std::collections::HashMap::new();
 
@@ -218,9 +218,9 @@ impl Task for ShowGithubSessionsTask {
         let sessions = if let Some(date_str) = &self.date_filter {
             let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                 .map_err(|e| format!("Invalid date format: {}. Expected YYYY-MM-DD", e))?;
-            GitHubService::get_sessions_by_date(date)?
+            GitHubService::production().get_sessions_by_date(date)?
         } else {
-            GitHubService::get_all_sessions()?
+            GitHubService::production().get_all_sessions()?
         };
 
         if sessions.is_empty() {
@@ -308,9 +308,9 @@ impl Task for ShowGithubEventsTask {
         let events = if let Some(date_str) = &self.date_filter {
             let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
                 .map_err(|e| format!("Invalid date format: {}. Expected YYYY-MM-DD", e))?;
-            GitHubService::get_events_by_date(date)?
+            GitHubService::production().get_events_by_date(date)?
         } else {
-            GitHubService::get_all_events()?
+            GitHubService::production().get_all_events()?
         };
 
         if events.is_empty() {
