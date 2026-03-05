@@ -27,7 +27,7 @@ impl Task for FetchGithubEventsTask {
         }
 
         // Get followed sprints
-        let sprints = JiraService::get_followed_sprint();
+        let sprints = JiraService::production().get_followed_sprint();
         if sprints.is_empty() {
             logger::log(
                 "No followed sprints found. Use 'wtf sprint follow' to follow sprints.".to_string(),
@@ -127,7 +127,7 @@ impl Task for LogGithubEventsTask {
         }
 
         // Get followed sprints
-        let sprints = JiraService::get_followed_sprint();
+        let sprints = JiraService::production().get_followed_sprint();
         if sprints.is_empty() {
             logger::log("No followed sprints found.".to_string());
             return Ok(());
@@ -162,7 +162,7 @@ impl Task for LogGithubEventsTask {
                 let issue_id = session.jira_issues[0].clone();
 
                 // Check if issue exists in database
-                if IssueService::get_by_key(&issue_id).is_none() {
+                if IssueService::production().get_by_key(&issue_id).is_none() {
                     logger::log(format!(
                         "⚠️  Skipping {} - issue not found in local database (run 'wtf fetch' first)", 
                         issue_id

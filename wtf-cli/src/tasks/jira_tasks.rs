@@ -89,7 +89,7 @@ impl Task for FetchJiraIssues {
         }
         sprint_progress.finish_and_clear();
 
-        for board in JiraService::get_followed_boards()
+        for board in JiraService::production().get_followed_boards()
             .unwrap()
             .iter()
             .filter(|b| b.board_type == BoardType::Kanban || b.board_type == BoardType::Scrum)
@@ -146,7 +146,7 @@ impl Task for FetchJiraIssues {
 
         mp.println(format!("{} issues fetched", issues_to_store.len()))
             .unwrap();
-        IssueService::save_all_issues(issues_to_store);
+        IssueService::production().save_all_issues(issues_to_store);
         Ok(())
     }
 }
@@ -196,11 +196,11 @@ impl Task for FetchJiraBoard {
                         let mut board_to_store = Board::from_jira(jira_board.clone());
                         progress_bar.inc(1);
                         if let Some(db_board) =
-                            BoardService::get_by_id(jira_board.id.to_string().as_str())
+                            BoardService::production().get_by_id(jira_board.id.to_string().as_str())
                         {
                             board_to_store.followed = db_board.followed;
                         }
-                        BoardService::save_board(&board_to_store);
+                        BoardService::production().save_board(&board_to_store);
                         boards_added += 1;
                     }
                     progress_bar.finish_and_clear();
@@ -210,7 +210,7 @@ impl Task for FetchJiraBoard {
         }
         mp.println(format!("{} boards fetched", boards_added))
             .unwrap();
-        let boards = BoardService::get_all_boards();
+        let boards = BoardService::production().get_all_boards();
         if !self.skip_follow_prompt
             && boards
                 .iter()
@@ -227,7 +227,7 @@ impl Task for FetchJiraBoard {
             if let Some(caps) = regex.captures(&board) {
                 if let Some(board_id) = caps.get(1) {
                     println!("board '{}' is now followed", board_id.as_str());
-                    JiraService::follow_board(board_id.as_str()).unwrap();
+                    JiraService::production().follow_board(board_id.as_str()).unwrap();
                 }
             }
         }
@@ -237,7 +237,7 @@ impl Task for FetchJiraBoard {
 
 fn board_suggestor(input: &str) -> Result<Vec<String>, CustomUserError> {
     let input = input.to_lowercase();
-    Ok(BoardService::get_all_boards()
+    Ok(BoardService::production().get_all_boards()
         .iter()
         .filter(|board| {
             board.name.to_lowercase().contains(&input) || board.id.to_string().contains(&input)
@@ -265,7 +265,7 @@ impl FetchJiraSprint {
 
 impl Task for FetchJiraSprint {
     async fn execute(&self) -> Result<(), Box<dyn Error>> {
-        let boards = JiraService::get_followed_boards().unwrap();
+        let boards = JiraService::production().get_followed_boards().unwrap();
         if boards.is_empty() {
             println!("No boards found.");
             return Ok(());
@@ -292,7 +292,7 @@ impl Task for FetchJiraSprint {
                         .map(|s| into_sprint(s))
                         .map(|mut spr| {
                             if let Some(db_sprint) =
-                                SprintService::get_sprint_by_id(spr.id.to_string().as_str())
+                                SprintService::production().get_sprint_by_id(spr.id.to_string().as_str())
                             {
                                 spr.followed = db_sprint.followed;
                             }
@@ -311,7 +311,7 @@ impl Task for FetchJiraSprint {
                         })
                         .collect();
                     let sprints_to_add = sprints.len();
-                    SprintService::save_all_sprints(sprints);
+                    SprintService::production().save_all_sprints(sprints);
                     sprint_counts += sprints_to_add;
                 }
                 _ => debug!("no sprints attached to this board"),
@@ -432,10 +432,10 @@ impl Task for ListJiraSprints {
     async fn execute(&self) -> std::result::Result<(), Box<dyn Error>> {
         let mut sprints = if self.fetch_all {
             println!("Listing all available sprints:");
-            JiraService::get_available_sprints()
+            JiraService::production().get_available_sprints()
         } else {
             println!("Listing followed sprints:");
-            JiraService::get_followed_sprint()
+            JiraService::production().get_followed_sprint()
         };
         if sprints.is_empty() {
             println!("No sprint found.");

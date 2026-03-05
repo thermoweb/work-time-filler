@@ -40,7 +40,7 @@ impl Tui {
                     "Creating worklogs from meetings...".to_string(),
                 ));
 
-                let sprints = JiraService::get_followed_sprint();
+                let sprints = JiraService::production().get_followed_sprint();
                 match MeetingWorklogTask::new(sprints).execute().await {
                     Ok(_) => {
                         let _ = sender.send(FetchStatus::Complete);
@@ -111,7 +111,7 @@ impl Tui {
         }
 
         // Get all issues
-        let all_issues = IssueService::get_all_issues();
+        let all_issues = IssueService::production().get_all_issues();
 
         if all_issues.is_empty() {
             return; // No issues to link to
@@ -215,7 +215,7 @@ impl Tui {
                                     status: jira_issue.fields.status.name,
                                     summary: jira_issue.fields.summary,
                                 };
-                                IssueService::save_issue(&issue);
+                                IssueService::production().save_issue(&issue);
                             }
                             Err(e) => {
                                 log::warn!("Could not fetch issue {} from Jira: {:?}", key, e)
@@ -228,7 +228,7 @@ impl Tui {
             .ok();
 
             // Reload issues into cache after fetching
-            self.data.issues_by_key = IssueService::get_all_issues()
+            self.data.issues_by_key = IssueService::production().get_all_issues()
                 .into_iter()
                 .map(|i| (i.key.clone(), i))
                 .collect();

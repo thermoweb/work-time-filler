@@ -69,7 +69,7 @@ impl MeetingsService {
             return all_meetings;
         }
 
-        if let Some(sprint) = JiraService::get_followed_sprint()
+        if let Some(sprint) = JiraService::production().get_followed_sprint()
             .iter()
             .find(|s| matches!(s.state, SprintState::Active))
         {
@@ -88,7 +88,7 @@ impl MeetingsService {
     }
 
     pub fn get_meetings_for_sprint_id(&self, spring_id: &str) -> Vec<Meeting> {
-        match SprintService::get_sprint(spring_id) {
+        match SprintService::production().get_sprint(spring_id) {
             Ok(Some(sprint)) => self.get_meetings_for_sprint(&sprint),
             _ => {
                 eprintln!("Sprint '{}' not found!", spring_id);

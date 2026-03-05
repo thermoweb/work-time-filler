@@ -258,7 +258,7 @@ async fn step4_select_boards() -> Result<(), Box<dyn Error>> {
         })?;
 
     // Now get boards from database
-    let boards = wtf_lib::services::jira_service::BoardService::get_all_boards();
+    let boards = wtf_lib::services::jira_service::BoardService::production().get_all_boards();
 
     if boards.is_empty() {
         warn!("No boards found in your Jira instance.");
@@ -336,7 +336,7 @@ async fn step4_select_boards() -> Result<(), Box<dyn Error>> {
     // Follow selected boards
     info!("🔄 Following boards...");
     for board_id in &selected_boards {
-        JiraService::follow_board(board_id).map_err(|e| -> Box<dyn Error> { e })?;
+        JiraService::production().follow_board(board_id).map_err(|e| -> Box<dyn Error> { e })?;
     }
 
     success!("Following {} board(s)", selected_boards.len());
@@ -361,7 +361,7 @@ fn step5_select_sprints() -> Result<(), Box<dyn Error>> {
     info!("[Step 6/7] Selecting sprints");
     info!("🔄 Fetching active sprints...");
 
-    let sprints = JiraService::get_available_sprints();
+    let sprints = JiraService::production().get_available_sprints();
     let active_sprints: Vec<Sprint> = sprints
         .into_iter()
         .filter(|s| {
@@ -443,7 +443,7 @@ fn step5_select_sprints() -> Result<(), Box<dyn Error>> {
     } else {
         info!("🔄 Following sprints...");
         for sprint_id in &selected_sprints {
-            JiraService::follow_sprint(sprint_id).map_err(|e| -> Box<dyn Error> { e })?;
+            JiraService::production().follow_sprint(sprint_id).map_err(|e| -> Box<dyn Error> { e })?;
         }
         success!("Following {} sprint(s)", selected_sprints.len());
     }

@@ -709,7 +709,7 @@ impl Tui {
                         // Fetch issues
                         let _ =
                             sender.send(FetchStatus::Fetching("Fetching issues...".to_string()));
-                        let sprints = JiraService::get_followed_sprint();
+                        let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraIssues::new(sprints.clone())
                             .with_progress(mp.clone())
                             .execute()
@@ -753,7 +753,7 @@ impl Tui {
                         // Fetch worklogs only
                         let _ =
                             sender.send(FetchStatus::Fetching("Fetching worklogs...".to_string()));
-                        let sprints = JiraService::get_followed_sprint();
+                        let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraWorklogs::new(sprints)
                             .with_progress(mp.clone())
                             .execute()
@@ -807,7 +807,7 @@ impl Tui {
             KeyCode::Char('a') | KeyCode::Char('A') => {
                 // Open sprint follow/unfollow popup - get ALL available sprints
                 let mut all_sprints =
-                    wtf_lib::services::jira_service::JiraService::get_available_sprints();
+                    wtf_lib::services::jira_service::JiraService::production().get_available_sprints();
 
                 // Sort by start date (newest first), putting sprints without dates at the end
                 all_sprints.sort_by(|a, b| {
@@ -1186,7 +1186,7 @@ impl Tui {
                                 status: jira_issue.fields.status.name,
                                 summary: jira_issue.fields.summary,
                             };
-                            wtf_lib::services::jira_service::IssueService::save_issue(&issue);
+                            wtf_lib::services::jira_service::IssueService::production().save_issue(&issue);
 
                             // Link meeting
                             if let Some(mut meeting) =
@@ -1359,9 +1359,9 @@ impl Tui {
                     drop(filtered_sprints);
 
                     let result = if was_followed {
-                        wtf_lib::services::jira_service::JiraService::unfollow_sprint(&sprint_id)
+                        wtf_lib::services::jira_service::JiraService::production().unfollow_sprint(&sprint_id)
                     } else {
-                        wtf_lib::services::jira_service::JiraService::follow_sprint(&sprint_id)
+                        wtf_lib::services::jira_service::JiraService::production().follow_sprint(&sprint_id)
                     };
 
                     match result {

@@ -62,7 +62,7 @@ impl Tui {
                         Some(worklog.comment.clone())
                     };
 
-                    match wtf_lib::services::jira_service::IssueService::add_time(
+                    match wtf_lib::services::jira_service::IssueService::production().add_time(
                         &worklog.issue_id,
                         duration,
                         worklog.started,

@@ -40,7 +40,7 @@ impl Tui {
                 }
 
                 // Get followed sprints
-                let sprints = wtf_lib::services::jira_service::JiraService::get_followed_sprint();
+                let sprints = wtf_lib::services::jira_service::JiraService::production().get_followed_sprint();
                 if sprints.is_empty() {
                     let _ = sender.send(FetchStatus::Error("No followed sprints".to_string()));
                     return;

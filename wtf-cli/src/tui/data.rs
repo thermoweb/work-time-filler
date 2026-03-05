@@ -98,7 +98,7 @@ impl TuiData {
     /// Collect data while preserving existing UI state
     pub fn collect_with_ui_state(ui_state: TabUiState) -> Self {
         let config = Config::load().unwrap_or_default();
-        let sprints = JiraService::get_followed_sprint();
+        let sprints = JiraService::production().get_followed_sprint();
 
         // Get meetings and GitHub sessions for followed sprints only
         let all_meetings = Self::get_meetings_for_sprints(&sprints);
@@ -110,7 +110,7 @@ impl TuiData {
         let untracked_meeting_ids = MeetingsService::production().get_all_untracked_ids();
 
         // Build issue lookup map
-        let all_issues = IssueService::get_all_issues();
+        let all_issues = IssueService::production().get_all_issues();
         let issues_by_key: HashMap<String, Issue> = all_issues
             .into_iter()
             .map(|issue| (issue.key.clone(), issue))

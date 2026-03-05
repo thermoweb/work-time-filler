@@ -49,7 +49,7 @@ impl Command for IssueFetchCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let sprints = JiraService::get_followed_sprint();
+        let sprints = JiraService::production().get_followed_sprint();
         if sprints.is_empty() {
             println!("No sprint found.");
             return;
@@ -76,7 +76,7 @@ impl Command for IssueListCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        IssueService::get_all_issues()
+        IssueService::production().get_all_issues()
             .into_iter()
             .for_each(|b| println!("{:?}", b));
     }
@@ -102,9 +102,9 @@ impl Command for IssueLogTimeCommand {
         };
         let issue_key = matches.get_one::<String>("issue-key").unwrap();
 
-        match IssueService::get_by_key(&issue_key) {
+        match IssueService::production().get_by_key(&issue_key) {
             Some(issue) => {
-                match IssueService::add_time(issue.key.as_str(), duration, Utc::now(), None).await {
+                match IssueService::production().add_time(issue.key.as_str(), duration, Utc::now(), None).await {
                     Ok(_) => debug!("Logged '{}' for issue '{}'", duration, issue_key),
                     Err(e) => error!("Error: {:?}", e),
                 }

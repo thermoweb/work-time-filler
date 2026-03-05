@@ -321,7 +321,7 @@ impl LinkGoogleMeetingsCommand {
 
 fn issue_suggestor(input: &str) -> Result<Vec<String>, CustomUserError> {
     let input = input.to_lowercase();
-    Ok(IssueService::get_all_issues()
+    Ok(IssueService::production().get_all_issues()
         .iter()
         .filter(|issue| {
             issue.summary.to_lowercase().contains(&input)
@@ -333,11 +333,12 @@ fn issue_suggestor(input: &str) -> Result<Vec<String>, CustomUserError> {
 }
 
 async fn get_jira_candidates(meeting: &Meeting) -> Vec<Issue> {
+    let svc = JiraService::production();
     meeting
         .get_jira_candidates()
         .iter()
         .unique()
-        .map(|key| JiraService::get_issue_by_key(key))
+        .map(|key| svc.get_issue_by_key(key))
         .collect::<FuturesUnordered<_>>()
         .filter_map(|i| async { i })
         .collect::<Vec<Issue>>()
@@ -381,11 +382,11 @@ fn get_sprints_from_id_args(matches: &ArgMatches) -> Vec<Sprint> {
             .get_many::<String>("sprint-id")
             .unwrap()
             .cloned()
-            .filter_map(|sprint_id| SprintService::get_sprint(&sprint_id).unwrap())
+            .filter_map(|sprint_id| SprintService::production().get_sprint(&sprint_id).unwrap())
             .collect::<Vec<_>>()
     } else {
         debug!("sprint-id not found -> followed sprint returned");
-        JiraService::get_followed_sprint()
+        JiraService::production().get_followed_sprint()
     };
     sprints
 }

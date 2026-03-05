@@ -89,7 +89,7 @@ async fn fetch_sprints(multi_progress: Option<MultiProgress>) {
 }
 
 async fn fetch_issues(multi_progress: Option<MultiProgress>) {
-    let sprints = JiraService::get_followed_sprint();
+    let sprints = JiraService::production().get_followed_sprint();
     let _ = FetchJiraIssues::new(sprints)
         .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
         .execute()
@@ -98,7 +98,7 @@ async fn fetch_issues(multi_progress: Option<MultiProgress>) {
 }
 
 async fn fetch_worklogs(multi_progress: Option<MultiProgress>) {
-    let sprints = JiraService::get_followed_sprint();
+    let sprints = JiraService::production().get_followed_sprint();
     FetchJiraWorklogs::new(sprints)
         .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
         .execute()
@@ -107,7 +107,7 @@ async fn fetch_worklogs(multi_progress: Option<MultiProgress>) {
 }
 
 pub async fn fetch_google_meetings(multi_progress: Option<MultiProgress>) -> Result<(), String> {
-    let sprints = JiraService::get_followed_sprint();
+    let sprints = JiraService::production().get_followed_sprint();
 
     // Get min start date and max end date
     let min_date = sprints.iter().filter_map(|s| s.start).min();

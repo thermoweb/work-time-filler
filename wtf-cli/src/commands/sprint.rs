@@ -98,9 +98,9 @@ impl Command for SprintAddCommand {
             .cloned()
             .collect();
         for id in ids {
-            if let Some(mut sprint) = SprintService::get_sprint_by_id(&id) {
+            if let Some(mut sprint) = SprintService::production().get_sprint_by_id(&id) {
                 sprint.followed = true;
-                SprintService::save_sprint(&sprint);
+                SprintService::production().save_sprint(&sprint);
                 println!("sprint \"{}\" added successfully", sprint.id);
             } else {
                 println!("Sprint '{}' not found", id);
@@ -138,7 +138,7 @@ impl Command for SprintRemoveCommand {
 
         // Check if "all" is specified
         if ids.len() == 1 && ids[0] == "all" {
-            let followed_sprints = JiraService::get_followed_sprint();
+            let followed_sprints = JiraService::production().get_followed_sprint();
             if followed_sprints.is_empty() {
                 println!("No followed sprints to remove.");
                 return;
@@ -146,7 +146,7 @@ impl Command for SprintRemoveCommand {
 
             let count = followed_sprints.len();
             for sprint in followed_sprints {
-                match JiraService::unfollow_sprint(&sprint.id.to_string()) {
+                match JiraService::production().unfollow_sprint(&sprint.id.to_string()) {
                     Ok(..) => {}
                     Err(e) => eprintln!("Error unfollowing sprint {}: {}", sprint.id, e),
                 }
@@ -160,7 +160,7 @@ impl Command for SprintRemoveCommand {
         let mut error_count = 0;
 
         for id in &ids {
-            match JiraService::unfollow_sprint(id) {
+            match JiraService::production().unfollow_sprint(id) {
                 Ok(..) => {
                     println!("Sprint {} unfollowed successfully!", id);
                     success_count += 1;
@@ -205,7 +205,7 @@ impl Command for SprintStatusCommand {
         let min_hours = Duration::hours(7);
         let max_hours = Duration::hours(8);
 
-        match SprintService::get_sprint(sprint_id) {
+        match SprintService::production().get_sprint(sprint_id) {
             Ok(sprint) => match sprint {
                 None => println!("Sprint '{}' not found!", sprint_id),
                 Some(current_sprint) => {
@@ -277,7 +277,7 @@ impl Command for SprintClearWorklogsCommand {
         let dry_run = matches.get_flag("dry-run");
 
         // Get the sprint
-        let sprint = match SprintService::get_sprint_by_id(sprint_id) {
+        let sprint = match SprintService::production().get_sprint_by_id(sprint_id) {
             Some(s) => s,
             None => {
                 eprintln!("Sprint {} not found", sprint_id);
@@ -302,7 +302,7 @@ impl Command for SprintClearWorklogsCommand {
         println!();
 
         // Build a map of issue_id -> issue_key for lookups
-        let all_issues = IssueService::get_all_issues();
+        let all_issues = IssueService::production().get_all_issues();
         let issue_id_to_key: HashMap<String, String> = all_issues
             .iter()
             .map(|i| (i.id.clone(), i.key.clone()))
@@ -447,7 +447,7 @@ impl Command for SprintClearWorklogsCommand {
                     .cloned()
                     .unwrap_or_else(|| wl.issue_id.clone()); // fallback to issue_id if not found
 
-                IssueService::delete_worklog(&issue_key, &wl.id).await;
+                IssueService::production().delete_worklog(&issue_key, &wl.id).await;
                 deleted_jira += 1;
 
                 // Print progress every 10 worklogs or on last one

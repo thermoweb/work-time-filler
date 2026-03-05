@@ -5,41 +5,48 @@ use crate::storage::database::{GenericDatabase, DATABASE};
 use chrono::{DateTime, Duration, Utc};
 use lazy_static::lazy_static;
 use log::{debug, error};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error;
-use std::sync::Arc;
-
-static ISSUES_DATABASE: Lazy<Arc<GenericDatabase<Issue>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "issues").expect("could not initialize issues database"),
-    )
-});
 
 lazy_static! {
     static ref JIRA_CARD_IDENTIFIER: Regex = Regex::new(r"([a-zA-Z]+-[0-9]+)").unwrap();
 }
 
-pub struct IssueService;
+// --- IssueService ---
+
+pub struct IssueService {
+    issues_db: GenericDatabase<Issue>,
+}
 
 impl IssueService {
-    pub fn save_issue(issue: &Issue) {
-        ISSUES_DATABASE.insert(issue).unwrap();
+    pub fn new(issues_db: GenericDatabase<Issue>) -> Self {
+        Self { issues_db }
     }
 
-    pub fn save_all_issues(issues: Vec<Issue>) {
-        ISSUES_DATABASE.save_all(issues).unwrap();
+    pub fn production() -> Self {
+        let issues_db = GenericDatabase::new(&DATABASE, "issues")
+            .expect("could not initialize issues database");
+        Self::new(issues_db)
     }
 
-    pub fn get_all_issues() -> Vec<Issue> {
-        ISSUES_DATABASE.get_all().unwrap()
+    pub fn save_issue(&self, issue: &Issue) {
+        self.issues_db.insert(issue).unwrap();
     }
 
-    pub fn get_by_key(key: &str) -> Option<Issue> {
-        ISSUES_DATABASE.get(key).unwrap()
+    pub fn save_all_issues(&self, issues: Vec<Issue>) {
+        self.issues_db.save_all(issues).unwrap();
+    }
+
+    pub fn get_all_issues(&self) -> Vec<Issue> {
+        self.issues_db.get_all().unwrap()
+    }
+
+    pub fn get_by_key(&self, key: &str) -> Option<Issue> {
+        self.issues_db.get(key).unwrap()
     }
 
     pub async fn add_time(
+        &self,
         issue_key: &str,
         duration: Duration,
         start: DateTime<Utc>,
@@ -67,7 +74,7 @@ impl IssueService {
         .into())
     }
 
-    pub async fn delete_worklog(issue_key: &str, worklog_id: &str) {
+    pub async fn delete_worklog(&self, issue_key: &str, worklog_id: &str) {
         let jira_client = JiraClient::create();
         debug!(
             "deleting worklog '{}' for issue '{}' (KEY)",
@@ -82,8 +89,6 @@ impl IssueService {
                 );
             }
             Err(e) => {
-                // Check if it's a 404 - worklog doesn't exist in Jira (already deleted or never existed)
-                // Or 400 - permission denied (not your worklog, shouldn't be in our DB)
                 let err_str = format!("{:?}", e);
                 if err_str.contains("404")
                     || err_str.contains("Not Found")
@@ -106,78 +111,117 @@ impl IssueService {
     }
 }
 
-static BOARD_DATABASE: Lazy<Arc<GenericDatabase<Board>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "boards").expect("could not initialize board database"),
-    )
-});
-pub struct BoardService;
+// --- BoardService ---
+
+pub struct BoardService {
+    boards_db: GenericDatabase<Board>,
+}
 
 impl BoardService {
-    pub fn save_board(board: &Board) {
-        BOARD_DATABASE.insert(board).unwrap();
+    pub fn new(boards_db: GenericDatabase<Board>) -> Self {
+        Self { boards_db }
     }
 
-    pub fn get_all_boards() -> Vec<Board> {
-        BOARD_DATABASE.get_all().unwrap()
+    pub fn production() -> Self {
+        let boards_db = GenericDatabase::new(&DATABASE, "boards")
+            .expect("could not initialize board database");
+        Self::new(boards_db)
     }
 
-    pub fn get_by_id(id: &str) -> Option<Board> {
-        BOARD_DATABASE.get(id).unwrap()
+    pub fn save_board(&self, board: &Board) {
+        self.boards_db.insert(board).unwrap();
+    }
+
+    pub fn get_all_boards(&self) -> Vec<Board> {
+        self.boards_db.get_all().unwrap()
+    }
+
+    pub fn get_by_id(&self, id: &str) -> Option<Board> {
+        self.boards_db.get(id).unwrap()
     }
 }
 
-static SPRINT_DATABASE: Lazy<Arc<GenericDatabase<Sprint>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "sprints").expect("could not initialize sprint database"),
-    )
-});
+// --- SprintService ---
 
-pub struct SprintService;
+pub struct SprintService {
+    sprints_db: GenericDatabase<Sprint>,
+}
 
 impl SprintService {
-    pub fn get_sprint(sprint_id: &str) -> Result<Option<Sprint>, Box<dyn Error + Send + Sync>> {
-        SPRINT_DATABASE.get(sprint_id)
+    pub fn new(sprints_db: GenericDatabase<Sprint>) -> Self {
+        Self { sprints_db }
     }
 
-    pub fn get_sprint_by_id(id: &str) -> Option<Sprint> {
-        SPRINT_DATABASE.get(id).unwrap()
+    pub fn production() -> Self {
+        let sprints_db = GenericDatabase::new(&DATABASE, "sprints")
+            .expect("could not initialize sprint database");
+        Self::new(sprints_db)
     }
 
-    pub fn save_sprint(sprint: &Sprint) {
-        SPRINT_DATABASE.insert(sprint).unwrap();
+    pub fn get_sprint(&self, sprint_id: &str) -> Result<Option<Sprint>, Box<dyn Error + Send + Sync>> {
+        self.sprints_db.get(sprint_id)
     }
 
-    pub fn save_all_sprints(sprints: Vec<Sprint>) {
-        SPRINT_DATABASE.save_all(sprints).unwrap();
+    pub fn get_sprint_by_id(&self, id: &str) -> Option<Sprint> {
+        self.sprints_db.get(id).unwrap()
+    }
+
+    pub fn save_sprint(&self, sprint: &Sprint) {
+        self.sprints_db.insert(sprint).unwrap();
+    }
+
+    pub fn save_all_sprints(&self, sprints: Vec<Sprint>) {
+        self.sprints_db.save_all(sprints).unwrap();
     }
 }
 
-pub struct JiraService;
+// --- JiraService (facade over all three DBs + Jira API) ---
+
+pub struct JiraService {
+    issues_db: GenericDatabase<Issue>,
+    boards_db: GenericDatabase<Board>,
+    sprints_db: GenericDatabase<Sprint>,
+}
 
 impl JiraService {
-    pub fn get_available_sprints() -> Vec<Sprint> {
-        let sprints = SPRINT_DATABASE.get_all().unwrap();
-        sprints
+    pub fn new(
+        issues_db: GenericDatabase<Issue>,
+        boards_db: GenericDatabase<Board>,
+        sprints_db: GenericDatabase<Sprint>,
+    ) -> Self {
+        Self { issues_db, boards_db, sprints_db }
     }
 
-    pub fn get_followed_sprint() -> Vec<Sprint> {
-        let sprints: Vec<Sprint> = SPRINT_DATABASE
+    pub fn production() -> Self {
+        let issues_db = GenericDatabase::new(&DATABASE, "issues")
+            .expect("could not initialize issues database");
+        let boards_db = GenericDatabase::new(&DATABASE, "boards")
+            .expect("could not initialize board database");
+        let sprints_db = GenericDatabase::new(&DATABASE, "sprints")
+            .expect("could not initialize sprint database");
+        Self::new(issues_db, boards_db, sprints_db)
+    }
+
+    pub fn get_available_sprints(&self) -> Vec<Sprint> {
+        self.sprints_db.get_all().unwrap()
+    }
+
+    pub fn get_followed_sprint(&self) -> Vec<Sprint> {
+        self.sprints_db
             .get_all()
             .unwrap()
             .iter()
             .filter(|s| s.followed)
             .cloned()
-            .collect();
-        sprints
+            .collect()
     }
 
-    pub fn follow_sprint(sprint_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match SPRINT_DATABASE.get(sprint_id)? {
+    pub fn follow_sprint(&self, sprint_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match self.sprints_db.get(sprint_id)? {
             Some(mut sprint) => {
                 if !sprint.followed {
                     sprint.followed = true;
-                    SprintService::save_sprint(&sprint);
+                    self.sprints_db.insert(&sprint).unwrap();
                     Ok(())
                 } else {
                     Err("Sprint already followed")?
@@ -187,12 +231,12 @@ impl JiraService {
         }
     }
 
-    pub fn unfollow_sprint(sprint_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match SPRINT_DATABASE.get(sprint_id)? {
+    pub fn unfollow_sprint(&self, sprint_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match self.sprints_db.get(sprint_id)? {
             Some(mut sprint) => {
                 if sprint.followed {
                     sprint.followed = false;
-                    SprintService::save_sprint(&sprint);
+                    self.sprints_db.insert(&sprint).unwrap();
                     Ok(())
                 } else {
                     Err("Sprint not followed")?
@@ -202,12 +246,12 @@ impl JiraService {
         }
     }
 
-    pub fn get_available_boards() -> Result<Vec<Board>, Box<dyn Error + Send + Sync>> {
-        BOARD_DATABASE.get_all()
+    pub fn get_available_boards(&self) -> Result<Vec<Board>, Box<dyn Error + Send + Sync>> {
+        self.boards_db.get_all()
     }
 
-    pub fn get_followed_boards() -> Result<Vec<Board>, Box<dyn Error + Send + Sync>> {
-        Ok(BOARD_DATABASE
+    pub fn get_followed_boards(&self) -> Result<Vec<Board>, Box<dyn Error + Send + Sync>> {
+        Ok(self.boards_db
             .get_all()?
             .iter()
             .filter(|b| b.followed)
@@ -215,29 +259,29 @@ impl JiraService {
             .collect())
     }
 
-    pub fn follow_board(board_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match BOARD_DATABASE.get(board_id)? {
+    pub fn follow_board(&self, board_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match self.boards_db.get(board_id)? {
             Some(mut db_board) => {
                 db_board.followed = true;
-                BOARD_DATABASE.insert(&db_board)
+                self.boards_db.insert(&db_board)
             }
             None => Err(format!("Board '{}' not found", board_id))?,
         }
     }
 
-    pub fn unfollow_board(board_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match BOARD_DATABASE.get(board_id)? {
+    pub fn unfollow_board(&self, board_id: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+        match self.boards_db.get(board_id)? {
             Some(mut db_board) => {
                 db_board.followed = false;
-                BOARD_DATABASE.insert(&db_board)
+                self.boards_db.insert(&db_board)
             }
             None => Err(format!("Board '{}' not found", board_id))?,
         }
     }
 
-    pub async fn get_issue_by_key(key: &str) -> Option<Issue> {
+    pub async fn get_issue_by_key(&self, key: &str) -> Option<Issue> {
         debug!("check issue with key '{}'", key);
-        match ISSUES_DATABASE
+        match self.issues_db
             .get_all()
             .unwrap_or_default()
             .iter()
@@ -249,7 +293,7 @@ impl JiraService {
                 debug!("no issue found in database, checking remotely...");
                 if let Ok(issue) = JiraClient::create().get_issue(key).await {
                     let issue_to_store = issue.into();
-                    ISSUES_DATABASE.insert(&issue_to_store).unwrap();
+                    self.issues_db.insert(&issue_to_store).unwrap();
                     return Some(issue_to_store);
                 }
                 None

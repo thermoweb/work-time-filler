@@ -60,7 +60,7 @@ impl LocalWorklogService {
                     "removing worklog '{}' for issue '{}'",
                     worklog_id, wl.issue_id
                 );
-                IssueService::delete_worklog(&wl.issue_id, worklog_id).await;
+                IssueService::production().delete_worklog(&wl.issue_id, worklog_id).await;
                 self.remove_local_worklog(&wl);
             } else {
                 debug!("local worklog not associated with jira worklog...");

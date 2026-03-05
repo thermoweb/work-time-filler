@@ -49,10 +49,10 @@ impl Command for BoardListCommand {
         let list_all = matches.get_flag("all");
         let boards = if list_all {
             println!("Listing all available boards:");
-            JiraService::get_available_boards().unwrap()
+            JiraService::production().get_available_boards().unwrap()
         } else {
             println!("Listing followed boards:");
-            JiraService::get_followed_boards().unwrap()
+            JiraService::production().get_followed_boards().unwrap()
         };
         if boards.is_empty() {
             println!("No board found.");
@@ -130,7 +130,7 @@ impl Command for BoardAddCommand {
 
     async fn execute(&self, matches: &ArgMatches) {
         let id = matches.get_one::<String>("id").unwrap();
-        match JiraService::follow_board(id) {
+        match JiraService::production().follow_board(id) {
             Ok(_) => println!("Board '{}' followed", id),
             Err(e) => println!("{}", e),
         }
@@ -157,7 +157,7 @@ impl Command for BoardRemoveCommand {
     async fn execute(&self, matches: &ArgMatches) {
         let id = matches.get_one::<String>("id").unwrap();
 
-        match JiraService::unfollow_board(id) {
+        match JiraService::production().unfollow_board(id) {
             Ok(..) => println!("Board '{}' unfollow successfully!", id),
             Err(e) => println!("{}", e),
         }

@@ -284,7 +284,7 @@ impl Command for LogPushCommand {
         let worklogs = LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged]);
         let mut local_worklogs_id: Vec<String> = Vec::new();
         for mut wl in worklogs {
-            match IssueService::add_time(
+            match IssueService::production().add_time(
                 wl.issue_id.as_str(),
                 Duration::seconds(wl.time_spent_seconds),
                 wl.started,
