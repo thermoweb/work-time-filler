@@ -1,0 +1,4 @@
+[alias]
+# Run tests with coverage report (HTML + terminal summary)
+# Output: coverage/tarpaulin-report.html
+coverage = "tarpaulin --out Html --output-dir coverage/ --workspace --exclude-files 'wtf-cli/*'"
