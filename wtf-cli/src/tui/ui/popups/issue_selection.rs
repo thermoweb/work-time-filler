@@ -15,7 +15,7 @@ pub(in crate::tui) fn render_issue_selection_popup(frame: &mut Frame, state: &Is
     use wtf_lib::services::meetings_service::MeetingsService;
 
     // Get the meeting being linked
-    let meeting = MeetingsService::get_meeting_by_id(state.meeting_id.clone());
+    let meeting = MeetingsService::production().get_meeting_by_id(state.meeting_id.clone());
 
     // Calculate popup size - 80% width, 80% height
     let area = frame.area();

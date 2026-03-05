@@ -107,7 +107,7 @@ impl TuiData {
         let all_worklogs = LocalWorklogService::get_all_local_worklogs();
         let jira_worklogs = WorklogsService::get_all_worklogs();
         let worklog_history = LocalWorklogService::get_history();
-        let untracked_meeting_ids = MeetingsService::get_all_untracked_ids();
+        let untracked_meeting_ids = MeetingsService::production().get_all_untracked_ids();
 
         // Build issue lookup map
         let all_issues = IssueService::get_all_issues();
@@ -144,7 +144,7 @@ impl TuiData {
 
     fn get_meetings_for_sprints(sprints: &[Sprint]) -> Vec<Meeting> {
         use chrono::{TimeZone, Utc};
-        let all_meetings = MeetingsService::get_all_meetings();
+        let all_meetings = MeetingsService::production().get_all_meetings();
 
         // Filter meetings that fall within sprint date ranges, expanded to full UTC days
         // so meetings at the start/end of the sprint day are not missed.
@@ -259,7 +259,7 @@ impl TuiData {
 
         // Mark absence days
         let mut absence_days: HashMap<NaiveDate, bool> = HashMap::new();
-        let absences = MeetingsService::get_absences();
+        let absences = MeetingsService::production().get_absences();
 
         for absence in absences {
             let mut current_date = absence.start.date_naive();
@@ -352,7 +352,7 @@ impl TuiData {
 
         // Mark absence days and add as 7-hour days (typical work day)
         let mut absence_days: HashMap<NaiveDate, bool> = HashMap::new();
-        let absences = MeetingsService::get_absences();
+        let absences = MeetingsService::production().get_absences();
         for absence in absences {
             let mut current_date = absence.start.date_naive();
             let end_date = absence.end.date_naive();

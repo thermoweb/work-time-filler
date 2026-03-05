@@ -900,7 +900,7 @@ impl Tui {
             KeyCode::Char('x') | KeyCode::Char('X') => {
                 // Toggle untracked state for the selected meeting
                 if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {
-                    let now_untracked = MeetingsService::toggle_untracked(&meeting.id);
+                    let now_untracked = MeetingsService::production().toggle_untracked(&meeting.id);
                     if now_untracked {
                         logger::log(format!("🚫 Meeting marked as untracked"));
                     } else {
@@ -1112,10 +1112,10 @@ impl Tui {
                     let issue_key = issue.key.clone();
                     let meeting_id = state.meeting_id.clone();
                     if let Some(mut meeting) =
-                        MeetingsService::get_meeting_by_id(meeting_id.clone())
+                        MeetingsService::production().get_meeting_by_id(meeting_id.clone())
                     {
                         meeting.jira_link = Some(issue_key.clone());
-                        MeetingsService::save(&meeting);
+                        MeetingsService::production().save(&meeting);
                         logger::log(format!("✅ Linked meeting to {}", issue_key));
                         self.refresh_data();
 
@@ -1190,10 +1190,10 @@ impl Tui {
 
                             // Link meeting
                             if let Some(mut meeting) =
-                                MeetingsService::get_meeting_by_id(meeting_id.clone())
+                                MeetingsService::production().get_meeting_by_id(meeting_id.clone())
                             {
                                 meeting.jira_link = Some(issue_key.clone());
-                                MeetingsService::save(&meeting);
+                                MeetingsService::production().save(&meeting);
                                 logger::log(format!(
                                     "✅ Fetched and linked meeting to {}",
                                     issue_key

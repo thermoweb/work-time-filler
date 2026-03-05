@@ -34,11 +34,11 @@ impl MeetingWorklogTask {
         let mut meetings_to_log: Vec<(DateTime<Utc>, Meeting)> = Vec::new();
         while current <= end {
             debug!("day {}", current);
-            if MeetingsService::is_absent(current.date_naive()) {
+            if MeetingsService::production().is_absent(current.date_naive()) {
                 debug!("user was absent that day !");
             } else {
                 meetings_to_log.extend(
-                    MeetingsService::get_meeting_by_date(current)
+                    MeetingsService::production().get_meeting_by_date(current)
                         .into_iter()
                         .filter(|m| !Self::meeting_already_logged(m, current.date_naive()))
                         .map(|meeting| (current, meeting)),

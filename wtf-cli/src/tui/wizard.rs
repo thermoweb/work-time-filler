@@ -98,10 +98,10 @@ impl Tui {
                         if self.data.issues_by_key.contains_key(&key) {
                             // Link the meeting by updating jira_link field
                             if let Some(mut meeting) =
-                                MeetingsService::get_meeting_by_id(meeting.id.clone())
+                                MeetingsService::production().get_meeting_by_id(meeting.id.clone())
                             {
                                 meeting.jira_link = Some(key.clone());
-                                MeetingsService::save(&meeting);
+                                MeetingsService::production().save(&meeting);
 
                                 // Track for rollback
                                 wizard
@@ -550,9 +550,9 @@ impl Tui {
 
             // Unlink meetings
             for meeting_id in &log.linked_meeting_ids {
-                if let Some(mut meeting) = MeetingsService::get_meeting_by_id(meeting_id.clone()) {
+                if let Some(mut meeting) = MeetingsService::production().get_meeting_by_id(meeting_id.clone()) {
                     meeting.jira_link = None;
-                    MeetingsService::save(&meeting);
+                    MeetingsService::production().save(&meeting);
                     logger::log(format!("🔗 Unlinked meeting: {}", meeting_id));
                 } else {
                     logger::log(format!("⚠️  Meeting {} not found", meeting_id));

@@ -331,7 +331,7 @@ impl Task for FetchJiraSprint {
 }
 
 fn into_sprint(sprint: &JiraSprint) -> Sprint {
-    let bind = MeetingsService::get_absences();
+    let bind = MeetingsService::production().get_absences();
     let absences = bind
         .iter()
         .filter(|a| {

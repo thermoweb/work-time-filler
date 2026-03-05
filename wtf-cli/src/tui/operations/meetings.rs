@@ -55,16 +55,16 @@ impl Tui {
     }
 
     pub(in crate::tui) fn unlink_meeting(&mut self, meeting_id: String) {
-        if let Some(mut meeting) = MeetingsService::get_meeting_by_id(meeting_id) {
+        if let Some(mut meeting) = MeetingsService::production().get_meeting_by_id(meeting_id) {
             meeting.jira_link = None;
-            MeetingsService::save(&meeting);
+            MeetingsService::production().save(&meeting);
             self.refresh_data();
         }
     }
 
     pub(in crate::tui) fn link_meeting(&mut self, meeting_id: String) {
         // Get the meeting to extract potential Jira IDs
-        let meeting = match MeetingsService::get_meeting_by_id(meeting_id.clone()) {
+        let meeting = match MeetingsService::production().get_meeting_by_id(meeting_id.clone()) {
             Some(m) => m,
             None => return,
         };
@@ -103,7 +103,7 @@ impl Tui {
                 // Auto-link
                 let mut meeting = meeting;
                 meeting.jira_link = Some(issue_key.clone());
-                MeetingsService::save(&meeting);
+                MeetingsService::production().save(&meeting);
                 logger::log(format!("✅ Auto-linked meeting to {}", issue_key));
                 self.refresh_data();
                 return;
@@ -253,10 +253,10 @@ impl Tui {
                             }
                             let key = jira_key.clone();
                             if let Some(mut m) =
-                                MeetingsService::get_meeting_by_id(meeting.id.clone())
+                                MeetingsService::production().get_meeting_by_id(meeting.id.clone())
                             {
                                 m.jira_link = Some(key.clone());
-                                MeetingsService::save(&m);
+                                MeetingsService::production().save(&m);
                                 linked_count += 1;
                                 continue;
                             }
@@ -278,10 +278,10 @@ impl Tui {
                     // Check if issue exists in our data (now includes freshly fetched ones)
                     if self.data.issues_by_key.contains_key(&key) {
                         if let Some(mut meeting) =
-                            MeetingsService::get_meeting_by_id(meeting.id.clone())
+                            MeetingsService::production().get_meeting_by_id(meeting.id.clone())
                         {
                             meeting.jira_link = Some(key.clone());
-                            MeetingsService::save(&meeting);
+                            MeetingsService::production().save(&meeting);
                             linked_count += 1;
                         }
                     }

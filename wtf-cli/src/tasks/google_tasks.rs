@@ -64,7 +64,7 @@ impl Task for FetchGoogleCalendarTask {
 
                     // Clean up meetings that no longer exist in Google Calendar
                     let db_meetings =
-                        MeetingsService::get_meetings_between_dates(self.start, self.end);
+                        MeetingsService::production().get_meetings_between_dates(self.start, self.end);
                     debug!(
                         "Found {} meetings in database for date range {} to {}",
                         db_meetings.len(),
@@ -85,7 +85,7 @@ impl Task for FetchGoogleCalendarTask {
                                 db_meeting.title.as_deref().unwrap_or("Untitled"),
                                 db_meeting.start.format("%Y-%m-%d %H:%M")
                             );
-                            MeetingsService::delete_meeting(&db_meeting.id);
+                            MeetingsService::production().delete_meeting(&db_meeting.id);
                             removed_count += 1;
                         } else {
                             debug!(
@@ -111,7 +111,7 @@ impl Task for FetchGoogleCalendarTask {
 }
 
 fn upsert_meetings(mut meeting: MeetingEntity) {
-    match MeetingsService::get_meeting_by_id(meeting.id.to_string()) {
+    match MeetingsService::production().get_meeting_by_id(meeting.id.to_string()) {
         Some(db_meeting) => {
             meeting.jira_link = db_meeting.jira_link;
         }
@@ -119,7 +119,7 @@ fn upsert_meetings(mut meeting: MeetingEntity) {
             debug!("No meeting with id: {}", meeting.id);
         }
     }
-    MeetingsService::save(&meeting);
+    MeetingsService::production().save(&meeting);
 }
 pub enum GoogleEvent {
     Absence(AbsenceEntity),

@@ -366,7 +366,7 @@ impl IssueChoice {
 
 fn link_issue(mut meeting: Meeting, issue_key: &str) {
     meeting.jira_link = Some(issue_key.to_string());
-    MeetingsService::save(&meeting);
+    MeetingsService::production().save(&meeting);
     println!(
         "meeting '{}' linked to issue '{}'",
         meeting.title.unwrap_or(meeting.id),
@@ -392,12 +392,12 @@ fn get_sprints_from_id_args(matches: &ArgMatches) -> Vec<Sprint> {
 
 fn get_meetings_from_args(matches: &ArgMatches) -> Vec<Meeting> {
     if matches.get_flag("all") {
-        MeetingsService::get_all_meetings()
+        MeetingsService::production().get_all_meetings()
     } else {
         debug!("no 'all' flag");
         get_sprints_from_id_args(matches)
             .iter()
-            .flat_map(|s| MeetingsService::get_meetings_for_sprint(s))
+            .flat_map(|s| MeetingsService::production().get_meetings_for_sprint(s))
             .collect::<Vec<_>>()
     }
 }
@@ -412,7 +412,7 @@ impl Command for ClearMeetingsCommand {
 
     async fn execute(&self, _matches: &ArgMatches) {
         println!("Clearing meetings database...");
-        MeetingsService::clear_all_meetings();
+        MeetingsService::production().clear_all_meetings();
         println!("✓ Meetings database cleared. Run 'wtf fetch google' to rebuild.");
     }
 
