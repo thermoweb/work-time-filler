@@ -1,6 +1,7 @@
 use chrono::Duration;
 use std::num::ParseIntError;
 
+#[derive(Debug)]
 pub enum DurationParserError {
     InvalidFormat,
     ParseError(ParseIntError),
@@ -23,5 +24,51 @@ pub fn parse_duration(time_str: &str) -> Result<Duration, DurationParserError> {
         "d" => Ok(Duration::days(num)),
         "w" => Ok(Duration::weeks(num)),
         _ => Err(DurationParserError::InvalidFormat),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_hours() {
+        assert_eq!(parse_duration("2h").unwrap(), Duration::hours(2));
+    }
+
+    #[test]
+    fn test_parse_minutes() {
+        assert_eq!(parse_duration("30m").unwrap(), Duration::minutes(30));
+    }
+
+    #[test]
+    fn test_parse_seconds() {
+        assert_eq!(parse_duration("45s").unwrap(), Duration::seconds(45));
+    }
+
+    #[test]
+    fn test_parse_days() {
+        assert_eq!(parse_duration("3d").unwrap(), Duration::days(3));
+    }
+
+    #[test]
+    fn test_parse_weeks() {
+        assert_eq!(parse_duration("1w").unwrap(), Duration::weeks(1));
+    }
+
+    #[test]
+    fn test_invalid_unit() {
+        assert!(matches!(
+            parse_duration("5x"),
+            Err(DurationParserError::InvalidFormat)
+        ));
+    }
+
+    #[test]
+    fn test_invalid_number() {
+        assert!(matches!(
+            parse_duration("abch"),
+            Err(DurationParserError::ParseError(_))
+        ));
     }
 }

@@ -401,3 +401,145 @@ impl WorklogsService {
         self.db.save_all(all_combined).unwrap();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::data::{LocalWorklog, LocalWorklogState, Worklog};
+    use crate::storage::database::{Database, GenericDatabase};
+    use chrono::{NaiveDate, TimeZone, Utc};
+
+    fn make_local_service() -> LocalWorklogService {
+        let db = Database::temporary();
+        let worklogs_db = GenericDatabase::new(&db, "local_worklogs").unwrap();
+        let history_db = GenericDatabase::new(&db, "local_worklogs_history").unwrap();
+        LocalWorklogService::new(worklogs_db, history_db)
+    }
+
+    fn make_worklogs_service() -> WorklogsService {
+        let db = Database::temporary();
+        let worklogs_db = GenericDatabase::new(&db, "worklogs").unwrap();
+        WorklogsService::new(worklogs_db)
+    }
+
+    fn local_worklog(id: &str, started: DateTime<Utc>, seconds: i64) -> LocalWorklog {
+        LocalWorklog {
+            id: id.to_string(),
+            comment: "test".to_string(),
+            time_spent_seconds: seconds,
+            issue_id: "PROJ-1".to_string(),
+            status: LocalWorklogState::Created,
+            started,
+            meeting_id: None,
+            worklog_id: None,
+        }
+    }
+
+    fn worklog(id: &str, started: DateTime<Utc>, seconds: u64) -> Worklog {
+        Worklog {
+            id: id.to_string(),
+            author: "user".to_string(),
+            created: started,
+            time_spent: "1h".to_string(),
+            time_spent_seconds: seconds,
+            comment: None,
+            issue_id: "PROJ-1".to_string(),
+            started,
+        }
+    }
+
+    #[test]
+    fn test_save_and_get_local_worklog() {
+        let svc = make_local_service();
+        let t = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        svc.save_local_worklog(local_worklog("wl-1", t, 3600));
+
+        let all = svc.get_all_local_worklogs();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "wl-1");
+    }
+
+    #[test]
+    fn test_remove_local_worklog() {
+        let svc = make_local_service();
+        let t = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let wl = local_worklog("wl-del", t, 1800);
+        svc.save_local_worklog(wl.clone());
+        svc.remove_local_worklog(&wl);
+        assert!(svc.get_all_local_worklogs().is_empty());
+    }
+
+    #[test]
+    fn test_calculate_daily_total() {
+        let svc = make_local_service();
+        let jan10 = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let jan11 = Utc.with_ymd_and_hms(2024, 1, 11, 9, 0, 0).unwrap();
+        svc.save_local_worklog(local_worklog("wl-a", jan10, 3600)); // 1h
+        svc.save_local_worklog(local_worklog("wl-b", jan10, 1800)); // 0.5h
+        svc.save_local_worklog(local_worklog("wl-c", jan11, 7200)); // 2h on different day
+
+        let total = svc.calculate_daily_total(NaiveDate::from_ymd_opt(2024, 1, 10).unwrap());
+        assert!((total - 1.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_find_gap_days_skips_weekends() {
+        let svc = make_local_service();
+        // 2024-01-13 is Saturday, 2024-01-14 is Sunday
+        let gaps = svc.find_gap_days(
+            NaiveDate::from_ymd_opt(2024, 1, 13).unwrap(),
+            NaiveDate::from_ymd_opt(2024, 1, 14).unwrap(),
+            8.0,
+            0.0,
+        );
+        assert!(gaps.is_empty());
+    }
+
+    #[test]
+    fn test_find_gap_days_weekday_with_gap() {
+        let svc = make_local_service();
+        // 2024-01-10 is Wednesday — no work logged, expect gap with min_threshold=0.5
+        let gaps = svc.find_gap_days(
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
+            8.0,
+            0.5,
+        );
+        assert_eq!(gaps.len(), 1);
+        assert!((gaps[0].1 - 8.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_worklogs_service_save_and_get() {
+        let svc = make_worklogs_service();
+        let t = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        svc.save_worklog(worklog("jira-wl-1", t, 3600));
+
+        let all = svc.get_all_worklogs();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "jira-wl-1");
+    }
+
+    #[test]
+    fn test_worklogs_service_get_by_date() {
+        let svc = make_worklogs_service();
+        let jan10 = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let jan11 = Utc.with_ymd_and_hms(2024, 1, 11, 9, 0, 0).unwrap();
+        svc.save_worklog(worklog("w1", jan10, 3600));
+        svc.save_worklog(worklog("w2", jan11, 3600));
+
+        let day = NaiveDate::from_ymd_opt(2024, 1, 10).unwrap();
+        let results = svc.get_worklogs_by_date(day);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "w1");
+    }
+
+    #[test]
+    fn test_worklogs_service_remove() {
+        let svc = make_worklogs_service();
+        let t = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        svc.save_worklog(worklog("w-del", t, 3600));
+        svc.remove_worklog("w-del");
+        assert!(svc.get_all_worklogs().is_empty());
+    }
+}

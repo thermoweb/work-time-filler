@@ -195,12 +195,5 @@ mod tests {
         assert_eq!(achievement.name, "Chronie's Friend");
         assert_eq!(achievement.icon, "🧙");
         assert!(!achievement.chronie_message.is_empty());
-
-        println!("✅ Secret sequence: {:?}", chronie_seq.keys);
-        println!(
-            "✅ Secret achievement: {} {}",
-            achievement.icon, achievement.name
-        );
-        println!("✅ Chronie says: {}", achievement.chronie_message);
     }
 }

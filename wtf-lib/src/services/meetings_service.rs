@@ -215,3 +215,126 @@ fn sprint_day_bounds(start: DateTime<Utc>, end: DateTime<Utc>) -> (DateTime<Utc>
     let end_day = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
     (start_day, end_day)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::database::{Database, GenericDatabase};
+    use chrono::{Duration, TimeZone, Utc};
+    use std::collections::HashMap;
+
+    fn make_service() -> MeetingsService {
+        let db = Database::temporary();
+        let meetings_db = GenericDatabase::new(&db, "meetings").unwrap();
+        let untracked_db = GenericDatabase::new(&db, "untracked_meetings").unwrap();
+        let absences_db = GenericDatabase::new(&db, "absences").unwrap();
+        MeetingsService::new(meetings_db, untracked_db, absences_db)
+    }
+
+    fn make_meeting(id: &str, start: DateTime<Utc>, end: DateTime<Utc>) -> Meeting {
+        Meeting {
+            id: id.to_string(),
+            title: Some(id.to_string()),
+            description: None,
+            start,
+            end,
+            attendees: None,
+            jira_link: None,
+            recurrence: None,
+            logs: HashMap::new(),
+            my_response_status: None,
+            color_id: None,
+        }
+    }
+
+    #[test]
+    fn test_save_and_get_meeting() {
+        let svc = make_service();
+        let start = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2024, 1, 10, 10, 0, 0).unwrap();
+        let meeting = make_meeting("meet-1", start, end);
+
+        svc.save(&meeting);
+
+        let all = svc.get_all_meetings();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "meet-1");
+    }
+
+    #[test]
+    fn test_get_meeting_by_id() {
+        let svc = make_service();
+        let start = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2024, 1, 10, 10, 0, 0).unwrap();
+        svc.save(&make_meeting("meet-2", start, end));
+
+        assert!(svc.get_meeting_by_id("meet-2".to_string()).is_some());
+        assert!(svc.get_meeting_by_id("unknown".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_delete_meeting() {
+        let svc = make_service();
+        let start = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2024, 1, 10, 10, 0, 0).unwrap();
+        svc.save(&make_meeting("meet-3", start, end));
+        svc.delete_meeting("meet-3");
+
+        assert!(svc.get_meeting_by_id("meet-3".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_get_meetings_between_dates() {
+        let svc = make_service();
+        let jan10 = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let jan11 = Utc.with_ymd_and_hms(2024, 1, 11, 9, 0, 0).unwrap();
+        svc.save(&make_meeting("m1", jan10, jan10 + Duration::hours(1)));
+        svc.save(&make_meeting("m2", jan11, jan11 + Duration::hours(1)));
+
+        let results = svc.get_meetings_between_dates(
+            Utc.with_ymd_and_hms(2024, 1, 10, 0, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 10, 23, 59, 59).unwrap(),
+        );
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "m1");
+    }
+
+    #[test]
+    fn test_toggle_untracked() {
+        let svc = make_service();
+
+        // first toggle → now untracked
+        assert!(svc.toggle_untracked("meet-x"));
+        let ids = svc.get_all_untracked_ids();
+        assert!(ids.contains("meet-x"));
+
+        // second toggle → removed
+        assert!(!svc.toggle_untracked("meet-x"));
+        assert!(svc.get_all_untracked_ids().is_empty());
+    }
+
+    #[test]
+    fn test_save_and_is_absent() {
+        let svc = make_service();
+        let start = Utc.with_ymd_and_hms(2024, 1, 15, 0, 0, 0).unwrap();
+        let end = Utc.with_ymd_and_hms(2024, 1, 17, 0, 0, 0).unwrap();
+        let absence = Absence { id: "abs-1".to_string(), start, end };
+        svc.save_absence(&absence);
+
+        use chrono::NaiveDate;
+        assert!(svc.is_absent(NaiveDate::from_ymd_opt(2024, 1, 16).unwrap()));
+        assert!(!svc.is_absent(NaiveDate::from_ymd_opt(2024, 1, 18).unwrap()));
+    }
+
+    #[test]
+    fn test_clear_all_meetings() {
+        let svc = make_service();
+        let start = Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap();
+        let end = start + Duration::hours(1);
+        svc.save(&make_meeting("m-clear", start, end));
+        assert_eq!(svc.get_all_meetings().len(), 1);
+
+        svc.clear_all_meetings();
+        assert!(svc.get_all_meetings().is_empty());
+    }
+}
