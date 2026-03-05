@@ -14,7 +14,7 @@ use super::super::{
 impl Tui {
     pub(in crate::tui) fn handle_push_worklogs(&mut self) {
         // Get all staged worklogs directly from DB (not from self.data which might be stale)
-        let staged_worklogs = LocalWorklogService::get_all_local_worklogs()
+        let staged_worklogs = LocalWorklogService::production().get_all_local_worklogs()
             .into_iter()
             .filter(|w| w.status == LocalWorklogState::Staged)
             .collect::<Vec<_>>();
@@ -38,7 +38,7 @@ impl Tui {
         // Create worklog history BEFORE pushing to Jira for safety
         // This ensures we can revert even if the push crashes
         let worklog_ids: Vec<String> = staged_worklogs.iter().map(|w| w.id.clone()).collect();
-        let history_id = LocalWorklogService::historize(worklog_ids);
+        let history_id = LocalWorklogService::production().historize(worklog_ids);
         logger::log(format!("📝 Created history entry for {} worklogs", count));
 
         // Spawn background thread to push worklogs
@@ -75,7 +75,7 @@ impl Tui {
                             let mut updated_worklog = worklog.clone();
                             updated_worklog.status = LocalWorklogState::Pushed;
                             updated_worklog.worklog_id = Some(jira_worklog.id.clone());
-                            LocalWorklogService::save_local_worklog(updated_worklog);
+                            LocalWorklogService::production().save_local_worklog(updated_worklog);
                             success_count += 1;
                             let _ = progress_sender.send(format!(
                                 "✅ [{}/{}] Pushed {} ({:.1}h)",
@@ -130,7 +130,7 @@ impl Tui {
 
         let count = unpushed_worklogs.len();
         for worklog in unpushed_worklogs {
-            LocalWorklogService::remove_local_worklog(worklog);
+            LocalWorklogService::production().remove_local_worklog(worklog);
         }
 
         logger::log(format!("Deleted {} unpushed worklogs", count));
@@ -139,8 +139,8 @@ impl Tui {
     }
 
     pub(in crate::tui) fn handle_delete_worklog(&mut self, worklog_id: String) {
-        if let Some(worklog) = LocalWorklogService::get_worklog(&worklog_id) {
-            LocalWorklogService::remove_local_worklog(&worklog);
+        if let Some(worklog) = LocalWorklogService::production().get_worklog(&worklog_id) {
+            LocalWorklogService::production().remove_local_worklog(&worklog);
             logger::log(format!("Deleted worklog {}", worklog_id));
             log_chronie_message("erasing_timeline", "🧙 Chronie:");
             self.refresh_data();
@@ -148,17 +148,17 @@ impl Tui {
     }
 
     pub(in crate::tui) fn handle_toggle_worklog_stage(&mut self, worklog_id: String) {
-        if let Some(mut worklog) = LocalWorklogService::get_worklog(&worklog_id) {
+        if let Some(mut worklog) = LocalWorklogService::production().get_worklog(&worklog_id) {
             match worklog.status {
                 LocalWorklogState::Created => {
                     worklog.status = LocalWorklogState::Staged;
-                    LocalWorklogService::save_local_worklog(worklog.clone());
+                    LocalWorklogService::production().save_local_worklog(worklog.clone());
                     logger::log(format!("Staged worklog for {}", worklog.issue_id));
                     self.refresh_data();
                 }
                 LocalWorklogState::Staged => {
                     worklog.status = LocalWorklogState::Created;
-                    LocalWorklogService::save_local_worklog(worklog.clone());
+                    LocalWorklogService::production().save_local_worklog(worklog.clone());
                     logger::log(format!("Unstaged worklog for {}", worklog.issue_id));
                     self.refresh_data();
                 }
@@ -182,7 +182,7 @@ impl Tui {
         let count = created_worklogs.len();
         for mut worklog in created_worklogs {
             worklog.status = LocalWorklogState::Staged;
-            LocalWorklogService::save_local_worklog(worklog);
+            LocalWorklogService::production().save_local_worklog(worklog);
         }
 
         logger::log(format!("Staged {} worklogs", count));
@@ -203,7 +203,7 @@ impl Tui {
             meeting.title.as_ref().unwrap_or(&"Untitled".to_string())
         );
 
-        let worklog = LocalWorklogService::create_new_local_worklogs(
+        let worklog = LocalWorklogService::production().create_new_local_worklogs(
             meeting.start,
             duration_seconds,
             issue_key,

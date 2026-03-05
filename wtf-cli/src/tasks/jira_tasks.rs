@@ -445,7 +445,7 @@ impl Task for ListJiraSprints {
         let sprints_data = sprints
             .iter()
             .map(|s| {
-                let time_spent = WorklogsService::get_all_worklogs()
+                let time_spent = WorklogsService::production().get_all_worklogs()
                     .iter()
                     .filter(|wl| {
                         let worklog_date = wl.started;
@@ -678,7 +678,7 @@ impl Task for FetchJiraWorklogs {
                 "Replacing worklogs for sprint date range {} to {} with {} fresh worklogs",
                 min, max, total_worklogs
             );
-            WorklogsService::replace_worklogs_for_date_range(min, max, all_fetched_worklogs);
+            WorklogsService::production().replace_worklogs_for_date_range(min, max, all_fetched_worklogs);
         } else {
             debug!("No sprints with dates found, not updating database");
         }

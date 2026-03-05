@@ -173,7 +173,7 @@ impl Task for LogGithubEventsTask {
 
                 // Create worklog using the service method
                 let comment = session.description.clone();
-                LocalWorklogService::create_new_local_worklogs(
+                LocalWorklogService::production().create_new_local_worklogs(
                     session.start_time,
                     session.duration_seconds(),
                     &issue_id,

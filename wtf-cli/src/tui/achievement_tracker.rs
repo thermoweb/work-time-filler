@@ -78,13 +78,13 @@ impl AchievementTracker {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Get the specific history entry directly by ID
-        if let Some(entry) = LocalWorklogService::get_history_by_id(history_id) {
+        if let Some(entry) = LocalWorklogService::production().get_history_by_id(history_id) {
             let sixty_days_ago = Utc::now() - chrono::Duration::days(60);
 
             // Check each worklog in this push, fetching them one by one
             // Early exit as soon as we find one >60 days old
             for worklog_id in &entry.local_worklogs_id {
-                if let Some(worklog) = LocalWorklogService::get_local_worklog_by_id(worklog_id) {
+                if let Some(worklog) = LocalWorklogService::production().get_local_worklog_by_id(worklog_id) {
                     if worklog.started < sixty_days_ago {
                         return true; // Found one! No need to check more
                     }
@@ -101,14 +101,14 @@ impl AchievementTracker {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Get the dates covered by THIS push
-        let current_entry = match LocalWorklogService::get_history_by_id(history_id) {
+        let current_entry = match LocalWorklogService::production().get_history_by_id(history_id) {
             Some(e) => e,
             None => return false,
         };
         let current_dates: HashSet<chrono::NaiveDate> = current_entry
             .local_worklogs_id
             .iter()
-            .filter_map(|wid| LocalWorklogService::get_local_worklog_by_id(wid))
+            .filter_map(|wid| LocalWorklogService::production().get_local_worklog_by_id(wid))
             .map(|wl| wl.started.date_naive())
             .collect();
 
@@ -117,14 +117,14 @@ impl AchievementTracker {
         }
 
         // Count how many history entries (pushes) cover each date across all history
-        let all_history = LocalWorklogService::get_history();
+        let all_history = LocalWorklogService::production().get_history();
         let mut push_counts: HashMap<chrono::NaiveDate, usize> = HashMap::new();
 
         for entry in &all_history {
             let dates: HashSet<chrono::NaiveDate> = entry
                 .local_worklogs_id
                 .iter()
-                .filter_map(|wid| LocalWorklogService::get_local_worklog_by_id(wid))
+                .filter_map(|wid| LocalWorklogService::production().get_local_worklog_by_id(wid))
                 .map(|wl| wl.started.date_naive())
                 .collect();
             for date in dates {
@@ -152,7 +152,7 @@ impl AchievementTracker {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Collect all dates that have at least one pushed worklog
-        let logged_dates: HashSet<NaiveDate> = LocalWorklogService::get_all_local_worklogs()
+        let logged_dates: HashSet<NaiveDate> = LocalWorklogService::production().get_all_local_worklogs()
             .into_iter()
             .filter(|w| w.status == wtf_lib::models::data::LocalWorklogState::Pushed)
             .map(|w| w.started.date_naive())
@@ -204,10 +204,10 @@ impl AchievementTracker {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Get the specific history entry directly by ID
-        if let Some(entry) = LocalWorklogService::get_history_by_id(history_id) {
+        if let Some(entry) = LocalWorklogService::production().get_history_by_id(history_id) {
             // Check each worklog in this push
             for worklog_id in &entry.local_worklogs_id {
-                if let Some(worklog) = LocalWorklogService::get_local_worklog_by_id(worklog_id) {
+                if let Some(worklog) = LocalWorklogService::production().get_local_worklog_by_id(worklog_id) {
                     // Check if worklog has a meeting link
                     if let Some(meeting_id) = &worklog.meeting_id {
                         // Find the meeting in tui data

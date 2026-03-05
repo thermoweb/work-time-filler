@@ -53,7 +53,7 @@ impl IssueService {
             Ok(jira_worklog) => {
                 if let Some(jira_worklog) = jira_worklog {
                     let worklog = jira_worklog.into_worklog();
-                    WorklogsService::save_worklog(worklog.clone());
+                    WorklogsService::production().save_worklog(worklog.clone());
                     return Ok(Some(worklog));
                 }
                 return Ok(None);
@@ -75,7 +75,7 @@ impl IssueService {
         );
         match jira_client.delete_worklog(issue_key, worklog_id).await {
             Ok(()) => {
-                WorklogsService::remove_worklog(worklog_id);
+                WorklogsService::production().remove_worklog(worklog_id);
                 debug!(
                     "worklog '{}' deleted from Jira and local database",
                     worklog_id
@@ -94,7 +94,7 @@ impl IssueService {
                         "worklog '{}' error from Jira ({}), removing from local database anyway",
                         worklog_id, err_str
                     );
-                    WorklogsService::remove_worklog(worklog_id);
+                    WorklogsService::production().remove_worklog(worklog_id);
                 } else {
                     error!(
                         "Failed to delete worklog '{}' from issue '{}': {:?}",

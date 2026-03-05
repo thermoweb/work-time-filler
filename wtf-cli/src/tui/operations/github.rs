@@ -101,7 +101,7 @@ impl Tui {
 
             let requested_hours = time_per_issue as f64 / 3600.0;
             let session_date = session.start_time.date_naive();
-            let existing_hours = LocalWorklogService::calculate_daily_total(session_date);
+            let existing_hours = LocalWorklogService::production().calculate_daily_total(session_date);
 
             // Check if this would exceed daily limit
             if existing_hours + requested_hours > self.data.daily_hours_limit {
@@ -159,7 +159,7 @@ impl Tui {
                     .unwrap_or("Development work")
             );
 
-            let worklog = LocalWorklogService::create_new_local_worklogs(
+            let worklog = LocalWorklogService::production().create_new_local_worklogs(
                 session.start_time,
                 time_per_issue,
                 issue_id,

@@ -71,9 +71,9 @@ impl Command for LogListCommand {
     async fn execute(&self, matches: &ArgMatches) {
         let list_all = matches.get_flag("all");
         let mut db_wl = if list_all {
-            LocalWorklogService::get_all_local_worklogs()
+            LocalWorklogService::production().get_all_local_worklogs()
         } else {
-            LocalWorklogService::get_all_local_worklogs_by_status(vec![Created, Staged])
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created, Staged])
         };
         db_wl.sort_by(|a, b| a.started.cmp(&b.started));
         let (status_stats, total_time_spent) = compute_worklogs_stats(db_wl.clone());
@@ -161,7 +161,7 @@ impl Command for LogResetCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let wl = LocalWorklogService::get_all_local_worklogs();
+        let wl = LocalWorklogService::production().get_all_local_worklogs();
         let wl_to_remove: Vec<LocalWorklog> = wl
             .iter()
             .filter(|w| w.status == Created || w.status == Staged)
@@ -170,7 +170,7 @@ impl Command for LogResetCommand {
         let wl_removed = wl_to_remove.len();
         for w in wl_to_remove {
             debug!("removing unpushed worklog '{}'", w.id.as_str());
-            LocalWorklogService::remove_local_worklog(&w);
+            LocalWorklogService::production().remove_local_worklog(&w);
         }
         println!("{} worklogs removed", wl_removed);
     }
@@ -195,9 +195,9 @@ impl Command for LogAddCommand {
             .cloned()
             .collect();
         let worklogs_to_add = if !ids.is_empty() && ids.contains(&"all".to_string()) {
-            LocalWorklogService::get_all_local_worklogs_by_status(vec![Created])
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created])
         } else {
-            LocalWorklogService::get_all_local_worklogs_by_status(vec![Created])
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created])
                 .iter()
                 .filter(|w| ids.iter().any(|i| w.id.starts_with(i)))
                 .cloned()
@@ -205,7 +205,7 @@ impl Command for LogAddCommand {
         };
         for mut w in worklogs_to_add {
             w.status = Staged;
-            LocalWorklogService::save_local_worklog(w.clone());
+            LocalWorklogService::production().save_local_worklog(w.clone());
             println!("Worklog '{}' added", w.id);
         }
     }
@@ -241,9 +241,9 @@ impl Command for LogRemoveCommand {
             .cloned()
             .collect();
         let worklogs_to_remove = if !ids.is_empty() && ids.contains(&"all".to_string()) {
-            LocalWorklogService::get_all_local_worklogs_by_status(vec![Staged])
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged])
         } else {
-            LocalWorklogService::get_all_local_worklogs_by_status(vec![Staged])
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged])
                 .iter()
                 .filter(|w| ids.iter().any(|i| w.id.starts_with(i)))
                 .cloned()
@@ -251,7 +251,7 @@ impl Command for LogRemoveCommand {
         };
         for mut w in worklogs_to_remove {
             w.status = Created;
-            LocalWorklogService::save_local_worklog(w.clone());
+            LocalWorklogService::production().save_local_worklog(w.clone());
             println!("Worklog '{}' removed", w.id);
         }
     }
@@ -281,7 +281,7 @@ impl Command for LogPushCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let worklogs = LocalWorklogService::get_all_local_worklogs_by_status(vec![Staged]);
+        let worklogs = LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged]);
         let mut local_worklogs_id: Vec<String> = Vec::new();
         for mut wl in worklogs {
             match IssueService::add_time(
@@ -297,13 +297,13 @@ impl Command for LogPushCommand {
                     if let Some(jira_worklog) = result {
                         wl.worklog_id = Some(jira_worklog.id);
                     }
-                    LocalWorklogService::save_local_worklog(wl.clone());
+                    LocalWorklogService::production().save_local_worklog(wl.clone());
                     local_worklogs_id.push(wl.id);
                 }
                 Err(err) => eprintln!("{:?}", err),
             }
         }
-        LocalWorklogService::historize(local_worklogs_id.clone());
+        LocalWorklogService::production().historize(local_worklogs_id.clone());
     }
 
     fn clap_command(&self) -> ClapCommand {
@@ -323,11 +323,11 @@ impl Command for LogRevertCommand {
         let worklog_histories: Vec<LocalWorklogHistory> = matches
             .get_many::<String>("worklog-ids")
             .expect("where are my ids ??!")
-            .filter_map(|whid| LocalWorklogService::get_worklog_history(whid))
+            .filter_map(|whid| LocalWorklogService::production().get_worklog_history(whid))
             .collect();
         debug!("{:?} worklogs to revert", worklog_histories);
         for worklog_history in worklog_histories {
-            LocalWorklogService::revert_worklog_history(&worklog_history).await;
+            LocalWorklogService::production().revert_worklog_history(&worklog_history).await;
             println!("{} worklog reverted", worklog_history.id.as_str());
         }
     }
@@ -351,7 +351,7 @@ impl Command for LogHistoryCommand {
     }
 
     async fn execute(&self, matches: &ArgMatches) {
-        let history = LocalWorklogService::get_history();
+        let history = LocalWorklogService::production().get_history();
         if history.is_empty() {
             println!("No worklogs in history");
         }
@@ -359,7 +359,7 @@ impl Command for LogHistoryCommand {
             let mut worklogs = local_worklog_history
                 .local_worklogs_id
                 .iter()
-                .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+                .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
                 .collect::<Vec<_>>();
             worklogs.sort_by(|a, b| a.started.cmp(&b.started));
             let total_time = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();
@@ -412,8 +412,8 @@ impl Command for LogCleanupCommand {
         let dry_run = matches.get_flag("dry-run");
 
         // Get all local worklogs and Jira worklogs
-        let local_worklogs = LocalWorklogService::get_all_local_worklogs();
-        let jira_worklogs = WorklogsService::get_all_worklogs();
+        let local_worklogs = LocalWorklogService::production().get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::production().get_all_worklogs();
 
         // Build set of Jira worklog IDs
         let jira_worklog_ids: HashSet<String> =
@@ -474,7 +474,7 @@ impl Command for LogCleanupCommand {
                 num_duplicates
             );
             for dup in duplicates {
-                LocalWorklogService::remove_local_worklog(dup);
+                LocalWorklogService::production().remove_local_worklog(dup);
             }
             println!("✓ Cleanup complete! {} worklogs removed.", num_duplicates);
         }

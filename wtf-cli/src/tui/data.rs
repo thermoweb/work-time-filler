@@ -104,9 +104,9 @@ impl TuiData {
         let all_meetings = Self::get_meetings_for_sprints(&sprints);
         let github_sessions = Self::get_github_sessions_for_sprints(&sprints);
 
-        let all_worklogs = LocalWorklogService::get_all_local_worklogs();
-        let jira_worklogs = WorklogsService::get_all_worklogs();
-        let worklog_history = LocalWorklogService::get_history();
+        let all_worklogs = LocalWorklogService::production().get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::production().get_all_worklogs();
+        let worklog_history = LocalWorklogService::production().get_history();
         let untracked_meeting_ids = MeetingsService::production().get_all_untracked_ids();
 
         // Build issue lookup map
@@ -214,8 +214,8 @@ impl TuiData {
         use std::collections::HashSet;
 
         // Get both local worklogs AND Jira worklogs
-        let local_worklogs = LocalWorklogService::get_all_local_worklogs();
-        let jira_worklogs = WorklogsService::get_all_worklogs();
+        let local_worklogs = LocalWorklogService::production().get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::production().get_all_worklogs();
 
         // Get sprint date range
         let (start_date, end_date) = match (sprint.start, sprint.end) {
@@ -314,8 +314,8 @@ impl TuiData {
         let this_sunday = this_monday + Duration::days(6);
 
         // Get both local worklogs AND Jira worklogs
-        let local_worklogs = LocalWorklogService::get_all_local_worklogs();
-        let jira_worklogs = WorklogsService::get_all_worklogs();
+        let local_worklogs = LocalWorklogService::production().get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::production().get_all_worklogs();
 
         // Collect all Jira worklog IDs for deduplication
         let jira_worklog_ids: HashSet<String> =

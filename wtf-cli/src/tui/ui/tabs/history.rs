@@ -132,7 +132,7 @@ fn render_history_list(
         let worklogs: Vec<_> = history_entry
             .local_worklogs_id
             .iter()
-            .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
             .collect();
 
         let total_time = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();
@@ -385,7 +385,7 @@ fn render_revert_preview(
     let worklogs: Vec<_> = history_entry
         .local_worklogs_id
         .iter()
-        .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+        .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
         .collect();
 
     if worklogs.is_empty() {
@@ -576,7 +576,7 @@ fn render_selected_history_item(
     let worklogs: Vec<_> = history_entry
         .local_worklogs_id
         .iter()
-        .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+        .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
         .collect();
 
     let total_time = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();

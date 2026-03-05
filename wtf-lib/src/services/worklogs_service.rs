@@ -3,43 +3,41 @@ use crate::services::jira_service::IssueService;
 use crate::storage::database::{GenericDatabase, DATABASE};
 use chrono::{DateTime, NaiveDate, Utc};
 use log::{debug, error};
-use once_cell::sync::Lazy;
-use std::sync::Arc;
 
-static LOCAL_WORKLOGS_DB: Lazy<Arc<GenericDatabase<LocalWorklog>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "local_worklogs")
-            .expect("could not initialize local_worklogs database"),
-    )
-});
-
-static LOCAL_WORKLOGS_HISTORY_DB: Lazy<Arc<GenericDatabase<LocalWorklogHistory>>> =
-    Lazy::new(|| {
-        Arc::new(
-            GenericDatabase::new(&DATABASE, "local_worklogs_history")
-                .expect("could not initialize local_worklogs_history database"),
-        )
-    });
-
-static WORKLOGS_DATABASE: Lazy<Arc<GenericDatabase<Worklog>>> = Lazy::new(|| {
-    Arc::new(
-        GenericDatabase::new(&DATABASE, "worklogs")
-            .expect("could not initialize worklogs database"),
-    )
-});
-
-pub struct LocalWorklogService;
+pub struct LocalWorklogService {
+    worklogs_db: GenericDatabase<LocalWorklog>,
+    history_db: GenericDatabase<LocalWorklogHistory>,
+}
 
 impl LocalWorklogService {
-    pub fn get_worklog(worklog_id: &String) -> Option<LocalWorklog> {
-        LOCAL_WORKLOGS_DB.get(worklog_id).unwrap_or_else(|e| {
+    pub fn new(
+        worklogs_db: GenericDatabase<LocalWorklog>,
+        history_db: GenericDatabase<LocalWorklogHistory>,
+    ) -> Self {
+        Self {
+            worklogs_db,
+            history_db,
+        }
+    }
+
+    /// Create a service backed by the production sled database.
+    pub fn production() -> Self {
+        let worklogs_db = GenericDatabase::new(&DATABASE, "local_worklogs")
+            .expect("could not initialize local_worklogs database");
+        let history_db = GenericDatabase::new(&DATABASE, "local_worklogs_history")
+            .expect("could not initialize local_worklogs_history database");
+        Self::new(worklogs_db, history_db)
+    }
+
+    pub fn get_worklog(&self, worklog_id: &String) -> Option<LocalWorklog> {
+        self.worklogs_db.get(worklog_id).unwrap_or_else(|e| {
             error!("Failed to get worklog '{}': {}", worklog_id, e);
             None
         })
     }
 
-    pub fn get_worklog_history(worklog_history_id: &str) -> Option<LocalWorklogHistory> {
-        LOCAL_WORKLOGS_HISTORY_DB
+    pub fn get_worklog_history(&self, worklog_history_id: &str) -> Option<LocalWorklogHistory> {
+        self.history_db
             .get(worklog_history_id)
             .unwrap_or_else(|e| {
                 error!(
@@ -50,11 +48,11 @@ impl LocalWorklogService {
             })
     }
 
-    pub async fn revert_worklog_history(worklog_history: &LocalWorklogHistory) {
+    pub async fn revert_worklog_history(&self, worklog_history: &LocalWorklogHistory) {
         let worklogs_to_revert = worklog_history
             .local_worklogs_id
             .iter()
-            .filter_map(|wid| Self::get_worklog(wid))
+            .filter_map(|wid| self.get_worklog(wid))
             .collect::<Vec<_>>();
         for wl in worklogs_to_revert {
             if let Some(worklog_id) = &wl.worklog_id {
@@ -63,12 +61,12 @@ impl LocalWorklogService {
                     worklog_id, wl.issue_id
                 );
                 IssueService::delete_worklog(&wl.issue_id, worklog_id).await;
-                LocalWorklogService::remove_local_worklog(&wl);
+                self.remove_local_worklog(&wl);
             } else {
                 debug!("local worklog not associated with jira worklog...");
             }
         }
-        LOCAL_WORKLOGS_HISTORY_DB
+        self.history_db
             .remove(&worklog_history.id)
             .unwrap_or_else(|e| {
                 error!(
@@ -77,19 +75,21 @@ impl LocalWorklogService {
                 );
             });
     }
-    pub fn get_all_local_worklogs() -> Vec<LocalWorklog> {
-        LOCAL_WORKLOGS_DB.get_all().unwrap_or_default()
+
+    pub fn get_all_local_worklogs(&self) -> Vec<LocalWorklog> {
+        self.worklogs_db.get_all().unwrap_or_default()
     }
 
-    pub fn get_local_worklog_by_id(id: &str) -> Option<LocalWorklog> {
-        LOCAL_WORKLOGS_DB.get(id).ok().flatten()
+    pub fn get_local_worklog_by_id(&self, id: &str) -> Option<LocalWorklog> {
+        self.worklogs_db.get(id).ok().flatten()
     }
 
     pub fn get_local_worklogs_on_day_for_meeting(
+        &self,
         meeting_id: &str,
         day: NaiveDate,
     ) -> Vec<LocalWorklog> {
-        LOCAL_WORKLOGS_DB
+        self.worklogs_db
             .get_all()
             .unwrap_or_default()
             .iter()
@@ -104,8 +104,8 @@ impl LocalWorklogService {
             .collect::<Vec<LocalWorklog>>()
     }
 
-    pub fn get_all_local_worklogs_by_status(statuses: Vec<LocalWorklogState>) -> Vec<LocalWorklog> {
-        LOCAL_WORKLOGS_DB
+    pub fn get_all_local_worklogs_by_status(&self, statuses: Vec<LocalWorklogState>) -> Vec<LocalWorklog> {
+        self.worklogs_db
             .get_all()
             .unwrap_or_else(|_| Vec::new())
             .iter()
@@ -114,14 +114,14 @@ impl LocalWorklogService {
             .collect::<Vec<_>>()
     }
 
-    pub fn save_local_worklog(local_worklog: LocalWorklog) {
-        if let Err(e) = LOCAL_WORKLOGS_DB.insert(&local_worklog) {
+    pub fn save_local_worklog(&self, local_worklog: LocalWorklog) {
+        if let Err(e) = self.worklogs_db.insert(&local_worklog) {
             error!("Failed to save local worklog '{}': {}", local_worklog.id, e);
         }
     }
 
-    pub fn remove_local_worklog(local_worklog: &LocalWorklog) {
-        if let Err(e) = LOCAL_WORKLOGS_DB.remove(local_worklog.id.as_str()) {
+    pub fn remove_local_worklog(&self, local_worklog: &LocalWorklog) {
+        if let Err(e) = self.worklogs_db.remove(local_worklog.id.as_str()) {
             error!(
                 "Failed to remove local worklog '{}': {}",
                 local_worklog.id, e
@@ -129,19 +129,16 @@ impl LocalWorklogService {
         }
     }
 
-    /// Create history entry for already-pushed worklogs (recovery function)
-    /// Use this to create missing history for worklogs that were pushed before history was saved
-    pub fn create_history_for_pushed_worklogs() {
+    pub fn create_history_for_pushed_worklogs(&self) {
         let pushed_worklogs =
-            Self::get_all_local_worklogs_by_status(vec![LocalWorklogState::Pushed]);
+            self.get_all_local_worklogs_by_status(vec![LocalWorklogState::Pushed]);
 
         if pushed_worklogs.is_empty() {
             debug!("No pushed worklogs found to historize");
             return;
         }
 
-        // Get all existing history entries to check which worklogs are already historized
-        let history = Self::get_history();
+        let history = self.get_history();
         let mut historized_worklog_ids = std::collections::HashSet::new();
         for entry in history {
             for wid in &entry.local_worklogs_id {
@@ -149,7 +146,6 @@ impl LocalWorklogService {
             }
         }
 
-        // Only historize worklogs that aren't already in a history entry
         let worklog_ids: Vec<String> = pushed_worklogs
             .iter()
             .filter(|w| !historized_worklog_ids.contains(&w.id))
@@ -161,7 +157,7 @@ impl LocalWorklogService {
             return;
         }
 
-        Self::historize(worklog_ids.clone());
+        self.historize(worklog_ids.clone());
         debug!(
             "Created recovery history for {} unhistorized pushed worklogs",
             worklog_ids.len()
@@ -171,8 +167,8 @@ impl LocalWorklogService {
     /// Import Jira worklogs that have no local counterpart, save them as Pushed LocalWorklogs,
     /// and group them into a single new history entry so they can be reverted later.
     /// Returns the number of imported worklogs.
-    pub fn create_history_for_jira_only_worklogs(jira_worklogs: &[Worklog]) -> usize {
-        let local_worklogs = Self::get_all_local_worklogs();
+    pub fn create_history_for_jira_only_worklogs(&self, jira_worklogs: &[Worklog]) -> usize {
+        let local_worklogs = self.get_all_local_worklogs();
         let tracked_jira_ids: std::collections::HashSet<String> = local_worklogs
             .iter()
             .filter_map(|w| w.worklog_id.clone())
@@ -204,7 +200,7 @@ impl LocalWorklogService {
                 meeting_id: None,
                 worklog_id: Some(jira_wl.id.clone()),
             };
-            if let Err(e) = LOCAL_WORKLOGS_DB.insert(&local_wl) {
+            if let Err(e) = self.worklogs_db.insert(&local_wl) {
                 error!(
                     "Failed to save imported Jira worklog '{}': {}",
                     local_wl.id, e
@@ -218,7 +214,7 @@ impl LocalWorklogService {
             return 0;
         }
         let count = new_ids.len();
-        Self::historize(new_ids);
+        self.historize(new_ids);
         debug!(
             "Imported {} Jira-only worklogs into a new history entry",
             count
@@ -227,6 +223,7 @@ impl LocalWorklogService {
     }
 
     pub fn create_new_local_worklogs(
+        &self,
         started: DateTime<Utc>,
         time_spent_seconds: i64,
         issue_id: &str,
@@ -245,7 +242,7 @@ impl LocalWorklogService {
             meeting_id,
             worklog_id: None,
         };
-        if let Err(e) = LOCAL_WORKLOGS_DB.insert(&worklog) {
+        if let Err(e) = self.worklogs_db.insert(&worklog) {
             error!("Failed to create worklog '{}': {}", worklog.id, e);
         }
         debug!("new worklog created: '{}'", worklog.id);
@@ -258,10 +255,10 @@ impl LocalWorklogService {
         format!("{:x}", digest)[..8].to_string()
     }
 
-    pub fn historize(local_worklogs_id: Vec<String>) -> String {
+    pub fn historize(&self, local_worklogs_id: Vec<String>) -> String {
         let wl_history = LocalWorklogHistory::new(Utc::now(), local_worklogs_id);
         let history_id = wl_history.id.clone();
-        if let Err(e) = LOCAL_WORKLOGS_HISTORY_DB.insert(&wl_history) {
+        if let Err(e) = self.history_db.insert(&wl_history) {
             error!(
                 "Failed to create worklog history '{}': {}",
                 wl_history.id, e
@@ -270,20 +267,19 @@ impl LocalWorklogService {
         history_id
     }
 
-    pub fn get_history() -> Vec<LocalWorklogHistory> {
-        let mut history = LOCAL_WORKLOGS_HISTORY_DB.get_all().unwrap_or_default();
+    pub fn get_history(&self) -> Vec<LocalWorklogHistory> {
+        let mut history = self.history_db.get_all().unwrap_or_default();
         history.sort_by(|a, b| b.date.cmp(&a.date));
         history
     }
 
-    pub fn get_history_by_id(history_id: &str) -> Option<LocalWorklogHistory> {
-        LOCAL_WORKLOGS_HISTORY_DB.get(history_id).ok().flatten()
+    pub fn get_history_by_id(&self, history_id: &str) -> Option<LocalWorklogHistory> {
+        self.history_db.get(history_id).ok().flatten()
     }
 
     /// Delete a history entry from the database WITHOUT reverting in Jira
-    /// This just removes the history record, the worklogs remain in Pushed state
-    pub fn delete_history_from_db(history_id: &str) -> Result<(), String> {
-        LOCAL_WORKLOGS_HISTORY_DB
+    pub fn delete_history_from_db(&self, history_id: &str) -> Result<(), String> {
+        self.history_db
             .remove(history_id)
             .map_err(|e| format!("Failed to delete history: {}", e))?;
         debug!("Deleted history entry from DB: {}", history_id);
@@ -291,9 +287,8 @@ impl LocalWorklogService {
     }
 
     /// Calculate total hours logged for a specific date
-    /// Includes all worklogs (Created, Staged, Pushed) for that day
-    pub fn calculate_daily_total(date: NaiveDate) -> f64 {
-        LOCAL_WORKLOGS_DB
+    pub fn calculate_daily_total(&self, date: NaiveDate) -> f64 {
+        self.worklogs_db
             .get_all()
             .unwrap_or_default()
             .iter()
@@ -303,9 +298,8 @@ impl LocalWorklogService {
     }
 
     /// Find days in a date range that have gaps (less than daily_limit hours logged)
-    /// Returns Vec<(date, hours_to_add)> for days that need filling
-    /// Skips weekends and days already over min_threshold
     pub fn find_gap_days(
+        &self,
         start_date: NaiveDate,
         end_date: NaiveDate,
         daily_limit: f64,
@@ -317,16 +311,14 @@ impl LocalWorklogService {
         let mut current_date = start_date;
 
         while current_date <= end_date {
-            // Skip weekends (Saturday=6, Sunday=7 in num_days_from_monday)
             let weekday = current_date.weekday().num_days_from_monday();
             if weekday >= 5 {
                 current_date = current_date.succ_opt().unwrap_or(current_date);
                 continue;
             }
 
-            let existing_hours = Self::calculate_daily_total(current_date);
+            let existing_hours = self.calculate_daily_total(current_date);
 
-            // Skip days already substantially logged (over threshold)
             if existing_hours >= min_threshold {
                 current_date = current_date.succ_opt().unwrap_or(current_date);
                 continue;
@@ -344,15 +336,28 @@ impl LocalWorklogService {
     }
 }
 
-pub struct WorklogsService;
+pub struct WorklogsService {
+    db: GenericDatabase<Worklog>,
+}
 
 impl WorklogsService {
-    pub fn get_all_worklogs() -> Vec<Worklog> {
-        WORKLOGS_DATABASE.get_all().unwrap_or_default()
+    pub fn new(db: GenericDatabase<Worklog>) -> Self {
+        Self { db }
     }
 
-    pub fn get_worklogs_by_date(day: NaiveDate) -> Vec<Worklog> {
-        WORKLOGS_DATABASE
+    /// Create a service backed by the production sled database.
+    pub fn production() -> Self {
+        let db = GenericDatabase::new(&DATABASE, "worklogs")
+            .expect("could not initialize worklogs database");
+        Self::new(db)
+    }
+
+    pub fn get_all_worklogs(&self) -> Vec<Worklog> {
+        self.db.get_all().unwrap_or_default()
+    }
+
+    pub fn get_worklogs_by_date(&self, day: NaiveDate) -> Vec<Worklog> {
+        self.db
             .get_all()
             .unwrap_or_default()
             .iter()
@@ -361,27 +366,26 @@ impl WorklogsService {
             .collect::<Vec<_>>()
     }
 
-    pub fn save_worklog(worklog: Worklog) {
-        WORKLOGS_DATABASE.insert(&worklog).unwrap();
+    pub fn save_worklog(&self, worklog: Worklog) {
+        self.db.insert(&worklog).unwrap();
     }
 
-    pub fn remove_worklog(worklog_id: &str) {
-        WORKLOGS_DATABASE.remove(worklog_id).unwrap();
+    pub fn remove_worklog(&self, worklog_id: &str) {
+        self.db.remove(worklog_id).unwrap();
     }
 
-    pub fn save_all_worklogs(worklogs: Vec<Worklog>) {
-        WORKLOGS_DATABASE.save_all(worklogs).unwrap();
+    pub fn save_all_worklogs(&self, worklogs: Vec<Worklog>) {
+        self.db.save_all(worklogs).unwrap();
     }
 
     pub fn replace_worklogs_for_date_range(
+        &self,
         start_date: chrono::NaiveDate,
         end_date: chrono::NaiveDate,
         new_worklogs: Vec<Worklog>,
     ) {
-        // Get all existing worklogs
-        let all_worklogs = Self::get_all_worklogs();
+        let all_worklogs = self.get_all_worklogs();
 
-        // Keep only worklogs OUTSIDE the date range we're updating
         let worklogs_to_keep: Vec<Worklog> = all_worklogs
             .into_iter()
             .filter(|w| {
@@ -390,12 +394,10 @@ impl WorklogsService {
             })
             .collect();
 
-        // Combine kept worklogs with new ones
         let mut all_combined = worklogs_to_keep;
         all_combined.extend(new_worklogs);
 
-        // Clear and save all
-        WORKLOGS_DATABASE.clear().unwrap();
-        WORKLOGS_DATABASE.save_all(all_combined).unwrap();
+        self.db.clear().unwrap();
+        self.db.save_all(all_combined).unwrap();
     }
 }

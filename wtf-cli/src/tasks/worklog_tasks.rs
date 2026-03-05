@@ -50,7 +50,7 @@ impl MeetingWorklogTask {
     }
 
     fn meeting_already_logged(meeting: &Meeting, day: NaiveDate) -> bool {
-        let found = LocalWorklogService::get_local_worklogs_on_day_for_meeting(&meeting.id, day);
+        let found = LocalWorklogService::production().get_local_worklogs_on_day_for_meeting(&meeting.id, day);
         !found.is_empty()
     }
 
@@ -60,7 +60,7 @@ impl MeetingWorklogTask {
         if let Some(jira_link) = meeting.clone().jira_link {
             let meeting_time_spent = (meeting.end - meeting.start).num_seconds();
             if let Some(start_date) = meeting.get_start_for_day(current.date_naive()) {
-                let created_worklog = LocalWorklogService::create_new_local_worklogs(
+                let created_worklog = LocalWorklogService::production().create_new_local_worklogs(
                     start_date,
                     meeting_time_spent,
                     jira_link.as_str(),

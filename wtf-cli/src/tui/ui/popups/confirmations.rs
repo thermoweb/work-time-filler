@@ -125,7 +125,7 @@ pub(in crate::tui) fn render_revert_confirmation(
         let worklogs: Vec<_> = history
             .local_worklogs_id
             .iter()
-            .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
             .collect();
         let total_time = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();
         (worklogs.len(), total_time as f64 / 3600.0)
@@ -515,7 +515,7 @@ pub(in crate::tui) fn render_gap_fill_confirmation(frame: &mut Frame, state: &Ga
     // Add preview of gaps (max 10 lines)
     for (date, hours) in state.gaps.iter().take(10) {
         let existing =
-            wtf_lib::services::worklogs_service::LocalWorklogService::calculate_daily_total(*date);
+            wtf_lib::services::worklogs_service::LocalWorklogService::production().calculate_daily_total(*date);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(

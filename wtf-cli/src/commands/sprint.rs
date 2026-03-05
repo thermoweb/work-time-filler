@@ -215,7 +215,7 @@ impl Command for SprintStatusCommand {
                     {
                         while current <= end {
                             let worklogs =
-                                WorklogsService::get_worklogs_by_date(current.date_naive());
+                                WorklogsService::production().get_worklogs_by_date(current.date_naive());
                             let time_spent_seconds =
                                 worklogs.iter().map(|wl| wl.time_spent_seconds).sum::<u64>() as i64;
                             let time_spent = Duration::new(time_spent_seconds, 0).unwrap();
@@ -313,8 +313,8 @@ impl Command for SprintClearWorklogsCommand {
         let current_user_email = config.jira.username.clone();
 
         // Get all worklogs (Jira + Local) in the sprint date range
-        let jira_worklogs = WorklogsService::get_all_worklogs();
-        let local_worklogs = LocalWorklogService::get_all_local_worklogs();
+        let jira_worklogs = WorklogsService::production().get_all_worklogs();
+        let local_worklogs = LocalWorklogService::production().get_all_local_worklogs();
 
         // Filter by date range AND by author (only your worklogs)
         let sprint_jira_wl: Vec<_> = jira_worklogs
@@ -468,7 +468,7 @@ impl Command for SprintClearWorklogsCommand {
             let total_local = sprint_local_wl.len();
             let mut deleted_local = 0;
             for (idx, wl) in sprint_local_wl.iter().enumerate() {
-                LocalWorklogService::remove_local_worklog(wl);
+                LocalWorklogService::production().remove_local_worklog(wl);
                 deleted_local += 1;
 
                 // Print progress every 10 worklogs or on last one

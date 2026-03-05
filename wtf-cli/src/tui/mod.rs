@@ -1568,7 +1568,7 @@ impl Tui {
                             self.data.all_sprints.iter().find(|s| s.id == sprint_id)
                         {
                             if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                                let gaps = LocalWorklogService::find_gap_days(
+                                let gaps = LocalWorklogService::production().find_gap_days(
                                     start.date_naive(),
                                     end.date_naive(),
                                     self.data.daily_hours_limit,
@@ -1638,7 +1638,7 @@ impl Tui {
 
                         let seconds = (hours_to_add * 3600.0) as i64;
 
-                        let worklog = LocalWorklogService::create_new_local_worklogs(
+                        let worklog = LocalWorklogService::production().create_new_local_worklogs(
                             datetime_utc,
                             seconds,
                             &confirmation.issue_id,
@@ -1811,7 +1811,7 @@ impl Tui {
                         let worklogs: Vec<_> = history
                             .local_worklogs_id
                             .iter()
-                            .filter_map(|wid| LocalWorklogService::get_worklog(wid))
+                            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
                             .collect();
                         let total_hours = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>()
                             as f64
@@ -1973,7 +1973,7 @@ impl Tui {
                         .worklog_history
                         .get(self.data.ui_state.selected_history_index)
                     {
-                        match LocalWorklogService::delete_history_from_db(&history.id) {
+                        match LocalWorklogService::production().delete_history_from_db(&history.id) {
                             Ok(()) => {
                                 logger::log(format!("🗑️ Deleted history entry from database (worklogs remain in Jira)"));
                                 self.refresh_data();
@@ -1992,7 +1992,7 @@ impl Tui {
                         sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i)
                     {
                         let count =
-                            LocalWorklogService::create_history_for_jira_only_worklogs(&sprint_wls);
+                            LocalWorklogService::production().create_history_for_jira_only_worklogs(&sprint_wls);
                         if count > 0 {
                             logger::log(format!(
                                 "☁ Imported {} Jira worklog(s) into a new history entry",
@@ -2004,7 +2004,7 @@ impl Tui {
                     }
                 } else {
                     // Create history for pushed local worklogs without history (recovery function)
-                    LocalWorklogService::create_history_for_pushed_worklogs();
+                    LocalWorklogService::production().create_history_for_pushed_worklogs();
                     logger::log(
                         "📝 Created recovery history for unhistorized pushed worklogs".to_string(),
                     );
@@ -2032,9 +2032,9 @@ impl Tui {
             let rt = tokio::runtime::Runtime::new().unwrap();
             let result = rt.block_on(async {
                 // Get the history entry first
-                if let Some(history) = LocalWorklogService::get_worklog_history(&history_id) {
+                if let Some(history) = LocalWorklogService::production().get_worklog_history(&history_id) {
                     info!("Reverting worklog history: {}", history_id);
-                    LocalWorklogService::revert_worklog_history(&history).await;
+                    LocalWorklogService::production().revert_worklog_history(&history).await;
                     info!("Successfully reverted worklog history: {}", history_id);
                     Ok(())
                 } else {

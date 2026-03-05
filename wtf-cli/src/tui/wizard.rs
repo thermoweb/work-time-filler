@@ -337,7 +337,7 @@ impl Tui {
         // check must use the full session duration to avoid underestimating the total.
         let total_requested_hours = duration_seconds as f64 / 3600.0;
         let session_date = session.start_time.date_naive();
-        let existing_hours = LocalWorklogService::calculate_daily_total(session_date);
+        let existing_hours = LocalWorklogService::production().calculate_daily_total(session_date);
 
         // Check if this would exceed daily limit
         if existing_hours + total_requested_hours > self.data.daily_hours_limit {
@@ -507,7 +507,7 @@ impl Tui {
                 let staged_count = worklogs_to_stage.len();
                 for mut worklog in worklogs_to_stage {
                     worklog.status = LocalWorklogState::Staged;
-                    LocalWorklogService::save_local_worklog(worklog);
+                    LocalWorklogService::production().save_local_worklog(worklog);
                 }
 
                 logger::log(format!("📦 Staged {} worklogs for push", staged_count));
@@ -561,8 +561,8 @@ impl Tui {
 
             // Delete created worklogs
             for worklog_id in &log.created_worklog_ids {
-                if let Some(worklog) = LocalWorklogService::get_worklog(worklog_id) {
-                    LocalWorklogService::remove_local_worklog(&worklog);
+                if let Some(worklog) = LocalWorklogService::production().get_worklog(worklog_id) {
+                    LocalWorklogService::production().remove_local_worklog(&worklog);
                     logger::log(format!("🗑️  Deleted worklog: {}", worklog_id));
                 } else {
                     logger::log(format!("⚠️  Worklog {} not found", worklog_id));
