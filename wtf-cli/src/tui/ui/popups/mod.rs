@@ -8,7 +8,9 @@ mod wizard;
 use ratatui::Frame;
 
 // Re-export individual functions for direct use if needed
-pub(in crate::tui) use wizard::{render_wizard, render_wizard_cancel_confirmation};
+pub(in crate::tui) use wizard::{
+    render_wizard, render_wizard_cancel_confirmation, render_wizard_pre_launch_prompt,
+};
 
 pub(in crate::tui) use issue_selection::{
     render_gap_fill_issue_selection, render_issue_selection_popup,
@@ -29,6 +31,11 @@ pub(in crate::tui) use other::{render_about_popup, render_sprint_follow_popup};
 /// 3. Wizard cancel confirmation (highest priority)
 /// 4. About popup (on top of everything)
 pub(in crate::tui) fn render_all(frame: &mut Frame, tui: &crate::tui::Tui) {
+    // Render wizard pre-launch prompt (existing unpushed worklogs detected)
+    if let Some(prompt) = &tui.wizard_pre_launch_prompt {
+        render_wizard_pre_launch_prompt(frame, prompt);
+    }
+
     // Render wizard if active (takes precedence over other popups except cancel confirmation)
     if let Some(wizard) = &tui.wizard_state {
         render_wizard(frame, wizard, &tui.data, &tui.gap_fill_state);

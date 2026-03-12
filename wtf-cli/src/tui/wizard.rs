@@ -25,30 +25,54 @@ impl Tui {
                 return;
             }
 
-            logger::log(format!(
-                "🧙 Chronie is starting the wizard for {}...",
-                sprint.name
-            ));
+            // Check for existing unpushed worklogs from a previous session
+            let existing_unpushed = LocalWorklogService::production()
+                .get_all_local_worklogs_by_status(vec![
+                    LocalWorklogState::Created,
+                    LocalWorklogState::Staged,
+                ]);
+            if !existing_unpushed.is_empty() {
+                logger::log(format!(
+                    "⚠️  Found {} unpushed worklog(s) from a previous session",
+                    existing_unpushed.len()
+                ));
+                self.wizard_pre_launch_prompt = Some(WizardPreLaunchPrompt {
+                    existing_count: existing_unpushed.len(),
+                    sprint_id: sprint.id,
+                    sprint_name: sprint.name.clone(),
+                });
+                return;
+            }
 
-            // Initialize wizard state
-            self.wizard_state = Some(WizardState {
-                sprint_id: sprint.id,
-                sprint_name: sprint.name.clone(),
-                current_step: WizardStep::Syncing,
-                completed_steps: std::collections::HashSet::new(),
-                summary: WizardSummary::default(),
-                rollback_log: WizardRollbackLog::default(),
-                skip_reasons: HashMap::new(),
-                push_logs: Vec::new(),
-                spinner_frame: 0,
-                push_current: 0,
-                push_total: 0,
-                startup_message: get_branding_text("startup"), // Set once at wizard start
-            });
-
-            // Start the first step (syncing)
-            self.wizard_step_sync();
+            self.do_launch_wizard(sprint.id, &sprint.name.clone());
         }
+    }
+
+    pub(super) fn do_launch_wizard(&mut self, sprint_id: usize, sprint_name: &str) {
+        logger::log(format!(
+            "🧙 Chronie is starting the wizard for {}...",
+            sprint_name
+        ));
+
+        // Initialize wizard state
+        self.wizard_state = Some(WizardState {
+            sprint_id,
+            sprint_name: sprint_name.to_string(),
+            current_step: WizardStep::Syncing,
+            completed_steps: std::collections::HashSet::new(),
+            summary: WizardSummary::default(),
+            rollback_log: WizardRollbackLog::default(),
+            skip_reasons: HashMap::new(),
+            push_logs: Vec::new(),
+            spinner_frame: 0,
+            push_current: 0,
+            push_total: 0,
+            startup_message: get_branding_text("startup"), // Set once at wizard start
+            github_step_intro: None,
+        });
+
+        // Start the first step (syncing)
+        self.wizard_step_sync();
     }
 
     // Wizard step implementations
@@ -133,7 +157,16 @@ impl Tui {
         // Refresh data to see the newly linked meetings
         self.refresh_data();
 
-        // Get unlinked, non-untracked meetings for manual linking step
+        // Get sprint date range for filtering
+        let sprint_range = self.wizard_state.as_ref().and_then(|w| {
+            self.data
+                .all_sprints
+                .iter()
+                .find(|s| s.id == w.sprint_id)
+                .and_then(|s| s.start.zip(s.end))
+        });
+
+        // Get unlinked, non-untracked meetings filtered to the sprint's date range
         let unlinked_meetings: Vec<_> = self
             .data
             .all_meetings
@@ -145,6 +178,9 @@ impl Tui {
                         &self.data.config,
                         &self.data.untracked_meeting_ids,
                     )
+                    && sprint_range
+                        .map(|(start, end)| m.start >= start && m.start <= end)
+                        .unwrap_or(true) // No date range on sprint → show all
             })
             .cloned()
             .collect();
@@ -271,13 +307,18 @@ impl Tui {
                             return;
                         }
 
-                        // Initialize the sessions list
+                        // Initialize the sessions list and show intro prompt
                         if let Some(wizard) = &mut self.wizard_state {
                             wizard.current_step = WizardStep::CreatingGitHubWorklogs {
                                 sessions: sprint_sessions,
                                 current_session_index: 0,
                             };
+                            // Show intro prompt so user can skip the entire step
+                            wizard.github_step_intro = Some(GitHubStepIntro {
+                                session_count: count,
+                            });
                         }
+                        return;
                     }
                 }
             }

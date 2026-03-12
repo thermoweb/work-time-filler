@@ -89,6 +89,7 @@ impl Tui {
             gap_fill_confirmation: None,
             wizard_state: None,
             wizard_cancel_confirmation: None,
+            wizard_pre_launch_prompt: None,
             sprint_follow_state: None,
             issue_selection_state: None,
             unlink_confirmation_meeting_id: None,
@@ -379,6 +380,12 @@ impl Tui {
             return;
         }
 
+        // Wizard pre-launch prompt (existing unpushed worklogs detected)
+        if self.wizard_pre_launch_prompt.is_some() {
+            self.handle_wizard_pre_launch_key(key);
+            return;
+        }
+
         // Wizard cancel confirmation takes highest priority
         if self.wizard_cancel_confirmation.is_some() {
             self.handle_wizard_cancel_confirmation_key(key);
@@ -404,6 +411,41 @@ impl Tui {
                     return;
                 }
                 WizardStep::CreatingGitHubWorklogs { .. } => {
+                    // If the intro prompt is shown, handle skip/continue
+                    let has_intro = self
+                        .wizard_state
+                        .as_ref()
+                        .map(|w| w.github_step_intro.is_some())
+                        .unwrap_or(false);
+                    if has_intro {
+                        match key.code {
+                            KeyCode::Esc => {
+                                if let Some(wizard) = &mut self.wizard_state {
+                                    wizard.github_step_intro = None;
+                                    wizard.completed_steps.insert(4);
+                                    wizard
+                                        .skip_reasons
+                                        .insert(4, "user skipped GitHub step".to_string());
+                                    logger::log(
+                                        "⏭️  Wizard: Skipping GitHub step, advancing to gap fill..."
+                                            .to_string(),
+                                    );
+                                    wizard.current_step = WizardStep::FillingGaps {
+                                        selected_issue: None,
+                                    };
+                                }
+                                self.wizard_step_fill_gaps();
+                            }
+                            KeyCode::Enter | KeyCode::Char(' ') => {
+                                if let Some(wizard) = &mut self.wizard_state {
+                                    wizard.github_step_intro = None;
+                                }
+                                self.wizard_process_next_github_session();
+                            }
+                            _ => {}
+                        }
+                        return;
+                    }
                     // If worklog creation confirmation is shown, handle it
                     if self.worklog_creation_confirmation.is_some() {
                         self.handle_worklog_creation_confirmation_key(key);
@@ -1708,11 +1750,59 @@ impl Tui {
                 self.wizard_state = None;
                 self.refresh_data();
             }
+            KeyCode::Char('k') | KeyCode::Char('K') => {
+                // Exit wizard but keep all created worklogs/links staged (no rollback)
+                logger::log(
+                    "⏹️  Wizard exited, worklogs kept staged for manual handling".to_string(),
+                );
+                self.wizard_cancel_confirmation = None;
+                self.wizard_state = None;
+                self.refresh_data();
+            }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 // User declined, continue wizard
                 self.wizard_cancel_confirmation = None;
             }
             _ => {}
+        }
+    }
+
+    fn handle_wizard_pre_launch_key(&mut self, key: KeyEvent) {
+        let prompt = match self.wizard_pre_launch_prompt.take() {
+            Some(p) => p,
+            None => return,
+        };
+        match key.code {
+            KeyCode::Char('k') | KeyCode::Char('K') => {
+                // Keep existing worklogs, launch wizard as-is
+                logger::log(
+                    "▶️  Keeping existing worklogs, starting wizard...".to_string(),
+                );
+                self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
+            }
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                // Reset: delete all unpushed worklogs, then launch
+                logger::log("🗑️  Resetting unpushed worklogs before wizard launch...".to_string());
+                let to_delete = LocalWorklogService::production()
+                    .get_all_local_worklogs_by_status(vec![
+                        LocalWorklogState::Created,
+                        LocalWorklogState::Staged,
+                    ]);
+                for wl in &to_delete {
+                    LocalWorklogService::production().remove_local_worklog(wl);
+                }
+                logger::log(format!("🗑️  Deleted {} unpushed worklog(s)", to_delete.len()));
+                self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
+            }
+            KeyCode::Esc => {
+                // Abort wizard launch
+                logger::log("⚠️  Wizard launch aborted".to_string());
+                // prompt was already taken, nothing to restore
+            }
+            _ => {
+                // Put the prompt back; ignore unrecognized keys
+                self.wizard_pre_launch_prompt = Some(prompt);
+            }
         }
     }
 

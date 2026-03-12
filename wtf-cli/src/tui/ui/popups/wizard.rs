@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::tui::data::TuiData;
 use crate::tui::theme::theme;
-use crate::tui::{GapFillState, WizardState, WizardStep};
+use crate::tui::{GapFillState, WizardPreLaunchPrompt, WizardState, WizardStep};
 
 pub(in crate::tui) fn render_wizard(
     frame: &mut Frame,
@@ -237,6 +237,37 @@ pub(in crate::tui) fn render_wizard(
         } => {
             if sessions.is_empty() {
                 lines.push(Line::from("💻 Looking for GitHub sessions..."));
+            } else if let Some(intro) = &wizard.github_step_intro {
+                lines.push(Line::from(vec![
+                    Span::styled("💻 ", Style::default()),
+                    Span::styled(
+                        format!("{} GitHub session(s) found", intro.session_count),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ]));
+                lines.push(Line::from(""));
+                lines.push(Line::from(
+                    "Create worklogs from these GitHub sessions?",
+                ));
+                lines.push(Line::from(""));
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        "[Enter]",
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" Process sessions  "),
+                    Span::styled(
+                        "[Esc]",
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" Skip this step"),
+                ]));
             } else {
                 lines.push(Line::from(format!(
                     "💻 Processing GitHub session {}/{}",
@@ -542,7 +573,7 @@ pub(in crate::tui) fn matches_current_step(step_num: usize, current_step: &Wizar
 pub(in crate::tui) fn render_wizard_cancel_confirmation(frame: &mut Frame) {
     let area = frame.area();
     let popup_width = 65.min(area.width.saturating_sub(4));
-    let popup_height = 11;
+    let popup_height = 13;
     let popup_area = Rect {
         x: (area.width.saturating_sub(popup_width)) / 2,
         y: (area.height.saturating_sub(popup_height)) / 2,
@@ -560,24 +591,72 @@ pub(in crate::tui) fn render_wizard_cancel_confirmation(frame: &mut Frame) {
                 .add_modifier(Modifier::BOLD),
         )]),
         Line::from(""),
-        Line::from("This will rollback all changes:"),
-        Line::from("  • Unlink all linked meetings"),
-        Line::from("  • Delete all created worklogs"),
+        Line::from(vec![
+            Span::styled("[Y] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw("Cancel & rollback (unlink meetings, delete worklogs)"),
+        ]),
+        Line::from(vec![
+            Span::styled("[K] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::raw("Exit & keep logs staged (no rollback)"),
+        ]),
+        Line::from(vec![
+            Span::styled("[N] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::raw("Continue wizard"),
+        ]),
+    ];
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(theme().bg_primary));
+
+    let paragraph = Paragraph::new(lines)
+        .block(block)
+        .alignment(Alignment::Left);
+
+    frame.render_widget(paragraph, popup_area);
+}
+
+pub(in crate::tui) fn render_wizard_pre_launch_prompt(
+    frame: &mut Frame,
+    prompt: &WizardPreLaunchPrompt,
+) {
+    let area = frame.area();
+    let popup_width = 68.min(area.width.saturating_sub(4));
+    let popup_height = 11;
+    let popup_area = Rect {
+        x: (area.width.saturating_sub(popup_width)) / 2,
+        y: (area.height.saturating_sub(popup_height)) / 2,
+        width: popup_width,
+        height: popup_height,
+    };
+
+    frame.render_widget(Clear, popup_area);
+
+    let lines = vec![
+        Line::from(vec![Span::styled(
+            "🧙 Chronie found unpushed worklogs",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(""),
+        Line::from(format!(
+            "  {} unpushed worklog(s) exist from a previous session.",
+            prompt.existing_count
+        )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("Press ", Style::default().fg(Color::DarkGray)),
-            Span::styled(
-                "[Y]",
-                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" to cancel wizard, "),
-            Span::styled(
-                "[N]",
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" to continue"),
+            Span::styled("[K] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::raw("Keep them and continue"),
+        ]),
+        Line::from(vec![
+            Span::styled("[R] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::raw("Reset (delete unpushed worklogs) and start fresh"),
+        ]),
+        Line::from(vec![
+            Span::styled("[Esc] ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+            Span::raw("Abort"),
         ]),
     ];
 

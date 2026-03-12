@@ -206,6 +206,7 @@ pub struct Tui {
     pub(crate) gap_fill_confirmation: Option<GapFillConfirmation>,
     pub(crate) wizard_state: Option<WizardState>,
     pub(crate) wizard_cancel_confirmation: Option<WizardCancelConfirmation>,
+    pub(crate) wizard_pre_launch_prompt: Option<WizardPreLaunchPrompt>,
     pub(crate) sprint_follow_state: Option<SprintFollowState>,
     pub(crate) issue_selection_state: Option<IssueSelectionState>,
     pub(crate) unlink_confirmation_meeting_id: Option<String>,
@@ -258,6 +259,10 @@ pub struct GapFillConfirmation {
     pub(crate) sprint_name: String,
     pub(crate) issue_id: String,
     pub(crate) gaps: Vec<(chrono::NaiveDate, f64)>, // (date, hours_to_add)
+}
+
+pub struct GitHubStepIntro {
+    pub(crate) session_count: usize,
 }
 
 pub struct SprintFollowState {
@@ -338,6 +343,7 @@ pub struct WizardState {
     pub push_current: usize,                  // Current worklog being pushed (for progress bar)
     pub push_total: usize,                    // Total worklogs to push (for progress bar)
     pub startup_message: Option<String>,      // Chronie's startup quote (set once)
+    pub github_step_intro: Option<GitHubStepIntro>, // Shown before processing GitHub sessions
 }
 
 #[derive(Clone)]
@@ -383,3 +389,9 @@ impl Default for WizardRollbackLog {
 }
 
 pub struct WizardCancelConfirmation;
+
+pub struct WizardPreLaunchPrompt {
+    pub(crate) existing_count: usize,
+    pub(crate) sprint_id: usize,
+    pub(crate) sprint_name: String,
+}
