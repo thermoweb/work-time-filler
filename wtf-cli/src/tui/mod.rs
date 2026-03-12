@@ -107,6 +107,7 @@ impl Tui {
             status_clear_time: None,
             needs_full_clear: false,
             should_quit: false,
+            pending_auto_link: false,
             log_collector,
         }
     }
@@ -162,8 +163,8 @@ impl Tui {
                 self.fetch_status = status.clone();
                 match status {
                     FetchStatus::Complete => {
+                        self.pending_auto_link = true;
                         self.refresh_data();
-                        self.auto_link_meetings();
                         self.fetch_receiver = None;
                         self.status_clear_time = Some(std::time::Instant::now());
                         self.event_bus
@@ -254,6 +255,12 @@ impl Tui {
                 self.data = new_data.clone();
                 self.data_refresh_receiver = None;
                 self.event_bus.publish(AppEvent::DataRefreshed(new_data));
+
+                // Auto-link is deferred until data is fresh (triggered after fetch completes)
+                if self.pending_auto_link {
+                    self.pending_auto_link = false;
+                    self.auto_link_meetings();
+                }
             }
         }
     }

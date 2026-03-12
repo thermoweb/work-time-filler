@@ -231,6 +231,7 @@ pub struct Tui {
     pub(super) status_clear_time: Option<std::time::Instant>,
     pub(super) needs_full_clear: bool,
     pub(super) should_quit: bool,
+    pub(super) pending_auto_link: bool, // Set after fetch; executed once data refresh completes
     pub(super) log_collector: std::sync::Arc<crate::logger::CollectingLogger>,
 }
 
