@@ -89,6 +89,7 @@ impl Tui {
             achievements_tab: ui::tabs::achievements::AchievementsTab,
             meetings_tab: ui::tabs::meetings::MeetingsTab,
             github_tab: ui::tabs::github::GitHubTab,
+            settings_tab: ui::tabs::settings::SettingsTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
             gap_fill_state: None,
@@ -557,7 +558,8 @@ impl Tui {
 
         // If we're in settings edit mode, capture all keys before global shortcuts
         if self.current_tab == Tab::Settings && self.data.ui_state.settings_editing {
-            self.handle_settings_key(key);
+            let settings_tab = self.settings_tab;
+            settings_tab.handle_key(self, key);
             return;
         }
 
@@ -692,7 +694,8 @@ impl Tui {
                 achievements_tab.handle_key(self, key);
             }
             Tab::Settings => {
-                self.handle_settings_key(key);
+                let settings_tab = self.settings_tab;
+                settings_tab.handle_key(self, key);
             }
         }
     }
@@ -703,6 +706,7 @@ impl Tui {
             Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
             Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
             Tab::GitHub => self.github_tab.render(frame, area, &self.data),
+            Tab::Settings => self.settings_tab.render(frame, area, &self.data),
             _ => self.current_tab.render(frame, area, &self.data),
         }
     }
@@ -1934,72 +1938,7 @@ impl Tui {
         }
     }
 
-    fn handle_settings_key(&mut self, key: KeyEvent) {
-        use crate::tui::ui::tabs::settings::{get_field_value, FIELD_COUNT};
-
-        if self.data.ui_state.settings_editing {
-            match key.code {
-                KeyCode::Esc => {
-                    self.data.ui_state.settings_editing = false;
-                    self.data.ui_state.settings_input_buffer.clear();
-                }
-                KeyCode::Enter => {
-                    self.apply_settings_field_edit();
-                }
-                KeyCode::Backspace => {
-                    self.data.ui_state.settings_input_buffer.pop();
-                }
-                KeyCode::Char(c) => {
-                    self.data.ui_state.settings_input_buffer.push(c);
-                }
-                _ => {}
-            }
-        } else {
-            // Clear status on navigation
-            match key.code {
-                KeyCode::Up | KeyCode::Down => {
-                    self.data.ui_state.settings_status = None;
-                }
-                _ => {}
-            }
-
-            match key.code {
-                KeyCode::Up => {
-                    if self.data.ui_state.settings_selected_field > 0 {
-                        self.data.ui_state.settings_selected_field -= 1;
-                    }
-                }
-                KeyCode::Down => {
-                    if self.data.ui_state.settings_selected_field < FIELD_COUNT - 1 {
-                        self.data.ui_state.settings_selected_field += 1;
-                    }
-                }
-                KeyCode::Enter => {
-                    // Populate input buffer with current value and enter edit mode
-                    let field_idx = self.data.ui_state.settings_selected_field;
-                    let current = get_field_value(field_idx, &self.data.config.clone());
-                    self.data.ui_state.settings_input_buffer = current;
-                    self.data.ui_state.settings_editing = true;
-                    self.data.ui_state.settings_status = None;
-                }
-                KeyCode::Char('v') | KeyCode::Char('V') => {
-                    let field_idx = self.data.ui_state.settings_selected_field;
-                    let revealed = &mut self.data.ui_state.settings_show_sensitive;
-                    if revealed.contains(&field_idx) {
-                        revealed.remove(&field_idx);
-                    } else {
-                        revealed.insert(field_idx);
-                    }
-                }
-                KeyCode::Char('s') | KeyCode::Char('S') => {
-                    self.save_settings();
-                }
-                _ => {}
-            }
-        }
-    }
-
-    fn apply_settings_field_edit(&mut self) {
+    pub(in crate::tui) fn apply_settings_field_edit(&mut self) {
         use wtf_lib::config::{GoogleConfig, SensitiveString};
 
         let field_idx = self.data.ui_state.settings_selected_field;
@@ -2061,7 +2000,7 @@ impl Tui {
         self.data.ui_state.settings_dirty = true;
     }
 
-    fn save_settings(&mut self) {
+    pub(in crate::tui) fn save_settings(&mut self) {
         match self.data.config.save() {
             Ok(()) => {
                 self.data.ui_state.settings_dirty = false;

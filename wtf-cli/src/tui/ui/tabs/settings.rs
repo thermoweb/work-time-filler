@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
@@ -7,9 +8,82 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::build_shortcut_help;
+use crate::tui::Tui;
 use wtf_lib::config::{Config, GOOGLE_CALENDAR_EVENT_COLORS};
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct SettingsTab;
+
+impl TabController for SettingsTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_settings_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: crossterm::event::KeyEvent) {
+        if tui.data.ui_state.settings_editing {
+            match key.code {
+                KeyCode::Esc => {
+                    tui.data.ui_state.settings_editing = false;
+                    tui.data.ui_state.settings_input_buffer.clear();
+                }
+                KeyCode::Enter => {
+                    tui.apply_settings_field_edit();
+                }
+                KeyCode::Backspace => {
+                    tui.data.ui_state.settings_input_buffer.pop();
+                }
+                KeyCode::Char(c) => {
+                    tui.data.ui_state.settings_input_buffer.push(c);
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        match key.code {
+            KeyCode::Up | KeyCode::Down => {
+                tui.data.ui_state.settings_status = None;
+            }
+            _ => {}
+        }
+
+        match key.code {
+            KeyCode::Up => {
+                if tui.data.ui_state.settings_selected_field > 0 {
+                    tui.data.ui_state.settings_selected_field -= 1;
+                }
+            }
+            KeyCode::Down => {
+                if tui.data.ui_state.settings_selected_field < FIELD_COUNT - 1 {
+                    tui.data.ui_state.settings_selected_field += 1;
+                }
+            }
+            KeyCode::Enter => {
+                let field_idx = tui.data.ui_state.settings_selected_field;
+                let current = get_field_value(field_idx, &tui.data.config.clone());
+                tui.data.ui_state.settings_input_buffer = current;
+                tui.data.ui_state.settings_editing = true;
+                tui.data.ui_state.settings_status = None;
+            }
+            KeyCode::Char('v') | KeyCode::Char('V') => {
+                let field_idx = tui.data.ui_state.settings_selected_field;
+                let revealed = &mut tui.data.ui_state.settings_show_sensitive;
+                if revealed.contains(&field_idx) {
+                    revealed.remove(&field_idx);
+                } else {
+                    revealed.insert(field_idx);
+                }
+            }
+            KeyCode::Char('s') | KeyCode::Char('S') => {
+                tui.save_settings();
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Number of editable fields in the settings tab (indices 0..FIELD_COUNT-1).
 /// 0-7: standard fields, 8-18: Google Calendar color labels (11 colors)
