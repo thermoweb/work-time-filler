@@ -138,6 +138,12 @@ pub enum Tab {
     Settings,
 }
 
+type TabRenderer = fn(
+    &mut ratatui::Frame,
+    &ratatui::layout::Rect,
+    &super::data::TuiData,
+);
+
 impl Tab {
     /// Get all available tabs (conditional based on state)
     pub fn available_tabs(has_achievements: bool) -> Vec<Tab> {
@@ -175,6 +181,20 @@ impl Tab {
         tabs[prev_index]
     }
 
+    fn renderer(&self) -> TabRenderer {
+        use super::ui::tabs;
+
+        match self {
+            Tab::Sprints => tabs::sprints::render_sprints_tab,
+            Tab::Meetings => tabs::meetings::render_meetings_tab,
+            Tab::Worklogs => tabs::worklogs::render_worklogs_tab,
+            Tab::GitHub => tabs::github::render_github_tab,
+            Tab::History => tabs::history::render_history_tab,
+            Tab::Achievements => tabs::achievements::render,
+            Tab::Settings => tabs::settings::render_settings_tab,
+        }
+    }
+
     /// Render this tab's content
     pub fn render(
         &self,
@@ -182,17 +202,7 @@ impl Tab {
         area: &ratatui::layout::Rect,
         data: &super::data::TuiData,
     ) {
-        use super::ui::tabs;
-
-        match self {
-            Tab::Sprints => tabs::sprints::render_sprints_tab(frame, area, data),
-            Tab::Meetings => tabs::meetings::render_meetings_tab(frame, area, data),
-            Tab::Worklogs => tabs::worklogs::render_worklogs_tab(frame, area, data),
-            Tab::GitHub => tabs::github::render_github_tab(frame, area, data),
-            Tab::History => tabs::history::render_history_tab(frame, area, data),
-            Tab::Achievements => tabs::achievements::render(frame, *area, data),
-            Tab::Settings => tabs::settings::render_settings_tab(frame, area, data),
-        }
+        (self.renderer())(frame, area, data);
     }
 }
 
@@ -200,6 +210,7 @@ pub struct Tui {
     pub(crate) data: super::data::TuiData,
     pub(crate) achievement_service: AchievementService,
     pub(crate) current_tab: Tab,
+    pub(crate) meetings_tab: super::ui::tabs::meetings::MeetingsTab,
     pub(crate) revert_confirmation_state: Option<RevertConfirmationState>,
     pub(crate) worklog_creation_confirmation: Option<WorklogCreationConfirmation>,
     pub(crate) gap_fill_state: Option<GapFillState>,

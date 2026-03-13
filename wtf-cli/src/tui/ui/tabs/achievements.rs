@@ -70,7 +70,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
     (line1, line2)
 }
 
-pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
+pub fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let scroll_offset = data.ui_state.achievements_scroll_offset;
 
     // Main frame
@@ -80,8 +80,8 @@ pub fn render(frame: &mut Frame, area: Rect, data: &TuiData) {
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
+    let inner = block.inner(*area);
+    frame.render_widget(block, *area);
 
     // Split into header, content, and footer
     let chunks = Layout::default()

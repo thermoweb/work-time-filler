@@ -189,6 +189,73 @@ When splitting a large file:
 
 ---
 
+### Feature Ownership, Cohesion, and Encapsulation
+
+**Rule: Keep feature-specific behavior with the feature that owns it. Prefer high cohesion over scattering logic across unrelated files.**
+
+If code exists only to support one screen, tab, popup, or workflow, it should usually live in that feature's module. Avoid spreading one feature's rendering, keyboard shortcuts, popup state, filtering rules, and business decisions across generic files unless the logic is truly shared.
+
+#### What belongs together
+
+Keep these close to the owning feature/module whenever possible:
+- Rendering for that feature
+- Keyboard shortcuts and interaction rules for that feature
+- Popup/dialog state used only by that feature
+- Filtering, sorting, validation, and mapping rules specific to that feature
+- Small helper functions that are not reused elsewhere
+
+Extract code only when it is genuinely shared by multiple features, or when you are isolating a reusable abstraction.
+
+#### Use traits/interfaces for shared mechanics
+
+When multiple tabs or workflows follow the same pattern, define a shared trait/interface for the common mechanics and let each feature implement its own behavior behind that contract.
+
+The shared layer should depend on the trait, not on concrete feature-specific code.
+
+❌ **Bad - feature logic scattered across generic modules:**
+```rust
+// tui/mod.rs
+fn handle_meetings_key(&mut self, key: KeyEvent) { /* meetings-only behavior */ }
+
+// ui/popups/mod.rs
+fn render_unlink_confirmation(...) { /* only used by meetings */ }
+
+// ui_helpers.rs
+fn meeting_filter(...) -> bool { /* meetings-only rule in a generic file */ }
+```
+
+✅ **Good - feature owns its behavior, shared layer uses contracts:**
+```rust
+// ui/tabs/meetings/mod.rs
+pub struct MeetingsTab { /* meetings state */ }
+
+impl MeetingsTab {
+    fn render(&self, frame: &mut Frame, area: Rect) { }
+    fn handle_key(&mut self, key: KeyEvent) { }
+    fn render_popups(&self, frame: &mut Frame) { }
+    fn filter_meetings(&self, meeting: &Meeting) -> bool { }
+}
+
+trait TabController {
+    fn render(&self, frame: &mut Frame, area: Rect);
+    fn handle_key(&mut self, key: KeyEvent);
+}
+
+impl TabController for MeetingsTab { /* ... */ }
+```
+
+#### Meetings tab example
+
+For the meetings feature, code related to meeting shortcuts, selection dialogs, unlink confirmations, auto-linking triggers, and meeting-specific filtering should be grouped with the meetings tab/module. The top-level TUI should only orchestrate tab switching and call a well-defined interface, rather than owning meetings-specific behavior directly.
+
+#### Heuristic
+
+Ask: **"If I rename or delete this feature, would this code move with it?"**
+
+If the answer is yes, the code probably belongs in that feature's module.
+
+---
+
 ### Current Violations
 
 **Files requiring refactoring:**

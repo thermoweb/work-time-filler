@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use super::settings::GC_TERM_COLORS;
 use chrono::Local;
 use ratatui::{
@@ -8,21 +9,128 @@ use ratatui::{
     Frame,
 };
 
+use crate::logger;
 use crate::tui::data::TuiData;
+use crate::tui::helpers;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
+use crate::tui::Tui;
 use wtf_lib::config::Config;
+use wtf_lib::models::data::Meeting;
+use wtf_lib::services::meetings_service::MeetingsService;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MeetingsTab;
+
+pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
+    let mut sorted_meetings = data.all_meetings.clone();
+    sorted_meetings.sort_by(|a, b| b.start.cmp(&a.start));
+
+    if data.ui_state.filter_unlinked_only {
+        sorted_meetings
+            .into_iter()
+            .filter(|meeting| {
+                let is_unlinked = meeting.jira_link.is_none();
+                let is_not_declined = meeting
+                    .my_response_status
+                    .as_ref()
+                    .map(|status| status != "declined")
+                    .unwrap_or(true);
+                let is_not_untracked = !wtf_lib::utils::meetings::is_untracked(
+                    meeting,
+                    &data.config,
+                    &data.untracked_meeting_ids,
+                );
+
+                is_unlinked && is_not_declined && is_not_untracked
+            })
+            .collect()
+    } else {
+        sorted_meetings
+    }
+}
+
+impl TabController for MeetingsTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_meetings_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        let meetings = visible_meetings(&tui.data);
+        let max_index = meetings.len().saturating_sub(1);
+
+        if helpers::handle_list_navigation(
+            key,
+            &mut tui.data.ui_state.selected_meeting_index,
+            max_index,
+        ) {
+            return;
+        }
+
+        match key.code {
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                tui.refresh_data();
+            }
+            KeyCode::Char('u') | KeyCode::Char('U') => {
+                tui.handle_update();
+            }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                tui.auto_link_meetings();
+            }
+            KeyCode::Char('l') | KeyCode::Char('L') => {
+                tui.handle_meeting_log();
+            }
+            KeyCode::Char('f') | KeyCode::Char('F') => {
+                tui.data.ui_state.filter_unlinked_only = !tui.data.ui_state.filter_unlinked_only;
+                tui.data.ui_state.selected_meeting_index = 0;
+            }
+            KeyCode::Delete | KeyCode::Backspace => {
+                if let Some(meeting) = meetings.get(tui.data.ui_state.selected_meeting_index) {
+                    if meeting.jira_link.is_some() {
+                        tui.unlink_confirmation_meeting_id = Some(meeting.id.clone());
+                    }
+                }
+            }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                if let Some(meeting) = meetings.get(tui.data.ui_state.selected_meeting_index) {
+                    let now_untracked = MeetingsService::production().toggle_untracked(&meeting.id);
+                    if now_untracked {
+                        logger::log("🚫 Meeting marked as untracked".to_string());
+                    } else {
+                        logger::log("✅ Meeting unmarked as untracked".to_string());
+                    }
+                    tui.refresh_data();
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(meeting) = meetings.get(tui.data.ui_state.selected_meeting_index) {
+                    tui.link_meeting(meeting.id.clone());
+                }
+            }
+            KeyCode::PageUp => {
+                tui.data.ui_state.selected_meeting_index =
+                    tui.data.ui_state.selected_meeting_index.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                tui.data.ui_state.selected_meeting_index =
+                    (tui.data.ui_state.selected_meeting_index + 10).min(max_index);
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Render meetings tab with list and details
 pub(in crate::tui) fn render_meetings_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_meeting_index;
-    let filter_unlinked_only = data.ui_state.filter_unlinked_only;
+    let meetings = visible_meetings(data);
 
     render_list_detail_layout(
         frame,
         area,
-        |f, a| render_meetings_list(f, a, data, selected_index, filter_unlinked_only),
-        |f, a| render_meeting_details(f, a, data, selected_index, filter_unlinked_only),
+        |f, a| render_meetings_list(f, a, data, &meetings, selected_index),
+        |f, a| render_meeting_details(f, a, data, &meetings, selected_index),
     );
 }
 
@@ -30,43 +138,13 @@ fn render_meetings_list(
     frame: &mut Frame,
     area: &Rect,
     data: &TuiData,
+    meetings: &[Meeting],
     selected_index: usize,
-    filter_unlinked_only: bool,
 ) {
     let mut lines = vec![];
 
-    // Sort meetings by date (most recent first)
-    let mut sorted_meetings = data.all_meetings.clone();
-    sorted_meetings.sort_by(|a, b| b.start.cmp(&a.start));
-
-    // Apply filter if needed
-    let filtered_meetings: Vec<_> = if filter_unlinked_only {
-        sorted_meetings
-            .into_iter()
-            .filter(|m| {
-                // Filter out linked meetings
-                let is_unlinked = m.jira_link.is_none();
-                // Filter out declined meetings
-                let is_not_declined = m
-                    .my_response_status
-                    .as_ref()
-                    .map(|s| s != "declined")
-                    .unwrap_or(true);
-                // Filter out untracked meetings
-                let is_not_untracked = !wtf_lib::utils::meetings::is_untracked(
-                    m,
-                    &data.config,
-                    &data.untracked_meeting_ids,
-                );
-                is_unlinked && is_not_declined && is_not_untracked
-            })
-            .collect()
-    } else {
-        sorted_meetings
-    };
-
-    if filtered_meetings.is_empty() {
-        let message = if filter_unlinked_only {
+    if meetings.is_empty() {
+        let message = if data.ui_state.filter_unlinked_only {
             "No unlinked meetings found"
         } else {
             "No meetings found"
@@ -78,7 +156,7 @@ fn render_meetings_list(
     } else {
         // Calculate visible window (consider block borders: area.height - 2)
         let visible_height = area.height.saturating_sub(2) as usize;
-        let total_meetings = filtered_meetings.len();
+        let total_meetings = meetings.len();
 
         // Calculate scroll position to keep selected item visible
         let scroll_offset = if selected_index < visible_height / 2 {
@@ -90,7 +168,7 @@ fn render_meetings_list(
         };
 
         // Render visible meetings
-        let visible_meetings = filtered_meetings
+        let visible_meetings = meetings
             .iter()
             .enumerate()
             .skip(scroll_offset)
@@ -227,13 +305,13 @@ fn render_meetings_list(
     }
 
     // Check if selected meeting has a link (to show contextual help)
-    let selected_has_link = filtered_meetings
+    let selected_has_link = meetings
         .get(selected_index)
         .and_then(|m| m.jira_link.as_ref())
         .is_some();
 
     let pending_count = data.meeting_stats.pending;
-    let filter_text = if filter_unlinked_only {
+    let filter_text = if data.ui_state.filter_unlinked_only {
         " [FILTERED: Unlinked Only]"
     } else {
         ""
@@ -279,40 +357,11 @@ fn render_meetings_list(
 fn render_meeting_details(
     frame: &mut Frame,
     area: &Rect,
-    data: &TuiData,
+    _data: &TuiData,
+    meetings: &[Meeting],
     selected_index: usize,
-    filter_unlinked_only: bool,
 ) {
     use chrono::Local;
-
-    // Sort and filter meetings the same way as the list
-    let mut sorted_meetings = data.all_meetings.clone();
-    sorted_meetings.sort_by(|a, b| b.start.cmp(&a.start));
-
-    let filtered_meetings: Vec<_> = if filter_unlinked_only {
-        sorted_meetings
-            .into_iter()
-            .filter(|m| {
-                // Filter out linked meetings
-                let is_unlinked = m.jira_link.is_none();
-                // Filter out declined meetings
-                let is_not_declined = m
-                    .my_response_status
-                    .as_ref()
-                    .map(|s| s != "declined")
-                    .unwrap_or(true);
-                // Filter out untracked meetings
-                let is_not_untracked = !wtf_lib::utils::meetings::is_untracked(
-                    m,
-                    &data.config,
-                    &data.untracked_meeting_ids,
-                );
-                is_unlinked && is_not_declined && is_not_untracked
-            })
-            .collect()
-    } else {
-        sorted_meetings
-    };
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -324,7 +373,7 @@ fn render_meeting_details(
     let inner = block.inner(*area);
     frame.render_widget(block, *area);
 
-    if filtered_meetings.is_empty() || selected_index >= filtered_meetings.len() {
+    if meetings.is_empty() || selected_index >= meetings.len() {
         let content = vec![
             Line::from(""),
             Line::from(Span::styled(
@@ -337,7 +386,7 @@ fn render_meeting_details(
         return;
     }
 
-    let meeting = &filtered_meetings[selected_index];
+    let meeting = &meetings[selected_index];
     let local_start = meeting.start.with_timezone(&Local);
     let local_end = meeting.end.with_timezone(&Local);
 

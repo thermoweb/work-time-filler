@@ -2,6 +2,7 @@ mod achievement_tracker;
 pub mod data;
 mod helpers;
 mod operations;
+mod tab_controller;
 pub mod theme;
 mod types;
 pub mod ui;
@@ -39,7 +40,8 @@ use crate::tasks::jira_tasks::{
 use crate::tasks::Task;
 use data::TuiData;
 use once_cell::sync::Lazy;
-use wtf_lib::models::data::{LocalWorklog, LocalWorklogState, Meeting};
+use tab_controller::TabController;
+use wtf_lib::models::data::{LocalWorklog, LocalWorklogState};
 use wtf_lib::services::jira_service::JiraService;
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;
@@ -83,6 +85,7 @@ impl Tui {
             data: TuiData::collect(),
             achievement_service,
             current_tab: Tab::Sprints,
+            meetings_tab: ui::tabs::meetings::MeetingsTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
             gap_fill_state: None,
@@ -667,7 +670,8 @@ impl Tui {
                 self.handle_sprints_key(key);
             }
             Tab::Meetings => {
-                self.handle_meetings_key(key);
+                let meetings_tab = self.meetings_tab;
+                meetings_tab.handle_key(self, key);
             }
             Tab::Worklogs => {
                 self.handle_worklogs_key(key);
@@ -710,6 +714,13 @@ impl Tui {
             Tab::Settings => {
                 self.handle_settings_key(key);
             }
+        }
+    }
+
+    fn render_current_tab(&self, frame: &mut ratatui::Frame, area: &ratatui::layout::Rect) {
+        match self.current_tab {
+            Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
+            _ => self.current_tab.render(frame, area, &self.data),
         }
     }
 
@@ -876,101 +887,6 @@ impl Tui {
             }
             KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.launch_wizard();
-            }
-            _ => {}
-        }
-    }
-
-    fn handle_meetings_key(&mut self, key: KeyEvent) {
-        // Sort meetings by date (most recent first) - same as UI
-        let mut sorted_meetings = self.data.all_meetings.clone();
-        sorted_meetings.sort_by(|a, b| b.start.cmp(&a.start));
-
-        // Apply filter if needed
-        let meetings: Vec<Meeting> = if self.data.ui_state.filter_unlinked_only {
-            sorted_meetings
-                .into_iter()
-                .filter(|m| {
-                    // Filter out linked meetings
-                    let is_unlinked = m.jira_link.is_none();
-                    // Filter out declined meetings
-                    let is_not_declined = m
-                        .my_response_status
-                        .as_ref()
-                        .map(|s| s != "declined")
-                        .unwrap_or(true);
-                    is_unlinked && is_not_declined
-                })
-                .collect()
-        } else {
-            sorted_meetings
-        };
-
-        let max_index = meetings.len().saturating_sub(1);
-
-        // Handle standard navigation keys first
-        if helpers::handle_list_navigation(
-            key,
-            &mut self.data.ui_state.selected_meeting_index,
-            max_index,
-        ) {
-            return;
-        }
-
-        // Handle meeting-specific keys
-        match key.code {
-            KeyCode::Char('r') | KeyCode::Char('R') => {
-                self.refresh_data();
-            }
-            KeyCode::Char('u') | KeyCode::Char('U') => {
-                self.handle_update();
-            }
-            KeyCode::Char('a') | KeyCode::Char('A') => {
-                // Auto-link meetings
-                self.auto_link_meetings();
-            }
-            KeyCode::Char('l') | KeyCode::Char('L') => {
-                self.handle_meeting_log();
-            }
-            KeyCode::Char('f') | KeyCode::Char('F') => {
-                // Toggle filter
-                self.data.ui_state.filter_unlinked_only = !self.data.ui_state.filter_unlinked_only;
-                self.data.ui_state.selected_meeting_index = 0;
-            }
-            KeyCode::Delete | KeyCode::Backspace => {
-                // Show unlink confirmation
-                if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {
-                    // Only show confirmation if the meeting is actually linked
-                    if meeting.jira_link.is_some() {
-                        self.unlink_confirmation_meeting_id = Some(meeting.id.clone());
-                    }
-                }
-            }
-            KeyCode::Char('x') | KeyCode::Char('X') => {
-                // Toggle untracked state for the selected meeting
-                if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {
-                    let now_untracked = MeetingsService::production().toggle_untracked(&meeting.id);
-                    if now_untracked {
-                        logger::log(format!("🚫 Meeting marked as untracked"));
-                    } else {
-                        logger::log(format!("✅ Meeting unmarked as untracked"));
-                    }
-                    self.refresh_data();
-                }
-            }
-            KeyCode::Enter => {
-                // Link selected meeting
-                if let Some(meeting) = meetings.get(self.data.ui_state.selected_meeting_index) {
-                    self.link_meeting(meeting.id.clone());
-                }
-            }
-            KeyCode::PageUp => {
-                self.data.ui_state.selected_meeting_index =
-                    self.data.ui_state.selected_meeting_index.saturating_sub(10);
-            }
-            KeyCode::PageDown => {
-                self.data.ui_state.selected_meeting_index =
-                    (self.data.ui_state.selected_meeting_index + 10).min(max_index);
             }
             _ => {}
         }
