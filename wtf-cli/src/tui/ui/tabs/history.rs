@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -6,14 +7,264 @@ use ratatui::{
     Frame,
 };
 
+use crate::logger;
 use crate::tui::data::TuiData;
+use crate::tui::helpers;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
+use crate::tui::{RevertConfirmationState, Tui};
 use wtf_lib::models::data::{Sprint, Worklog};
 use wtf_lib::services::worklogs_service::LocalWorklogService;
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct HistoryTab;
+
 /// Prefix for virtual entry IDs per sprint: "__jira_only__{sprint_id}"
 pub(in crate::tui) const JIRA_ONLY_VIRTUAL_PREFIX: &str = "__jira_only__";
+
+impl TabController for HistoryTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_history_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        if tui.revert_confirmation_state.is_some() {
+            let mut revert_history_id: Option<String> = None;
+
+            {
+                let state = tui.revert_confirmation_state.as_mut().expect("checked above");
+                if state.reverting {
+                    return;
+                }
+
+                match key.code {
+                    KeyCode::Char(c) if c.is_ascii_digit() || c == '.' => {
+                        state.user_input.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        state.user_input.pop();
+                    }
+                    KeyCode::Enter => {
+                        if let Some(history) = tui
+                            .data
+                            .worklog_history
+                            .iter()
+                            .find(|history| history.id == state.history_id)
+                        {
+                            let worklogs: Vec<_> = history
+                                .local_worklogs_id
+                                .iter()
+                                .filter_map(|worklog_id| {
+                                    LocalWorklogService::production().get_worklog(worklog_id)
+                                })
+                                .collect();
+                            let total_hours =
+                                worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>() as f64
+                                    / 3600.0;
+
+                            if let Ok(user_hours) = state.user_input.parse::<f64>() {
+                                if (user_hours - total_hours).abs() < 0.05 {
+                                    revert_history_id = Some(state.history_id.clone());
+                                } else {
+                                    logger::log(format!(
+                                        "❌ Incorrect hours entered. Expected {:.1}, got {:.1}",
+                                        total_hours, user_hours
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    KeyCode::Esc => {
+                        tui.revert_confirmation_state = None;
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(history_id) = revert_history_id {
+                tui.revert_history(history_id);
+            }
+            return;
+        }
+
+        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (
+            usize,
+            Vec<String>,
+            Vec<Vec<wtf_lib::models::data::Worklog>>,
+        ) = {
+            let entries = jira_only_by_sprint(&tui.data);
+            let count = entries.len();
+            let ids: Vec<String> = entries
+                .iter()
+                .map(|(sprint, _)| format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, sprint.id))
+                .collect();
+            let worklogs: Vec<Vec<wtf_lib::models::data::Worklog>> = entries
+                .iter()
+                .map(|(_, sprint_worklogs)| {
+                    sprint_worklogs.iter().map(|worklog| (*worklog).clone()).collect()
+                })
+                .collect();
+            (count, ids, worklogs)
+        };
+        let has_jira_only = jira_only_count > 0;
+
+        let max_index = if tui.data.worklog_history.is_empty() && !has_jira_only {
+            0
+        } else {
+            tui.data.worklog_history.len() + jira_only_count - 1
+        };
+
+        if helpers::handle_list_navigation(
+            key,
+            &mut tui.data.ui_state.selected_history_index,
+            max_index,
+        ) {
+            return;
+        }
+
+        let virtual_entry_idx = tui.data.worklog_history.len();
+        let on_virtual_entry =
+            has_jira_only && tui.data.ui_state.selected_history_index >= virtual_entry_idx;
+        let virtual_sprint_i = tui
+            .data
+            .ui_state
+            .selected_history_index
+            .saturating_sub(virtual_entry_idx);
+        let virtual_id = virtual_ids.get(virtual_sprint_i).cloned();
+
+        match key.code {
+            KeyCode::Left | KeyCode::Char('h') => {
+                if on_virtual_entry {
+                    if let Some(virtual_id) = &virtual_id {
+                        tui.data.ui_state.expanded_history_ids.remove(virtual_id);
+                    }
+                } else if let Some(history) = tui
+                    .data
+                    .worklog_history
+                    .get(tui.data.ui_state.selected_history_index)
+                {
+                    tui.data.ui_state.expanded_history_ids.remove(&history.id);
+                }
+            }
+            KeyCode::Right | KeyCode::Char('l') => {
+                if on_virtual_entry {
+                    if let Some(virtual_id) = virtual_id {
+                        tui.data.ui_state.expanded_history_ids.insert(virtual_id);
+                    }
+                } else if let Some(history) = tui
+                    .data
+                    .worklog_history
+                    .get(tui.data.ui_state.selected_history_index)
+                {
+                    tui.data
+                        .ui_state
+                        .expanded_history_ids
+                        .insert(history.id.clone());
+                }
+            }
+            KeyCode::Enter => {
+                if on_virtual_entry {
+                    if let Some(virtual_id) = virtual_id {
+                        if tui.data.ui_state.expanded_history_ids.contains(&virtual_id) {
+                            tui.data.ui_state.expanded_history_ids.remove(&virtual_id);
+                        } else {
+                            tui.data.ui_state.expanded_history_ids.insert(virtual_id);
+                        }
+                    }
+                } else if let Some(history) = tui
+                    .data
+                    .worklog_history
+                    .get(tui.data.ui_state.selected_history_index)
+                {
+                    if tui
+                        .data
+                        .ui_state
+                        .expanded_history_ids
+                        .contains(&history.id)
+                    {
+                        tui.data.ui_state.expanded_history_ids.remove(&history.id);
+                    } else {
+                        tui.data
+                            .ui_state
+                            .expanded_history_ids
+                            .insert(history.id.clone());
+                    }
+                }
+            }
+            KeyCode::Delete => {
+                if !on_virtual_entry {
+                    if let Some(history) = tui
+                        .data
+                        .worklog_history
+                        .get(tui.data.ui_state.selected_history_index)
+                    {
+                        tui.revert_confirmation_state = Some(RevertConfirmationState {
+                            history_id: history.id.clone(),
+                            user_input: String::new(),
+                            reverting: false,
+                        });
+                    }
+                }
+            }
+            KeyCode::Char('D') => {
+                if !on_virtual_entry {
+                    if let Some(history) = tui
+                        .data
+                        .worklog_history
+                        .get(tui.data.ui_state.selected_history_index)
+                    {
+                        match LocalWorklogService::production().delete_history_from_db(&history.id) {
+                            Ok(()) => {
+                                logger::log(
+                                    "🗑️ Deleted history entry from database (worklogs remain in Jira)"
+                                        .to_string(),
+                                );
+                                tui.refresh_data();
+                            }
+                            Err(error) => {
+                                logger::log(format!("❌ Failed to delete history: {}", error));
+                            }
+                        }
+                    }
+                }
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if on_virtual_entry {
+                    if let Some(sprint_worklogs) =
+                        sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i)
+                    {
+                        let count = LocalWorklogService::production()
+                            .create_history_for_jira_only_worklogs(&sprint_worklogs);
+                        if count > 0 {
+                            logger::log(format!(
+                                "☁ Imported {} Jira worklog(s) into a new history entry",
+                                count
+                            ));
+                        } else {
+                            logger::log("ℹ️  No untracked Jira worklogs to import".to_string());
+                        }
+                    }
+                } else {
+                    LocalWorklogService::production().create_history_for_pushed_worklogs();
+                    logger::log(
+                        "📝 Created recovery history for unhistorized pushed worklogs".to_string(),
+                    );
+                }
+                tui.refresh_data();
+            }
+            KeyCode::PageUp => {
+                tui.data.ui_state.selected_history_index =
+                    tui.data.ui_state.selected_history_index.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                tui.data.ui_state.selected_history_index =
+                    (tui.data.ui_state.selected_history_index + 10).min(max_index);
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Returns one entry per followed sprint that has untracked Jira worklogs,
 /// sorted by sprint start date (most recent first).

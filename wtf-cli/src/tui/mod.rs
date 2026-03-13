@@ -91,6 +91,7 @@ impl Tui {
             github_tab: ui::tabs::github::GitHubTab,
             settings_tab: ui::tabs::settings::SettingsTab,
             worklogs_tab: ui::tabs::worklogs::WorklogsTab,
+            history_tab: ui::tabs::history::HistoryTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
             gap_fill_state: None,
@@ -391,7 +392,8 @@ impl Tui {
 
         // Revert confirmation popup takes highest priority
         if self.revert_confirmation_state.is_some() {
-            self.handle_history_key(key);
+            let history_tab = self.history_tab;
+            history_tab.handle_key(self, key);
             return;
         }
 
@@ -689,7 +691,8 @@ impl Tui {
                 github_tab.handle_key(self, key);
             }
             Tab::History => {
-                self.handle_history_key(key);
+                let history_tab = self.history_tab;
+                history_tab.handle_key(self, key);
             }
             Tab::Achievements => {
                 let achievements_tab = self.achievements_tab;
@@ -706,11 +709,11 @@ impl Tui {
         match self.current_tab {
             Tab::Sprints => self.sprints_tab.render(frame, area, &self.data),
             Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
-            Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
-            Tab::GitHub => self.github_tab.render(frame, area, &self.data),
-            Tab::Settings => self.settings_tab.render(frame, area, &self.data),
             Tab::Worklogs => self.worklogs_tab.render(frame, area, &self.data),
-            _ => self.current_tab.render(frame, area, &self.data),
+            Tab::GitHub => self.github_tab.render(frame, area, &self.data),
+            Tab::History => self.history_tab.render(frame, area, &self.data),
+            Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
+            Tab::Settings => self.settings_tab.render(frame, area, &self.data),
         }
     }
 
@@ -1587,249 +1590,7 @@ impl Tui {
         }
     }
 
-    fn handle_history_key(&mut self, key: KeyEvent) {
-        // If showing revert confirmation popup, handle that first
-        if let Some(ref mut state) = self.revert_confirmation_state {
-            // Don't handle input if reverting is in progress
-            if state.reverting {
-                // Only allow Escape to potentially cancel (though we won't actually cancel the operation)
-                if matches!(key.code, KeyCode::Esc) {
-                    // Don't cancel while reverting
-                }
-                return;
-            }
-
-            match key.code {
-                KeyCode::Char(c) if c.is_ascii_digit() || c == '.' => {
-                    state.user_input.push(c);
-                }
-                KeyCode::Backspace => {
-                    state.user_input.pop();
-                }
-                KeyCode::Enter => {
-                    // Get the expected hours
-                    if let Some(history) = self
-                        .data
-                        .worklog_history
-                        .iter()
-                        .find(|h| h.id == state.history_id)
-                    {
-                        let worklogs: Vec<_> = history
-                            .local_worklogs_id
-                            .iter()
-                            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
-                            .collect();
-                        let total_hours = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>()
-                            as f64
-                            / 3600.0;
-
-                        // Parse user input and check if it matches
-                        if let Ok(user_hours) = state.user_input.parse::<f64>() {
-                            // Allow some tolerance for rounding (0.05 hours = 3 minutes)
-                            if (user_hours - total_hours).abs() < 0.05 {
-                                // Confirm revert
-                                let history_id = state.history_id.clone();
-                                self.revert_history(history_id);
-                                // Don't close the popup - it will show spinner now
-                            } else {
-                                logger::log(format!(
-                                    "❌ Incorrect hours entered. Expected {:.1}, got {:.1}",
-                                    total_hours, user_hours
-                                ));
-                            }
-                        }
-                    }
-                }
-                KeyCode::Esc => {
-                    // Cancel revert
-                    self.revert_confirmation_state = None;
-                }
-                _ => {}
-            }
-            return;
-        }
-
-        // Normal navigation — compute sprint entry info using owned values to avoid borrow conflicts
-        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (
-            usize,
-            Vec<String>,
-            Vec<Vec<wtf_lib::models::data::Worklog>>,
-        ) = {
-            use crate::tui::ui::tabs::history::{jira_only_by_sprint, JIRA_ONLY_VIRTUAL_PREFIX};
-            let entries = jira_only_by_sprint(&self.data);
-            let count = entries.len();
-            let ids: Vec<String> = entries
-                .iter()
-                .map(|(s, _)| format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, s.id))
-                .collect();
-            let wls: Vec<Vec<wtf_lib::models::data::Worklog>> = entries
-                .iter()
-                .map(|(_, wls)| wls.iter().map(|w| (*w).clone()).collect())
-                .collect();
-            (count, ids, wls)
-        };
-        let has_jira_only = jira_only_count > 0;
-
-        let max_index = if self.data.worklog_history.is_empty() && !has_jira_only {
-            0
-        } else {
-            self.data.worklog_history.len() + jira_only_count - 1
-        };
-
-        // Handle standard navigation keys first
-        if helpers::handle_list_navigation(
-            key,
-            &mut self.data.ui_state.selected_history_index,
-            max_index,
-        ) {
-            return;
-        }
-
-        // Handle history-specific keys
-        let virtual_entry_idx = self.data.worklog_history.len();
-        let on_virtual_entry =
-            has_jira_only && self.data.ui_state.selected_history_index >= virtual_entry_idx;
-        let virtual_sprint_i = self
-            .data
-            .ui_state
-            .selected_history_index
-            .saturating_sub(virtual_entry_idx);
-        let virtual_id = virtual_ids.get(virtual_sprint_i).cloned();
-
-        match key.code {
-            KeyCode::Left | KeyCode::Char('h') => {
-                if on_virtual_entry {
-                    if let Some(vid) = &virtual_id {
-                        self.data.ui_state.expanded_history_ids.remove(vid);
-                    }
-                } else if let Some(history) = self
-                    .data
-                    .worklog_history
-                    .get(self.data.ui_state.selected_history_index)
-                {
-                    self.data.ui_state.expanded_history_ids.remove(&history.id);
-                }
-            }
-            KeyCode::Right | KeyCode::Char('l') => {
-                if on_virtual_entry {
-                    if let Some(vid) = virtual_id {
-                        self.data.ui_state.expanded_history_ids.insert(vid);
-                    }
-                } else if let Some(history) = self
-                    .data
-                    .worklog_history
-                    .get(self.data.ui_state.selected_history_index)
-                {
-                    self.data
-                        .ui_state
-                        .expanded_history_ids
-                        .insert(history.id.clone());
-                }
-            }
-            KeyCode::Enter => {
-                if on_virtual_entry {
-                    if let Some(vid) = virtual_id {
-                        if self.data.ui_state.expanded_history_ids.contains(&vid) {
-                            self.data.ui_state.expanded_history_ids.remove(&vid);
-                        } else {
-                            self.data.ui_state.expanded_history_ids.insert(vid);
-                        }
-                    }
-                } else if let Some(history) = self
-                    .data
-                    .worklog_history
-                    .get(self.data.ui_state.selected_history_index)
-                {
-                    if self
-                        .data
-                        .ui_state
-                        .expanded_history_ids
-                        .contains(&history.id)
-                    {
-                        self.data.ui_state.expanded_history_ids.remove(&history.id);
-                    } else {
-                        self.data
-                            .ui_state
-                            .expanded_history_ids
-                            .insert(history.id.clone());
-                    }
-                }
-            }
-            KeyCode::Delete => {
-                // Show revert confirmation (reverts in Jira) — not available for virtual entry
-                if !on_virtual_entry {
-                    if let Some(history) = self
-                        .data
-                        .worklog_history
-                        .get(self.data.ui_state.selected_history_index)
-                    {
-                        self.revert_confirmation_state = Some(RevertConfirmationState {
-                            history_id: history.id.clone(),
-                            user_input: String::new(),
-                            reverting: false,
-                        });
-                    }
-                }
-            }
-            KeyCode::Char('D') => {
-                // Delete history from DB without Jira revert (Shift+D)
-                if !on_virtual_entry {
-                    if let Some(history) = self
-                        .data
-                        .worklog_history
-                        .get(self.data.ui_state.selected_history_index)
-                    {
-                        match LocalWorklogService::production().delete_history_from_db(&history.id) {
-                            Ok(()) => {
-                                logger::log(format!("🗑️ Deleted history entry from database (worklogs remain in Jira)"));
-                                self.refresh_data();
-                            }
-                            Err(e) => {
-                                logger::log(format!("❌ Failed to delete history: {}", e));
-                            }
-                        }
-                    }
-                }
-            }
-            KeyCode::Char('c') | KeyCode::Char('C') => {
-                if on_virtual_entry {
-                    // Import only this sprint's untracked Jira worklogs as a new local history entry
-                    if let Some(sprint_wls) =
-                        sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i)
-                    {
-                        let count =
-                            LocalWorklogService::production().create_history_for_jira_only_worklogs(&sprint_wls);
-                        if count > 0 {
-                            logger::log(format!(
-                                "☁ Imported {} Jira worklog(s) into a new history entry",
-                                count
-                            ));
-                        } else {
-                            logger::log("ℹ️  No untracked Jira worklogs to import".to_string());
-                        }
-                    }
-                } else {
-                    // Create history for pushed local worklogs without history (recovery function)
-                    LocalWorklogService::production().create_history_for_pushed_worklogs();
-                    logger::log(
-                        "📝 Created recovery history for unhistorized pushed worklogs".to_string(),
-                    );
-                }
-                self.refresh_data();
-            }
-            KeyCode::PageUp => {
-                self.data.ui_state.selected_history_index =
-                    self.data.ui_state.selected_history_index.saturating_sub(10);
-            }
-            KeyCode::PageDown => {
-                self.data.ui_state.selected_history_index =
-                    (self.data.ui_state.selected_history_index + 10).min(max_index);
-            }
-            _ => {}
-        }
-    }
-
-    fn revert_history(&mut self, history_id: String) {
+    pub(in crate::tui) fn revert_history(&mut self, history_id: String) {
         let (sender, receiver) = std::sync::mpsc::channel();
         self.revert_receiver = Some(receiver);
 
