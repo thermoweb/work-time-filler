@@ -85,6 +85,7 @@ impl Tui {
             data: TuiData::collect(),
             achievement_service,
             current_tab: Tab::Sprints,
+            achievements_tab: ui::tabs::achievements::AchievementsTab,
             meetings_tab: ui::tabs::meetings::MeetingsTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
@@ -683,33 +684,8 @@ impl Tui {
                 self.handle_history_key(key);
             }
             Tab::Achievements => {
-                // Handle scrolling for achievements with left/right arrow keys
-                // The render function will clamp the offset to valid range
-                match key.code {
-                    KeyCode::Left | KeyCode::PageUp => {
-                        self.data.ui_state.achievements_scroll_offset = self
-                            .data
-                            .ui_state
-                            .achievements_scroll_offset
-                            .saturating_sub(1);
-                    }
-                    KeyCode::Right | KeyCode::PageDown => {
-                        let total_achievements = wtf_lib::Achievement::all().len();
-                        // Allow scrolling up to total-1 (render will clamp to actual max)
-                        if self.data.ui_state.achievements_scroll_offset < total_achievements {
-                            self.data.ui_state.achievements_scroll_offset += 1;
-                        }
-                    }
-                    KeyCode::Home => {
-                        self.data.ui_state.achievements_scroll_offset = 0;
-                    }
-                    KeyCode::End => {
-                        // Set to high value, render will clamp
-                        self.data.ui_state.achievements_scroll_offset =
-                            wtf_lib::Achievement::all().len();
-                    }
-                    _ => {}
-                }
+                let achievements_tab = self.achievements_tab;
+                achievements_tab.handle_key(self, key);
             }
             Tab::Settings => {
                 self.handle_settings_key(key);
@@ -720,6 +696,7 @@ impl Tui {
     fn render_current_tab(&self, frame: &mut ratatui::Frame, area: &ratatui::layout::Rect) {
         match self.current_tab {
             Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
+            Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
             _ => self.current_tab.render(frame, area, &self.data),
         }
     }

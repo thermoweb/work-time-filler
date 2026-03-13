@@ -21,7 +21,7 @@ use wtf_lib::models::data::Meeting;
 use wtf_lib::services::meetings_service::MeetingsService;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct MeetingsTab;
+pub(in crate::tui) struct MeetingsTab;
 
 pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
     let mut sorted_meetings = data.all_meetings.clone();

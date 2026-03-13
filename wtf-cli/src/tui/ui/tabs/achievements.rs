@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -7,8 +8,44 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
+use crate::tui::Tui;
 use wtf_lib::Achievement;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct AchievementsTab;
+
+impl TabController for AchievementsTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        match key.code {
+            KeyCode::Left | KeyCode::PageUp => {
+                tui.data.ui_state.achievements_scroll_offset = tui
+                    .data
+                    .ui_state
+                    .achievements_scroll_offset
+                    .saturating_sub(1);
+            }
+            KeyCode::Right | KeyCode::PageDown => {
+                let total_achievements = Achievement::all().len();
+                if tui.data.ui_state.achievements_scroll_offset < total_achievements {
+                    tui.data.ui_state.achievements_scroll_offset += 1;
+                }
+            }
+            KeyCode::Home => {
+                tui.data.ui_state.achievements_scroll_offset = 0;
+            }
+            KeyCode::End => {
+                tui.data.ui_state.achievements_scroll_offset = Achievement::all().len();
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Wrap text to exactly 2 lines, fitting within given width
 fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
@@ -70,7 +107,7 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
     (line1, line2)
 }
 
-pub fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
+pub(in crate::tui) fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let scroll_offset = data.ui_state.achievements_scroll_offset;
 
     // Main frame

@@ -210,6 +210,7 @@ pub struct Tui {
     pub(crate) data: super::data::TuiData,
     pub(crate) achievement_service: AchievementService,
     pub(crate) current_tab: Tab,
+    pub(crate) achievements_tab: super::ui::tabs::achievements::AchievementsTab,
     pub(crate) meetings_tab: super::ui::tabs::meetings::MeetingsTab,
     pub(crate) revert_confirmation_state: Option<RevertConfirmationState>,
     pub(crate) worklog_creation_confirmation: Option<WorklogCreationConfirmation>,
