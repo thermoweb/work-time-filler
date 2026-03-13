@@ -175,6 +175,60 @@ impl Tab {
         tabs[prev_index]
     }
 
+    pub(in crate::tui) fn render(
+        self,
+        tui: &Tui,
+        frame: &mut ratatui::Frame,
+        area: &ratatui::layout::Rect,
+    ) {
+        use super::tab_controller::TabController;
+
+        match self {
+            Tab::Sprints => tui.sprints_tab.render(frame, area, &tui.data),
+            Tab::Meetings => tui.meetings_tab.render(frame, area, &tui.data),
+            Tab::Worklogs => tui.worklogs_tab.render(frame, area, &tui.data),
+            Tab::GitHub => tui.github_tab.render(frame, area, &tui.data),
+            Tab::History => tui.history_tab.render(frame, area, &tui.data),
+            Tab::Achievements => tui.achievements_tab.render(frame, area, &tui.data),
+            Tab::Settings => tui.settings_tab.render(frame, area, &tui.data),
+        }
+    }
+
+    pub(in crate::tui) fn handle_key(self, tui: &mut Tui, key: crossterm::event::KeyEvent) {
+        use super::tab_controller::TabController;
+
+        match self {
+            Tab::Sprints => {
+                let controller = tui.sprints_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::Meetings => {
+                let controller = tui.meetings_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::Worklogs => {
+                let controller = tui.worklogs_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::GitHub => {
+                let controller = tui.github_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::History => {
+                let controller = tui.history_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::Achievements => {
+                let controller = tui.achievements_tab;
+                controller.handle_key(tui, key);
+            }
+            Tab::Settings => {
+                let controller = tui.settings_tab;
+                controller.handle_key(tui, key);
+            }
+        }
+    }
+
 }
 
 pub struct Tui {

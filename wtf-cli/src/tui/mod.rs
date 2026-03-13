@@ -667,53 +667,8 @@ impl Tui {
             }
             // Tab-specific navigation and actions
             _ => {
-                self.handle_tab_specific_key(key);
+                self.current_tab.handle_key(self, key);
             }
-        }
-    }
-
-    fn handle_tab_specific_key(&mut self, key: KeyEvent) {
-        match self.current_tab {
-            Tab::Sprints => {
-                let sprints_tab = self.sprints_tab;
-                sprints_tab.handle_key(self, key);
-            }
-            Tab::Meetings => {
-                let meetings_tab = self.meetings_tab;
-                meetings_tab.handle_key(self, key);
-            }
-            Tab::Worklogs => {
-                let worklogs_tab = self.worklogs_tab;
-                worklogs_tab.handle_key(self, key);
-            }
-            Tab::GitHub => {
-                let github_tab = self.github_tab;
-                github_tab.handle_key(self, key);
-            }
-            Tab::History => {
-                let history_tab = self.history_tab;
-                history_tab.handle_key(self, key);
-            }
-            Tab::Achievements => {
-                let achievements_tab = self.achievements_tab;
-                achievements_tab.handle_key(self, key);
-            }
-            Tab::Settings => {
-                let settings_tab = self.settings_tab;
-                settings_tab.handle_key(self, key);
-            }
-        }
-    }
-
-    fn render_current_tab(&self, frame: &mut ratatui::Frame, area: &ratatui::layout::Rect) {
-        match self.current_tab {
-            Tab::Sprints => self.sprints_tab.render(frame, area, &self.data),
-            Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
-            Tab::Worklogs => self.worklogs_tab.render(frame, area, &self.data),
-            Tab::GitHub => self.github_tab.render(frame, area, &self.data),
-            Tab::History => self.history_tab.render(frame, area, &self.data),
-            Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
-            Tab::Settings => self.settings_tab.render(frame, area, &self.data),
         }
     }
 

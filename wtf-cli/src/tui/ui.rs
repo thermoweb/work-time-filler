@@ -37,7 +37,7 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
     render_tab_bar(frame, &main_chunks[0], tui);
 
     // Render current tab content
-    tui.render_current_tab(frame, &main_chunks[1]);
+    tui.current_tab.render(tui, frame, &main_chunks[1]);
 
     // Render logs panel
     render_logs_panel(frame, &main_chunks[2], logs);
