@@ -87,6 +87,7 @@ impl Tui {
             current_tab: Tab::Sprints,
             achievements_tab: ui::tabs::achievements::AchievementsTab,
             meetings_tab: ui::tabs::meetings::MeetingsTab,
+            github_tab: ui::tabs::github::GitHubTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
             gap_fill_state: None,
@@ -678,7 +679,8 @@ impl Tui {
                 self.handle_worklogs_key(key);
             }
             Tab::GitHub => {
-                self.handle_github_key(key);
+                let github_tab = self.github_tab;
+                github_tab.handle_key(self, key);
             }
             Tab::History => {
                 self.handle_history_key(key);
@@ -697,6 +699,7 @@ impl Tui {
         match self.current_tab {
             Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
             Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
+            Tab::GitHub => self.github_tab.render(frame, area, &self.data),
             _ => self.current_tab.render(frame, area, &self.data),
         }
     }
@@ -947,69 +950,6 @@ impl Tui {
             KeyCode::PageDown => {
                 self.data.ui_state.selected_worklog_index =
                     (self.data.ui_state.selected_worklog_index + 10).min(max_index);
-            }
-            _ => {}
-        }
-    }
-
-    fn handle_github_key(&mut self, key: KeyEvent) {
-        let filtered_sessions = &self.data.github_sessions;
-
-        // Allow 'u' to work even if list is empty
-        match key.code {
-            KeyCode::Char('u') | KeyCode::Char('U') => {
-                self.handle_github_sync();
-                return;
-            }
-            KeyCode::Char('c') | KeyCode::Char('C') => {
-                if !filtered_sessions.is_empty() {
-                    self.handle_create_worklog_from_session();
-                }
-                return;
-            }
-            _ => {}
-        }
-
-        if filtered_sessions.is_empty() {
-            return;
-        }
-
-        let max_index = filtered_sessions.len().saturating_sub(1);
-
-        // Ensure index is within bounds before navigation
-        if self.data.ui_state.selected_github_session_index > max_index {
-            self.data.ui_state.selected_github_session_index = max_index;
-        }
-
-        match key.code {
-            KeyCode::Up => {
-                self.data.ui_state.selected_github_session_index = self
-                    .data
-                    .ui_state
-                    .selected_github_session_index
-                    .saturating_sub(1);
-            }
-            KeyCode::Down => {
-                if self.data.ui_state.selected_github_session_index < max_index {
-                    self.data.ui_state.selected_github_session_index += 1;
-                }
-            }
-            KeyCode::Home => {
-                self.data.ui_state.selected_github_session_index = 0;
-            }
-            KeyCode::End => {
-                self.data.ui_state.selected_github_session_index = max_index;
-            }
-            KeyCode::PageUp => {
-                self.data.ui_state.selected_github_session_index = self
-                    .data
-                    .ui_state
-                    .selected_github_session_index
-                    .saturating_sub(10);
-            }
-            KeyCode::PageDown => {
-                self.data.ui_state.selected_github_session_index =
-                    (self.data.ui_state.selected_github_session_index + 10).min(max_index);
             }
             _ => {}
         }

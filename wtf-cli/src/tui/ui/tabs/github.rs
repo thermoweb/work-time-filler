@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -7,8 +8,67 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
+use crate::tui::helpers;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
+use crate::tui::Tui;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct GitHubTab;
+
+impl TabController for GitHubTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_github_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        let sessions = &tui.data.github_sessions;
+
+        match key.code {
+            KeyCode::Char('u') | KeyCode::Char('U') => {
+                tui.handle_github_sync();
+                return;
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if !sessions.is_empty() {
+                    tui.handle_create_worklog_from_session();
+                }
+                return;
+            }
+            _ => {}
+        }
+
+        if sessions.is_empty() {
+            return;
+        }
+
+        let max_index = sessions.len().saturating_sub(1);
+        if tui.data.ui_state.selected_github_session_index > max_index {
+            tui.data.ui_state.selected_github_session_index = max_index;
+        }
+
+        if helpers::handle_list_navigation(
+            key,
+            &mut tui.data.ui_state.selected_github_session_index,
+            max_index,
+        ) {
+            return;
+        }
+
+        match key.code {
+            KeyCode::PageUp => {
+                tui.data.ui_state.selected_github_session_index =
+                    tui.data.ui_state.selected_github_session_index.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                tui.data.ui_state.selected_github_session_index =
+                    (tui.data.ui_state.selected_github_session_index + 10).min(max_index);
+            }
+            _ => {}
+        }
+    }
+}
 
 /// GitHub tab - list and details extracted from ui.rs
 pub(in crate::tui) fn render_github_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
