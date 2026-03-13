@@ -85,6 +85,7 @@ impl Tui {
             data: TuiData::collect(),
             achievement_service,
             current_tab: Tab::Sprints,
+            sprints_tab: ui::tabs::sprints::SprintsTab,
             achievements_tab: ui::tabs::achievements::AchievementsTab,
             meetings_tab: ui::tabs::meetings::MeetingsTab,
             github_tab: ui::tabs::github::GitHubTab,
@@ -669,7 +670,8 @@ impl Tui {
     fn handle_tab_specific_key(&mut self, key: KeyEvent) {
         match self.current_tab {
             Tab::Sprints => {
-                self.handle_sprints_key(key);
+                let sprints_tab = self.sprints_tab;
+                sprints_tab.handle_key(self, key);
             }
             Tab::Meetings => {
                 let meetings_tab = self.meetings_tab;
@@ -697,6 +699,7 @@ impl Tui {
 
     fn render_current_tab(&self, frame: &mut ratatui::Frame, area: &ratatui::layout::Rect) {
         match self.current_tab {
+            Tab::Sprints => self.sprints_tab.render(frame, area, &self.data),
             Tab::Meetings => self.meetings_tab.render(frame, area, &self.data),
             Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
             Tab::GitHub => self.github_tab.render(frame, area, &self.data),
@@ -819,57 +822,6 @@ impl Tui {
                 }
             });
         });
-    }
-
-    fn handle_sprints_key(&mut self, key: KeyEvent) {
-        let max_index = self.data.all_sprints.len().saturating_sub(1);
-
-        // Handle standard navigation keys first
-        if helpers::handle_list_navigation(
-            key,
-            &mut self.data.ui_state.selected_sprint_index,
-            max_index,
-        ) {
-            return;
-        }
-
-        // Handle sprint-specific keys
-        match key.code {
-            KeyCode::Char('r') | KeyCode::Char('R') => {
-                self.refresh_data();
-            }
-            KeyCode::Char('u') | KeyCode::Char('U') => {
-                self.handle_update();
-            }
-            KeyCode::Char('f') | KeyCode::Char('F') => {
-                self.handle_fill_gaps();
-            }
-            KeyCode::Char('a') | KeyCode::Char('A') => {
-                // Open sprint follow/unfollow popup - get ALL available sprints
-                let mut all_sprints =
-                    wtf_lib::services::jira_service::JiraService::production().get_available_sprints();
-
-                // Sort by start date (newest first), putting sprints without dates at the end
-                all_sprints.sort_by(|a, b| {
-                    match (a.start, b.start) {
-                        (Some(a_start), Some(b_start)) => b_start.cmp(&a_start), // Reverse order (newest first)
-                        (Some(_), None) => std::cmp::Ordering::Less, // With date before without
-                        (None, Some(_)) => std::cmp::Ordering::Greater, // Without date after with
-                        (None, None) => a.name.cmp(&b.name), // Both without date, sort by name
-                    }
-                });
-
-                self.sprint_follow_state = Some(SprintFollowState {
-                    all_sprints,
-                    selected_index: 0,
-                    search_query: String::new(),
-                });
-            }
-            KeyCode::Char('w') | KeyCode::Char('W') => {
-                self.launch_wizard();
-            }
-            _ => {}
-        }
     }
 
     fn handle_worklogs_key(&mut self, key: KeyEvent) {

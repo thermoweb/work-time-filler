@@ -1,3 +1,4 @@
+use crossterm::event::{KeyCode, KeyEvent};
 use chrono::Local;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -8,9 +9,66 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
+use crate::tui::helpers;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
+use crate::tui::{SprintFollowState, Tui};
 use wtf_lib::models::data::{Sprint, SprintState};
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct SprintsTab;
+
+impl TabController for SprintsTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_sprints_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        let max_index = tui.data.all_sprints.len().saturating_sub(1);
+
+        if helpers::handle_list_navigation(
+            key,
+            &mut tui.data.ui_state.selected_sprint_index,
+            max_index,
+        ) {
+            return;
+        }
+
+        match key.code {
+            KeyCode::Char('r') | KeyCode::Char('R') => {
+                tui.refresh_data();
+            }
+            KeyCode::Char('u') | KeyCode::Char('U') => {
+                tui.handle_update();
+            }
+            KeyCode::Char('f') | KeyCode::Char('F') => {
+                tui.handle_fill_gaps();
+            }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                let mut all_sprints =
+                    wtf_lib::services::jira_service::JiraService::production().get_available_sprints();
+
+                all_sprints.sort_by(|a, b| match (a.start, b.start) {
+                    (Some(a_start), Some(b_start)) => b_start.cmp(&a_start),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.name.cmp(&b.name),
+                });
+
+                tui.sprint_follow_state = Some(SprintFollowState {
+                    all_sprints,
+                    selected_index: 0,
+                    search_query: String::new(),
+                });
+            }
+            KeyCode::Char('w') | KeyCode::Char('W') => {
+                tui.launch_wizard();
+            }
+            _ => {}
+        }
+    }
+}
 
 fn render_worklog_wall(frame: &mut Frame, area: &Rect, data: &TuiData) {
     use chrono::Datelike;
