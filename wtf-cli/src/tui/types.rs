@@ -215,6 +215,7 @@ pub struct Tui {
     pub(in crate::tui) meetings_tab: super::ui::tabs::meetings::MeetingsTab,
     pub(in crate::tui) github_tab: super::ui::tabs::github::GitHubTab,
     pub(in crate::tui) settings_tab: super::ui::tabs::settings::SettingsTab,
+    pub(in crate::tui) worklogs_tab: super::ui::tabs::worklogs::WorklogsTab,
     pub(crate) revert_confirmation_state: Option<RevertConfirmationState>,
     pub(crate) worklog_creation_confirmation: Option<WorklogCreationConfirmation>,
     pub(crate) gap_fill_state: Option<GapFillState>,

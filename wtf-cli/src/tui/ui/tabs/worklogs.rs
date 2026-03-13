@@ -1,3 +1,4 @@
+use crossterm::event::{self, KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -7,20 +8,101 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
+use crate::tui::helpers;
+use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
+use crate::tui::Tui;
+use wtf_lib::models::data::LocalWorklog;
 use wtf_lib::models::data::LocalWorklogState;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(in crate::tui) struct WorklogsTab;
+
+pub(in crate::tui) fn visible_worklogs(data: &TuiData) -> Vec<LocalWorklog> {
+    let mut sorted_worklogs = data.all_worklogs.clone();
+    sorted_worklogs.sort_by(|a, b| b.started.cmp(&a.started));
+
+    if data.ui_state.filter_staged_only {
+        sorted_worklogs
+            .into_iter()
+            .filter(|worklog| {
+                worklog.status == LocalWorklogState::Staged
+                    || worklog.status == LocalWorklogState::Created
+            })
+            .collect()
+    } else {
+        sorted_worklogs
+    }
+}
+
+impl TabController for WorklogsTab {
+    fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
+        render_worklogs_tab(frame, area, data);
+    }
+
+    fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        let worklogs = visible_worklogs(&tui.data);
+        let max_index = worklogs.len().saturating_sub(1);
+
+        if tui.data.ui_state.selected_worklog_index > max_index {
+            tui.data.ui_state.selected_worklog_index = max_index;
+        }
+
+        if helpers::handle_list_navigation(
+            key,
+            &mut tui.data.ui_state.selected_worklog_index,
+            max_index,
+        ) {
+            return;
+        }
+
+        match key.code {
+            KeyCode::Char('r') | KeyCode::Char('R') => tui.refresh_data(),
+            KeyCode::Char('u') | KeyCode::Char('U') => tui.handle_update(),
+            KeyCode::Char('f') | KeyCode::Char('F') => {
+                tui.data.ui_state.filter_staged_only = !tui.data.ui_state.filter_staged_only;
+                tui.data.ui_state.selected_worklog_index = 0;
+            }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                if key.modifiers.contains(event::KeyModifiers::CONTROL) {
+                    tui.handle_stage_all_worklogs();
+                } else if let Some(worklog) =
+                    worklogs.get(tui.data.ui_state.selected_worklog_index)
+                {
+                    tui.handle_toggle_worklog_stage(worklog.id.clone());
+                }
+            }
+            KeyCode::Char('p') | KeyCode::Char('P') => tui.handle_push_worklogs(),
+            KeyCode::Char('x') | KeyCode::Char('X') => tui.handle_reset_worklogs(),
+            KeyCode::Delete | KeyCode::Backspace => {
+                if let Some(worklog) = worklogs.get(tui.data.ui_state.selected_worklog_index) {
+                    tui.handle_delete_worklog(worklog.id.clone());
+                }
+            }
+            KeyCode::PageUp => {
+                tui.data.ui_state.selected_worklog_index =
+                    tui.data.ui_state.selected_worklog_index.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                tui.data.ui_state.selected_worklog_index =
+                    (tui.data.ui_state.selected_worklog_index + 10).min(max_index);
+            }
+            _ => {}
+        }
+    }
+}
 
 /// Worklogs tab - Split view with list and details
 pub(in crate::tui) fn render_worklogs_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_worklog_index;
-    let filter_staged_only = data.ui_state.filter_staged_only;
+    let worklogs = visible_worklogs(data);
 
     render_list_detail_layout(
         frame,
         area,
-        |f, a| render_worklogs_list(f, a, data, selected_index, filter_staged_only),
-        |f, a| render_worklog_details(f, a, data, selected_index, filter_staged_only),
+        |f, a| render_worklogs_list(f, a, data, &worklogs, selected_index),
+        |f, a| render_worklog_details(f, a, data, &worklogs, selected_index),
     );
 }
 
@@ -28,27 +110,12 @@ fn render_worklogs_list(
     frame: &mut Frame,
     area: &Rect,
     data: &TuiData,
+    worklogs: &[LocalWorklog],
     selected_index: usize,
-    filter_staged_only: bool,
 ) {
     use chrono::{Datelike, Timelike};
 
-    // Sort and filter worklogs
-    let mut sorted_worklogs = data.all_worklogs.clone();
-    sorted_worklogs.sort_by(|a, b| b.started.cmp(&a.started));
-
-    let worklogs: Vec<_> = if filter_staged_only {
-        sorted_worklogs
-            .into_iter()
-            .filter(|w| {
-                w.status == LocalWorklogState::Staged || w.status == LocalWorklogState::Created
-            })
-            .collect()
-    } else {
-        sorted_worklogs
-    };
-
-    let filter_text = if filter_staged_only {
+    let filter_text = if data.ui_state.filter_staged_only {
         " [FILTERED: Unpushed Only]"
     } else {
         ""
@@ -353,8 +420,8 @@ fn render_selected_worklog_info(
     frame: &mut Frame,
     area: &Rect,
     data: &TuiData,
+    worklogs: &[LocalWorklog],
     selected_index: usize,
-    filter_staged_only: bool,
 ) {
     use chrono::{Datelike, Timelike};
 
@@ -365,21 +432,6 @@ fn render_selected_worklog_info(
 
     let inner = block.inner(*area);
     frame.render_widget(block, *area);
-
-    // Get the selected worklog
-    let mut sorted_worklogs = data.all_worklogs.clone();
-    sorted_worklogs.sort_by(|a, b| b.started.cmp(&a.started));
-
-    let worklogs: Vec<_> = if filter_staged_only {
-        sorted_worklogs
-            .into_iter()
-            .filter(|w| {
-                w.status == LocalWorklogState::Staged || w.status == LocalWorklogState::Created
-            })
-            .collect()
-    } else {
-        sorted_worklogs
-    };
 
     if worklogs.is_empty() {
         let content = vec![
@@ -486,8 +538,8 @@ fn render_worklog_details(
     frame: &mut Frame,
     area: &Rect,
     data: &TuiData,
+    worklogs: &[LocalWorklog],
     selected_index: usize,
-    filter_staged_only: bool,
 ) {
     use chrono::{Datelike, Timelike};
 
@@ -510,7 +562,7 @@ fn render_worklog_details(
             .split(*area);
 
         render_daily_summary(frame, &chunks[0], data);
-        render_selected_worklog_info(frame, &chunks[1], data, selected_index, filter_staged_only);
+        render_selected_worklog_info(frame, &chunks[1], data, worklogs, selected_index);
         return;
     }
 
@@ -524,20 +576,6 @@ fn render_worklog_details(
     frame.render_widget(block, *area);
 
     // Get the selected worklog
-    let mut sorted_worklogs = data.all_worklogs.clone();
-    sorted_worklogs.sort_by(|a, b| b.started.cmp(&a.started));
-
-    let worklogs: Vec<_> = if filter_staged_only {
-        sorted_worklogs
-            .into_iter()
-            .filter(|w| {
-                w.status == LocalWorklogState::Staged || w.status == LocalWorklogState::Created
-            })
-            .collect()
-    } else {
-        sorted_worklogs
-    };
-
     if worklogs.is_empty() {
         let content = vec![
             Line::from(""),

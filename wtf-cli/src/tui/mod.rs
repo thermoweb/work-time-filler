@@ -41,7 +41,7 @@ use crate::tasks::Task;
 use data::TuiData;
 use once_cell::sync::Lazy;
 use tab_controller::TabController;
-use wtf_lib::models::data::{LocalWorklog, LocalWorklogState};
+use wtf_lib::models::data::LocalWorklogState;
 use wtf_lib::services::jira_service::JiraService;
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;
@@ -90,6 +90,7 @@ impl Tui {
             meetings_tab: ui::tabs::meetings::MeetingsTab,
             github_tab: ui::tabs::github::GitHubTab,
             settings_tab: ui::tabs::settings::SettingsTab,
+            worklogs_tab: ui::tabs::worklogs::WorklogsTab,
             revert_confirmation_state: None,
             worklog_creation_confirmation: None,
             gap_fill_state: None,
@@ -680,7 +681,8 @@ impl Tui {
                 meetings_tab.handle_key(self, key);
             }
             Tab::Worklogs => {
-                self.handle_worklogs_key(key);
+                let worklogs_tab = self.worklogs_tab;
+                worklogs_tab.handle_key(self, key);
             }
             Tab::GitHub => {
                 let github_tab = self.github_tab;
@@ -707,6 +709,7 @@ impl Tui {
             Tab::Achievements => self.achievements_tab.render(frame, area, &self.data),
             Tab::GitHub => self.github_tab.render(frame, area, &self.data),
             Tab::Settings => self.settings_tab.render(frame, area, &self.data),
+            Tab::Worklogs => self.worklogs_tab.render(frame, area, &self.data),
             _ => self.current_tab.render(frame, area, &self.data),
         }
     }
@@ -826,89 +829,6 @@ impl Tui {
                 }
             });
         });
-    }
-
-    fn handle_worklogs_key(&mut self, key: KeyEvent) {
-        // Sort worklogs by date (most recent first)
-        let mut sorted_worklogs = self.data.all_worklogs.clone();
-        sorted_worklogs.sort_by(|a, b| b.started.cmp(&a.started));
-
-        // Apply filter if needed
-        let worklogs: Vec<LocalWorklog> = if self.data.ui_state.filter_staged_only {
-            sorted_worklogs
-                .into_iter()
-                .filter(|w| {
-                    w.status == LocalWorklogState::Staged || w.status == LocalWorklogState::Created
-                })
-                .collect()
-        } else {
-            sorted_worklogs
-        };
-
-        let max_index = worklogs.len().saturating_sub(1);
-
-        // Clamp the selected index to valid range
-        if self.data.ui_state.selected_worklog_index > max_index {
-            self.data.ui_state.selected_worklog_index = max_index;
-        }
-
-        // Handle standard navigation keys first
-        if helpers::handle_list_navigation(
-            key,
-            &mut self.data.ui_state.selected_worklog_index,
-            max_index,
-        ) {
-            return;
-        }
-
-        // Handle worklog-specific keys
-        match key.code {
-            KeyCode::Char('r') | KeyCode::Char('R') => {
-                self.refresh_data();
-            }
-            KeyCode::Char('u') | KeyCode::Char('U') => {
-                self.handle_update();
-            }
-            KeyCode::Char('f') | KeyCode::Char('F') => {
-                // Toggle filter
-                self.data.ui_state.filter_staged_only = !self.data.ui_state.filter_staged_only;
-                self.data.ui_state.selected_worklog_index = 0;
-            }
-            KeyCode::Char('a') | KeyCode::Char('A') => {
-                if key.modifiers.contains(event::KeyModifiers::CONTROL) {
-                    // Ctrl+A: Stage all Created worklogs
-                    self.handle_stage_all_worklogs();
-                } else {
-                    // 'a': Toggle worklog status (Created <-> Staged)
-                    if let Some(worklog) = worklogs.get(self.data.ui_state.selected_worklog_index) {
-                        self.handle_toggle_worklog_stage(worklog.id.clone());
-                    }
-                }
-            }
-            KeyCode::Char('p') | KeyCode::Char('P') => {
-                // Push all staged worklogs
-                self.handle_push_worklogs();
-            }
-            KeyCode::Char('x') | KeyCode::Char('X') => {
-                // Reset - delete all staged worklogs
-                self.handle_reset_worklogs();
-            }
-            KeyCode::Delete | KeyCode::Backspace => {
-                // Delete selected worklog
-                if let Some(worklog) = worklogs.get(self.data.ui_state.selected_worklog_index) {
-                    self.handle_delete_worklog(worklog.id.clone());
-                }
-            }
-            KeyCode::PageUp => {
-                self.data.ui_state.selected_worklog_index =
-                    self.data.ui_state.selected_worklog_index.saturating_sub(10);
-            }
-            KeyCode::PageDown => {
-                self.data.ui_state.selected_worklog_index =
-                    (self.data.ui_state.selected_worklog_index + 10).min(max_index);
-            }
-            _ => {}
-        }
     }
 
     fn handle_issue_selection_key(&mut self, key: KeyEvent) {
