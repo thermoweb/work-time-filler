@@ -37,15 +37,13 @@ impl LocalWorklogService {
     }
 
     pub fn get_worklog_history(&self, worklog_history_id: &str) -> Option<LocalWorklogHistory> {
-        self.history_db
-            .get(worklog_history_id)
-            .unwrap_or_else(|e| {
-                error!(
-                    "Failed to get worklog history '{}': {}",
-                    worklog_history_id, e
-                );
-                None
-            })
+        self.history_db.get(worklog_history_id).unwrap_or_else(|e| {
+            error!(
+                "Failed to get worklog history '{}': {}",
+                worklog_history_id, e
+            );
+            None
+        })
     }
 
     pub async fn revert_worklog_history(&self, worklog_history: &LocalWorklogHistory) {
@@ -60,7 +58,9 @@ impl LocalWorklogService {
                     "removing worklog '{}' for issue '{}'",
                     worklog_id, wl.issue_id
                 );
-                IssueService::production().delete_worklog(&wl.issue_id, worklog_id).await;
+                IssueService::production()
+                    .delete_worklog(&wl.issue_id, worklog_id)
+                    .await;
                 self.remove_local_worklog(&wl);
             } else {
                 debug!("local worklog not associated with jira worklog...");
@@ -104,7 +104,10 @@ impl LocalWorklogService {
             .collect::<Vec<LocalWorklog>>()
     }
 
-    pub fn get_all_local_worklogs_by_status(&self, statuses: Vec<LocalWorklogState>) -> Vec<LocalWorklog> {
+    pub fn get_all_local_worklogs_by_status(
+        &self,
+        statuses: Vec<LocalWorklogState>,
+    ) -> Vec<LocalWorklog> {
         self.worklogs_db
             .get_all()
             .unwrap_or_else(|_| Vec::new())

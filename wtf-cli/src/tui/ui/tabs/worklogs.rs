@@ -67,8 +67,7 @@ impl TabController for WorklogsTab {
             KeyCode::Char('a') | KeyCode::Char('A') => {
                 if key.modifiers.contains(event::KeyModifiers::CONTROL) {
                     tui.handle_stage_all_worklogs();
-                } else if let Some(worklog) =
-                    worklogs.get(tui.data.ui_state.selected_worklog_index)
+                } else if let Some(worklog) = worklogs.get(tui.data.ui_state.selected_worklog_index)
                 {
                     tui.handle_toggle_worklog_stage(worklog.id.clone());
                 }

@@ -40,7 +40,8 @@ impl Tui {
                 }
 
                 // Get followed sprints
-                let sprints = wtf_lib::services::jira_service::JiraService::production().get_followed_sprint();
+                let sprints = wtf_lib::services::jira_service::JiraService::production()
+                    .get_followed_sprint();
                 if sprints.is_empty() {
                     let _ = sender.send(FetchStatus::Error("No followed sprints".to_string()));
                     return;
@@ -73,11 +74,12 @@ impl Tui {
             .get(self.data.ui_state.selected_github_session_index)
             .cloned()
         {
-            let jira_issues = session.get_jira_issues();
+            let jira_issues = self.data.valid_github_issues_for_session(&session);
 
             if jira_issues.is_empty() {
                 logger::log(
-                    "❌ Cannot create worklog: No Jira issues found in this session".to_string(),
+                    "❌ Cannot create worklog: No valid Jira issues found in this session"
+                        .to_string(),
                 );
                 return;
             }
@@ -101,7 +103,8 @@ impl Tui {
 
             let requested_hours = time_per_issue as f64 / 3600.0;
             let session_date = session.start_time.date_naive();
-            let existing_hours = LocalWorklogService::production().calculate_daily_total(session_date);
+            let existing_hours =
+                LocalWorklogService::production().calculate_daily_total(session_date);
 
             // Check if this would exceed daily limit
             if existing_hours + requested_hours > self.data.daily_hours_limit {

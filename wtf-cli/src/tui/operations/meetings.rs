@@ -228,7 +228,8 @@ impl Tui {
             .ok();
 
             // Reload issues into cache after fetching
-            self.data.issues_by_key = IssueService::production().get_all_issues()
+            self.data.issues_by_key = IssueService::production()
+                .get_all_issues()
                 .into_iter()
                 .map(|i| (i.key.clone(), i))
                 .collect();

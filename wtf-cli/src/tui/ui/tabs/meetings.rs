@@ -1,6 +1,6 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use super::settings::GC_TERM_COLORS;
 use chrono::Local;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},

@@ -248,9 +248,7 @@ pub(in crate::tui) fn render_wizard(
                     ),
                 ]));
                 lines.push(Line::from(""));
-                lines.push(Line::from(
-                    "Create worklogs from these GitHub sessions?",
-                ));
+                lines.push(Line::from("Create worklogs from these GitHub sessions?"));
                 lines.push(Line::from(""));
                 lines.push(Line::from(vec![
                     Span::styled(
@@ -592,15 +590,28 @@ pub(in crate::tui) fn render_wizard_cancel_confirmation(frame: &mut Frame) {
         )]),
         Line::from(""),
         Line::from(vec![
-            Span::styled("[Y] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[Y] ",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Cancel & rollback (unlink meetings, delete worklogs)"),
         ]),
         Line::from(vec![
-            Span::styled("[K] ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[K] ",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Exit & keep logs staged (no rollback)"),
         ]),
         Line::from(vec![
-            Span::styled("[N] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[N] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Continue wizard"),
         ]),
     ];
@@ -647,15 +658,28 @@ pub(in crate::tui) fn render_wizard_pre_launch_prompt(
         )),
         Line::from(""),
         Line::from(vec![
-            Span::styled("[K] ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[K] ",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Keep them and continue"),
         ]),
         Line::from(vec![
-            Span::styled("[R] ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[R] ",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Reset (delete unpushed worklogs) and start fresh"),
         ]),
         Line::from(vec![
-            Span::styled("[Esc] ", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "[Esc] ",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw("Abort"),
         ]),
     ];

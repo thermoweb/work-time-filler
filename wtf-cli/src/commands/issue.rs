@@ -76,7 +76,8 @@ impl Command for IssueListCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        IssueService::production().get_all_issues()
+        IssueService::production()
+            .get_all_issues()
             .into_iter()
             .for_each(|b| println!("{:?}", b));
     }
@@ -104,7 +105,10 @@ impl Command for IssueLogTimeCommand {
 
         match IssueService::production().get_by_key(&issue_key) {
             Some(issue) => {
-                match IssueService::production().add_time(issue.key.as_str(), duration, Utc::now(), None).await {
+                match IssueService::production()
+                    .add_time(issue.key.as_str(), duration, Utc::now(), None)
+                    .await
+                {
                     Ok(_) => debug!("Logged '{}' for issue '{}'", duration, issue_key),
                     Err(e) => error!("Error: {:?}", e),
                 }

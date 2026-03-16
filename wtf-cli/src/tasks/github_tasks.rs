@@ -41,7 +41,8 @@ impl Task for FetchGithubEventsTask {
         ));
 
         // Sync events and sessions to database
-        let (events_saved, sessions_saved) = GitHubService::production().sync_events_for_sprints(&sprints)?;
+        let (events_saved, sessions_saved) =
+            GitHubService::production().sync_events_for_sprints(&sprints)?;
 
         if events_saved == 0 {
             logger::log("No GitHub events found in sprint date ranges.".to_string());

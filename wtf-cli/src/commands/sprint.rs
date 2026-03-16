@@ -214,8 +214,8 @@ impl Command for SprintStatusCommand {
                         (current_sprint.start, current_sprint.end)
                     {
                         while current <= end {
-                            let worklogs =
-                                WorklogsService::production().get_worklogs_by_date(current.date_naive());
+                            let worklogs = WorklogsService::production()
+                                .get_worklogs_by_date(current.date_naive());
                             let time_spent_seconds =
                                 worklogs.iter().map(|wl| wl.time_spent_seconds).sum::<u64>() as i64;
                             let time_spent = Duration::new(time_spent_seconds, 0).unwrap();
@@ -447,7 +447,9 @@ impl Command for SprintClearWorklogsCommand {
                     .cloned()
                     .unwrap_or_else(|| wl.issue_id.clone()); // fallback to issue_id if not found
 
-                IssueService::production().delete_worklog(&issue_key, &wl.id).await;
+                IssueService::production()
+                    .delete_worklog(&issue_key, &wl.id)
+                    .await;
                 deleted_jira += 1;
 
                 // Print progress every 10 worklogs or on last one

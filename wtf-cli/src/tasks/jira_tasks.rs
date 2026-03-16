@@ -89,7 +89,8 @@ impl Task for FetchJiraIssues {
         }
         sprint_progress.finish_and_clear();
 
-        for board in JiraService::production().get_followed_boards()
+        for board in JiraService::production()
+            .get_followed_boards()
             .unwrap()
             .iter()
             .filter(|b| b.board_type == BoardType::Kanban || b.board_type == BoardType::Scrum)
@@ -227,7 +228,9 @@ impl Task for FetchJiraBoard {
             if let Some(caps) = regex.captures(&board) {
                 if let Some(board_id) = caps.get(1) {
                     println!("board '{}' is now followed", board_id.as_str());
-                    JiraService::production().follow_board(board_id.as_str()).unwrap();
+                    JiraService::production()
+                        .follow_board(board_id.as_str())
+                        .unwrap();
                 }
             }
         }
@@ -237,7 +240,8 @@ impl Task for FetchJiraBoard {
 
 fn board_suggestor(input: &str) -> Result<Vec<String>, CustomUserError> {
     let input = input.to_lowercase();
-    Ok(BoardService::production().get_all_boards()
+    Ok(BoardService::production()
+        .get_all_boards()
         .iter()
         .filter(|board| {
             board.name.to_lowercase().contains(&input) || board.id.to_string().contains(&input)
@@ -291,8 +295,8 @@ impl Task for FetchJiraSprint {
                         .iter()
                         .map(|s| into_sprint(s))
                         .map(|mut spr| {
-                            if let Some(db_sprint) =
-                                SprintService::production().get_sprint_by_id(spr.id.to_string().as_str())
+                            if let Some(db_sprint) = SprintService::production()
+                                .get_sprint_by_id(spr.id.to_string().as_str())
                             {
                                 spr.followed = db_sprint.followed;
                             }
@@ -445,7 +449,8 @@ impl Task for ListJiraSprints {
         let sprints_data = sprints
             .iter()
             .map(|s| {
-                let time_spent = WorklogsService::production().get_all_worklogs()
+                let time_spent = WorklogsService::production()
+                    .get_all_worklogs()
                     .iter()
                     .filter(|wl| {
                         let worklog_date = wl.started;
@@ -678,7 +683,11 @@ impl Task for FetchJiraWorklogs {
                 "Replacing worklogs for sprint date range {} to {} with {} fresh worklogs",
                 min, max, total_worklogs
             );
-            WorklogsService::production().replace_worklogs_for_date_range(min, max, all_fetched_worklogs);
+            WorklogsService::production().replace_worklogs_for_date_range(
+                min,
+                max,
+                all_fetched_worklogs,
+            );
         } else {
             debug!("No sprints with dates found, not updating database");
         }

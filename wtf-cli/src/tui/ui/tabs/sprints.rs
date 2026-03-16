@@ -1,5 +1,5 @@
-use crossterm::event::{KeyCode, KeyEvent};
 use chrono::Local;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -46,8 +46,8 @@ impl TabController for SprintsTab {
                 tui.handle_fill_gaps();
             }
             KeyCode::Char('a') | KeyCode::Char('A') => {
-                let mut all_sprints =
-                    wtf_lib::services::jira_service::JiraService::production().get_available_sprints();
+                let mut all_sprints = wtf_lib::services::jira_service::JiraService::production()
+                    .get_available_sprints();
 
                 all_sprints.sort_by(|a, b| match (a.start, b.start) {
                     (Some(a_start), Some(b_start)) => b_start.cmp(&a_start),

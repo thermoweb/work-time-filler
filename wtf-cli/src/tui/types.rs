@@ -228,7 +228,6 @@ impl Tab {
             }
         }
     }
-
 }
 
 pub struct Tui {

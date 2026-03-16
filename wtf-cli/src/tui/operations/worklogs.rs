@@ -14,7 +14,8 @@ use super::super::{
 impl Tui {
     pub(in crate::tui) fn handle_push_worklogs(&mut self) {
         // Get all staged worklogs directly from DB (not from self.data which might be stale)
-        let staged_worklogs = LocalWorklogService::production().get_all_local_worklogs()
+        let staged_worklogs = LocalWorklogService::production()
+            .get_all_local_worklogs()
             .into_iter()
             .filter(|w| w.status == LocalWorklogState::Staged)
             .collect::<Vec<_>>();
@@ -62,13 +63,9 @@ impl Tui {
                         Some(worklog.comment.clone())
                     };
 
-                    match wtf_lib::services::jira_service::IssueService::production().add_time(
-                        &worklog.issue_id,
-                        duration,
-                        worklog.started,
-                        comment,
-                    )
-                    .await
+                    match wtf_lib::services::jira_service::IssueService::production()
+                        .add_time(&worklog.issue_id, duration, worklog.started, comment)
+                        .await
                     {
                         Ok(Some(jira_worklog)) => {
                             // Update local worklog status to Pushed and save Jira worklog ID

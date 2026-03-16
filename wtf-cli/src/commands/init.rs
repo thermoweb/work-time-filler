@@ -336,7 +336,9 @@ async fn step4_select_boards() -> Result<(), Box<dyn Error>> {
     // Follow selected boards
     info!("🔄 Following boards...");
     for board_id in &selected_boards {
-        JiraService::production().follow_board(board_id).map_err(|e| -> Box<dyn Error> { e })?;
+        JiraService::production()
+            .follow_board(board_id)
+            .map_err(|e| -> Box<dyn Error> { e })?;
     }
 
     success!("Following {} board(s)", selected_boards.len());
@@ -443,7 +445,9 @@ fn step5_select_sprints() -> Result<(), Box<dyn Error>> {
     } else {
         info!("🔄 Following sprints...");
         for sprint_id in &selected_sprints {
-            JiraService::production().follow_sprint(sprint_id).map_err(|e| -> Box<dyn Error> { e })?;
+            JiraService::production()
+                .follow_sprint(sprint_id)
+                .map_err(|e| -> Box<dyn Error> { e })?;
         }
         success!("Following {} sprint(s)", selected_sprints.len());
     }

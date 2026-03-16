@@ -33,7 +33,10 @@ impl TabController for HistoryTab {
             let mut revert_history_id: Option<String> = None;
 
             {
-                let state = tui.revert_confirmation_state.as_mut().expect("checked above");
+                let state = tui
+                    .revert_confirmation_state
+                    .as_mut()
+                    .expect("checked above");
                 if state.reverting {
                     return;
                 }
@@ -102,7 +105,10 @@ impl TabController for HistoryTab {
             let worklogs: Vec<Vec<wtf_lib::models::data::Worklog>> = entries
                 .iter()
                 .map(|(_, sprint_worklogs)| {
-                    sprint_worklogs.iter().map(|worklog| (*worklog).clone()).collect()
+                    sprint_worklogs
+                        .iter()
+                        .map(|worklog| (*worklog).clone())
+                        .collect()
                 })
                 .collect();
             (count, ids, worklogs)
@@ -177,12 +183,7 @@ impl TabController for HistoryTab {
                     .worklog_history
                     .get(tui.data.ui_state.selected_history_index)
                 {
-                    if tui
-                        .data
-                        .ui_state
-                        .expanded_history_ids
-                        .contains(&history.id)
-                    {
+                    if tui.data.ui_state.expanded_history_ids.contains(&history.id) {
                         tui.data.ui_state.expanded_history_ids.remove(&history.id);
                     } else {
                         tui.data
@@ -214,7 +215,8 @@ impl TabController for HistoryTab {
                         .worklog_history
                         .get(tui.data.ui_state.selected_history_index)
                     {
-                        match LocalWorklogService::production().delete_history_from_db(&history.id) {
+                        match LocalWorklogService::production().delete_history_from_db(&history.id)
+                        {
                             Ok(()) => {
                                 logger::log(
                                     "🗑️ Deleted history entry from database (worklogs remain in Jira)"

@@ -38,7 +38,8 @@ impl MeetingWorklogTask {
                 debug!("user was absent that day !");
             } else {
                 meetings_to_log.extend(
-                    MeetingsService::production().get_meeting_by_date(current)
+                    MeetingsService::production()
+                        .get_meeting_by_date(current)
                         .into_iter()
                         .filter(|m| !Self::meeting_already_logged(m, current.date_naive()))
                         .map(|meeting| (current, meeting)),
@@ -50,7 +51,8 @@ impl MeetingWorklogTask {
     }
 
     fn meeting_already_logged(meeting: &Meeting, day: NaiveDate) -> bool {
-        let found = LocalWorklogService::production().get_local_worklogs_on_day_for_meeting(&meeting.id, day);
+        let found = LocalWorklogService::production()
+            .get_local_worklogs_on_day_for_meeting(&meeting.id, day);
         !found.is_empty()
     }
 

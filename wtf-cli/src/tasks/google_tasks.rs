@@ -63,8 +63,8 @@ impl Task for FetchGoogleCalendarTask {
                     }
 
                     // Clean up meetings that no longer exist in Google Calendar
-                    let db_meetings =
-                        MeetingsService::production().get_meetings_between_dates(self.start, self.end);
+                    let db_meetings = MeetingsService::production()
+                        .get_meetings_between_dates(self.start, self.end);
                     debug!(
                         "Found {} meetings in database for date range {} to {}",
                         db_meetings.len(),

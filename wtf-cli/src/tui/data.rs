@@ -1,14 +1,21 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use wtf_lib::config::Config;
 use wtf_lib::models::achievement::AchievementUnlock;
 use wtf_lib::models::data::{
-    GitHubSession, Issue, LocalWorklog, LocalWorklogHistory, Meeting, Sprint,
+    GitHubEvent, GitHubSession, Issue, LocalWorklog, LocalWorklogHistory, Meeting, Sprint,
 };
 use wtf_lib::services::github_service::GitHubService;
 use wtf_lib::services::jira_service::{IssueService, JiraService};
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::{LocalWorklogService, WorklogsService};
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum GitHubIssueValidation {
+    Cached,
+    Remote,
+    Missing,
+}
 
 /// Activity for a single day
 #[derive(Debug, Clone)]
@@ -78,6 +85,8 @@ pub struct TuiData {
     pub jira_worklogs: Vec<wtf_lib::models::data::Worklog>,
     pub worklog_history: Vec<LocalWorklogHistory>,
     pub github_sessions: Vec<GitHubSession>,
+    pub github_events_by_id: HashMap<String, GitHubEvent>,
+    pub github_issue_validations: HashMap<String, GitHubIssueValidation>,
     pub issues_by_key: HashMap<String, Issue>,
     pub meeting_stats: MeetingStats,
     pub sprint_activities: HashMap<usize, Vec<DayActivity>>,
@@ -103,6 +112,7 @@ impl TuiData {
         // Get meetings and GitHub sessions for followed sprints only
         let all_meetings = Self::get_meetings_for_sprints(&sprints);
         let github_sessions = Self::get_github_sessions_for_sprints(&sprints);
+        let github_events = Self::get_github_events_for_sprints(&sprints);
 
         let all_worklogs = LocalWorklogService::production().get_all_local_worklogs();
         let jira_worklogs = WorklogsService::production().get_all_worklogs();
@@ -111,16 +121,31 @@ impl TuiData {
 
         // Build issue lookup map
         let all_issues = IssueService::production().get_all_issues();
-        let issues_by_key: HashMap<String, Issue> = all_issues
+        let mut issues_by_key: HashMap<String, Issue> = all_issues
             .into_iter()
             .map(|issue| (issue.key.clone(), issue))
+            .collect();
+        let github_issue_validations = Self::resolve_github_issue_validations(
+            &github_sessions,
+            &github_events,
+            &mut issues_by_key,
+        );
+        let github_sessions = Self::filter_github_sessions_with_usable_issues(
+            github_sessions,
+            &github_issue_validations,
+        );
+        let github_events_by_id = github_events
+            .into_iter()
+            .map(|event| (event.id.clone(), event))
             .collect();
 
         let meeting_stats =
             Self::calculate_meeting_stats(&all_meetings, &config, &untracked_meeting_ids);
         let sprint_activities = Self::calculate_all_sprint_activities(&sprints);
         let worklog_wall = Self::calculate_worklog_wall();
-        let unlocked_achievements = wtf_lib::services::achievement_service::AchievementService::production().get_all_unlocked();
+        let unlocked_achievements =
+            wtf_lib::services::achievement_service::AchievementService::production()
+                .get_all_unlocked();
 
         TuiData {
             all_sprints: sprints,
@@ -130,6 +155,8 @@ impl TuiData {
             jira_worklogs,
             worklog_history,
             github_sessions,
+            github_events_by_id,
+            github_issue_validations,
             issues_by_key,
             meeting_stats,
             sprint_activities,
@@ -167,7 +194,9 @@ impl TuiData {
     }
 
     fn get_github_sessions_for_sprints(sprints: &[Sprint]) -> Vec<GitHubSession> {
-        let all_sessions = GitHubService::production().get_all_sessions().unwrap_or_default();
+        let all_sessions = GitHubService::production()
+            .get_all_sessions()
+            .unwrap_or_default();
 
         // Filter sessions that fall within sprint date ranges
         all_sessions
@@ -181,6 +210,119 @@ impl TuiData {
                         false
                     }
                 })
+            })
+            .collect()
+    }
+
+    fn get_github_events_for_sprints(sprints: &[Sprint]) -> Vec<GitHubEvent> {
+        let all_events = GitHubService::production()
+            .get_all_events()
+            .unwrap_or_default();
+
+        all_events
+            .into_iter()
+            .filter(|event| {
+                sprints.iter().any(|sprint| {
+                    if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                        event.timestamp >= start && event.timestamp <= end
+                    } else {
+                        false
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn resolve_github_issue_validations(
+        github_sessions: &[GitHubSession],
+        github_events: &[GitHubEvent],
+        issues_by_key: &mut HashMap<String, Issue>,
+    ) -> HashMap<String, GitHubIssueValidation> {
+        let mut validations = HashMap::new();
+        let mut missing_keys = Vec::new();
+
+        for key in Self::collect_detected_github_issue_keys(github_sessions, github_events) {
+            if issues_by_key.contains_key(&key) {
+                validations.insert(key, GitHubIssueValidation::Cached);
+            } else {
+                missing_keys.push(key);
+            }
+        }
+
+        if missing_keys.is_empty() {
+            return validations;
+        }
+
+        let fetched_issues = std::thread::spawn(move || {
+            let jira_service = JiraService::production();
+            let runtime = tokio::runtime::Runtime::new()
+                .expect("failed to create runtime for GitHub Jira issue validation");
+
+            missing_keys
+                .into_iter()
+                .map(|key| {
+                    let issue = runtime.block_on(jira_service.get_issue_by_key(&key));
+                    (key, issue)
+                })
+                .collect::<Vec<_>>()
+        })
+        .join()
+        .expect("GitHub Jira validation worker thread panicked");
+
+        for (key, issue) in fetched_issues {
+            if let Some(issue) = issue {
+                issues_by_key.insert(issue.key.clone(), issue);
+                validations.insert(key, GitHubIssueValidation::Remote);
+            } else {
+                validations.insert(key, GitHubIssueValidation::Missing);
+            }
+        }
+
+        validations
+    }
+
+    fn filter_github_sessions_with_usable_issues(
+        github_sessions: Vec<GitHubSession>,
+        validations: &HashMap<String, GitHubIssueValidation>,
+    ) -> Vec<GitHubSession> {
+        github_sessions
+            .into_iter()
+            .filter(|session| {
+                let issue_keys = session.get_jira_issues();
+                issue_keys.is_empty()
+                    || issue_keys.iter().any(|key| {
+                        !matches!(validations.get(key), Some(GitHubIssueValidation::Missing))
+                    })
+            })
+            .collect()
+    }
+
+    fn collect_detected_github_issue_keys(
+        github_sessions: &[GitHubSession],
+        github_events: &[GitHubEvent],
+    ) -> BTreeSet<String> {
+        let mut keys = BTreeSet::new();
+
+        for session in github_sessions {
+            keys.extend(session.get_jira_issues());
+        }
+
+        for event in github_events {
+            keys.extend(event.get_jira_issues());
+        }
+
+        keys
+    }
+
+    pub fn valid_github_issues_for_session(&self, session: &GitHubSession) -> Vec<String> {
+        session
+            .get_jira_issues()
+            .into_iter()
+            .filter(|key| {
+                !matches!(
+                    self.github_issue_validations.get(key),
+                    Some(GitHubIssueValidation::Missing)
+                )
             })
             .collect()
     }
@@ -384,5 +526,99 @@ impl TuiData {
         }
 
         activities
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GitHubIssueValidation;
+    use super::TuiData;
+    use chrono::{TimeZone, Utc};
+    use std::collections::HashMap;
+    use wtf_lib::models::data::{GitHubEvent, GitHubSession};
+
+    #[test]
+    fn collect_detected_github_issue_keys_deduplicates_session_and_event_keys() {
+        let session = GitHubSession {
+            id: "session".to_string(),
+            start_time: Utc.with_ymd_and_hms(2026, 3, 16, 9, 0, 0).unwrap(),
+            end_time: Utc.with_ymd_and_hms(2026, 3, 16, 10, 0, 0).unwrap(),
+            duration_seconds: 3600,
+            repo: "org/repo".to_string(),
+            description: "Pushed: PAT-11".to_string(),
+            jira_issues: "PAT-11,APP-7".to_string(),
+            event_ids: "evt-1,evt-2".to_string(),
+            date: Utc
+                .with_ymd_and_hms(2026, 3, 16, 9, 0, 0)
+                .unwrap()
+                .date_naive(),
+        };
+        let event = GitHubEvent {
+            id: "evt-1".to_string(),
+            event_type: "PushEvent".to_string(),
+            repo: "org/repo".to_string(),
+            timestamp: Utc.with_ymd_and_hms(2026, 3, 16, 9, 30, 0).unwrap(),
+            description: "Pushed: PAT-11 and WEB-3".to_string(),
+            jira_issues: "PAT-11,WEB-3".to_string(),
+            date: Utc
+                .with_ymd_and_hms(2026, 3, 16, 9, 30, 0)
+                .unwrap()
+                .date_naive(),
+        };
+
+        let keys = TuiData::collect_detected_github_issue_keys(&[session], &[event]);
+
+        assert_eq!(
+            keys.into_iter().collect::<Vec<_>>(),
+            vec![
+                "APP-7".to_string(),
+                "PAT-11".to_string(),
+                "WEB-3".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn filter_github_sessions_with_usable_issues_removes_missing_only_sessions() {
+        let missing_only = GitHubSession {
+            id: "missing-only".to_string(),
+            start_time: Utc.with_ymd_and_hms(2026, 3, 16, 9, 0, 0).unwrap(),
+            end_time: Utc.with_ymd_and_hms(2026, 3, 16, 9, 15, 0).unwrap(),
+            duration_seconds: 900,
+            repo: "org/repo".to_string(),
+            description: String::new(),
+            jira_issues: "MISS-1".to_string(),
+            event_ids: String::new(),
+            date: Utc
+                .with_ymd_and_hms(2026, 3, 16, 9, 0, 0)
+                .unwrap()
+                .date_naive(),
+        };
+        let mixed = GitHubSession {
+            id: "mixed".to_string(),
+            start_time: Utc.with_ymd_and_hms(2026, 3, 16, 10, 0, 0).unwrap(),
+            end_time: Utc.with_ymd_and_hms(2026, 3, 16, 10, 30, 0).unwrap(),
+            duration_seconds: 1800,
+            repo: "org/repo".to_string(),
+            description: String::new(),
+            jira_issues: "MISS-1,OK-2".to_string(),
+            event_ids: String::new(),
+            date: Utc
+                .with_ymd_and_hms(2026, 3, 16, 10, 0, 0)
+                .unwrap()
+                .date_naive(),
+        };
+
+        let mut validations = HashMap::new();
+        validations.insert("MISS-1".to_string(), GitHubIssueValidation::Missing);
+        validations.insert("OK-2".to_string(), GitHubIssueValidation::Remote);
+
+        let filtered = TuiData::filter_github_sessions_with_usable_issues(
+            vec![missing_only, mixed.clone()],
+            &validations,
+        );
+
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, mixed.id);
     }
 }

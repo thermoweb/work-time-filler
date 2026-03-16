@@ -69,7 +69,8 @@ impl MeetingsService {
             return all_meetings;
         }
 
-        if let Some(sprint) = JiraService::production().get_followed_sprint()
+        if let Some(sprint) = JiraService::production()
+            .get_followed_sprint()
             .iter()
             .find(|s| matches!(s.state, SprintState::Active))
         {
@@ -106,7 +107,11 @@ impl MeetingsService {
         }
     }
 
-    pub fn get_meetings_between_dates(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> Vec<Meeting> {
+    pub fn get_meetings_between_dates(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> Vec<Meeting> {
         self.meetings_db
             .get_all()
             .unwrap_or_default()
@@ -181,11 +186,7 @@ impl MeetingsService {
     /// Toggle a meeting's manually-untracked state.
     /// Returns `true` if it is now untracked, `false` if it was removed.
     pub fn toggle_untracked(&self, meeting_id: &str) -> bool {
-        let already = self.untracked_db
-            .get(meeting_id)
-            .ok()
-            .flatten()
-            .is_some();
+        let already = self.untracked_db.get(meeting_id).ok().flatten().is_some();
         if already {
             let _ = self.untracked_db.remove(meeting_id);
             false
@@ -318,7 +319,11 @@ mod tests {
         let svc = make_service();
         let start = Utc.with_ymd_and_hms(2024, 1, 15, 0, 0, 0).unwrap();
         let end = Utc.with_ymd_and_hms(2024, 1, 17, 0, 0, 0).unwrap();
-        let absence = Absence { id: "abs-1".to_string(), start, end };
+        let absence = Absence {
+            id: "abs-1".to_string(),
+            start,
+            end,
+        };
         svc.save_absence(&absence);
 
         use chrono::NaiveDate;

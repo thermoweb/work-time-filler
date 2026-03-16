@@ -73,7 +73,8 @@ impl Command for LogListCommand {
         let mut db_wl = if list_all {
             LocalWorklogService::production().get_all_local_worklogs()
         } else {
-            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created, Staged])
+            LocalWorklogService::production()
+                .get_all_local_worklogs_by_status(vec![Created, Staged])
         };
         db_wl.sort_by(|a, b| a.started.cmp(&b.started));
         let (status_stats, total_time_spent) = compute_worklogs_stats(db_wl.clone());
@@ -197,7 +198,8 @@ impl Command for LogAddCommand {
         let worklogs_to_add = if !ids.is_empty() && ids.contains(&"all".to_string()) {
             LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created])
         } else {
-            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Created])
+            LocalWorklogService::production()
+                .get_all_local_worklogs_by_status(vec![Created])
                 .iter()
                 .filter(|w| ids.iter().any(|i| w.id.starts_with(i)))
                 .cloned()
@@ -243,7 +245,8 @@ impl Command for LogRemoveCommand {
         let worklogs_to_remove = if !ids.is_empty() && ids.contains(&"all".to_string()) {
             LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged])
         } else {
-            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged])
+            LocalWorklogService::production()
+                .get_all_local_worklogs_by_status(vec![Staged])
                 .iter()
                 .filter(|w| ids.iter().any(|i| w.id.starts_with(i)))
                 .cloned()
@@ -281,16 +284,18 @@ impl Command for LogPushCommand {
     }
 
     async fn execute(&self, _matches: &ArgMatches) {
-        let worklogs = LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged]);
+        let worklogs =
+            LocalWorklogService::production().get_all_local_worklogs_by_status(vec![Staged]);
         let mut local_worklogs_id: Vec<String> = Vec::new();
         for mut wl in worklogs {
-            match IssueService::production().add_time(
-                wl.issue_id.as_str(),
-                Duration::seconds(wl.time_spent_seconds),
-                wl.started,
-                Some(wl.comment.clone()),
-            )
-            .await
+            match IssueService::production()
+                .add_time(
+                    wl.issue_id.as_str(),
+                    Duration::seconds(wl.time_spent_seconds),
+                    wl.started,
+                    Some(wl.comment.clone()),
+                )
+                .await
             {
                 Ok(result) => {
                     wl.status = Pushed;
@@ -327,7 +332,9 @@ impl Command for LogRevertCommand {
             .collect();
         debug!("{:?} worklogs to revert", worklog_histories);
         for worklog_history in worklog_histories {
-            LocalWorklogService::production().revert_worklog_history(&worklog_history).await;
+            LocalWorklogService::production()
+                .revert_worklog_history(&worklog_history)
+                .await;
             println!("{} worklog reverted", worklog_history.id.as_str());
         }
     }

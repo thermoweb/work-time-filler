@@ -321,7 +321,8 @@ impl LinkGoogleMeetingsCommand {
 
 fn issue_suggestor(input: &str) -> Result<Vec<String>, CustomUserError> {
     let input = input.to_lowercase();
-    Ok(IssueService::production().get_all_issues()
+    Ok(IssueService::production()
+        .get_all_issues()
         .iter()
         .filter(|issue| {
             issue.summary.to_lowercase().contains(&input)

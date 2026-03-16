@@ -284,7 +284,7 @@ impl Tui {
                                 let session_date = s.start_time.date_naive();
                                 session_date >= start.date_naive()
                                     && session_date <= end.date_naive()
-                                    && !s.get_jira_issues().is_empty() // Only sessions with Jira issues
+                                    && !self.data.valid_github_issues_for_session(s).is_empty()
                             })
                             .cloned()
                             .collect();
@@ -363,7 +363,7 @@ impl Tui {
         ));
 
         // Get Jira issues from session
-        let jira_issues = session.get_jira_issues();
+        let jira_issues = self.data.valid_github_issues_for_session(&session);
 
         // Calculate time per issue
         let duration_seconds = session.duration_seconds;
@@ -591,7 +591,9 @@ impl Tui {
 
             // Unlink meetings
             for meeting_id in &log.linked_meeting_ids {
-                if let Some(mut meeting) = MeetingsService::production().get_meeting_by_id(meeting_id.clone()) {
+                if let Some(mut meeting) =
+                    MeetingsService::production().get_meeting_by_id(meeting_id.clone())
+                {
                     meeting.jira_link = None;
                     MeetingsService::production().save(&meeting);
                     logger::log(format!("🔗 Unlinked meeting: {}", meeting_id));

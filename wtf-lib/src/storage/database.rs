@@ -45,7 +45,10 @@ impl Database {
 
     #[cfg(test)]
     pub fn temporary() -> Self {
-        let db = sled::Config::new().temporary(true).open().expect("temp sled db");
+        let db = sled::Config::new()
+            .temporary(true)
+            .open()
+            .expect("temp sled db");
         Self { db }
     }
 

@@ -62,7 +62,8 @@ impl Tui {
         log_chronie_message("startup", "🧙 Chronie:");
 
         // Initialize achievement service and run revoke schedule
-        let achievement_service = wtf_lib::services::achievement_service::AchievementService::production();
+        let achievement_service =
+            wtf_lib::services::achievement_service::AchievementService::production();
         achievement_service.run_revoke_schedule();
 
         // Load logo image for About popup
@@ -902,7 +903,8 @@ impl Tui {
                                 status: jira_issue.fields.status.name,
                                 summary: jira_issue.fields.summary,
                             };
-                            wtf_lib::services::jira_service::IssueService::production().save_issue(&issue);
+                            wtf_lib::services::jira_service::IssueService::production()
+                                .save_issue(&issue);
 
                             // Link meeting
                             if let Some(mut meeting) =
@@ -1075,9 +1077,11 @@ impl Tui {
                     drop(filtered_sprints);
 
                     let result = if was_followed {
-                        wtf_lib::services::jira_service::JiraService::production().unfollow_sprint(&sprint_id)
+                        wtf_lib::services::jira_service::JiraService::production()
+                            .unfollow_sprint(&sprint_id)
                     } else {
-                        wtf_lib::services::jira_service::JiraService::production().follow_sprint(&sprint_id)
+                        wtf_lib::services::jira_service::JiraService::production()
+                            .follow_sprint(&sprint_id)
                     };
 
                     match result {
@@ -1135,7 +1139,8 @@ impl Tui {
                                 .find(|s| s.id == session_id)
                             {
                                 let session_clone = session.clone();
-                                let jira_issues = session_clone.get_jira_issues();
+                                let jira_issues =
+                                    self.data.valid_github_issues_for_session(&session_clone);
                                 let duration_seconds = session_clone.duration_seconds;
                                 let time_per_issue = if jira_issues.len() > 1 {
                                     duration_seconds / jira_issues.len() as i64
@@ -1193,7 +1198,8 @@ impl Tui {
                                 .find(|s| s.id == session_id)
                             {
                                 let session_clone = session.clone();
-                                let jira_issues = session_clone.get_jira_issues();
+                                let jira_issues =
+                                    self.data.valid_github_issues_for_session(&session_clone);
                                 // For partial, divide the suggested total evenly across issues
                                 let time_per_issue_partial = if jira_issues.len() > 1 {
                                     suggested_seconds / jira_issues.len() as i64
@@ -1449,23 +1455,24 @@ impl Tui {
         match key.code {
             KeyCode::Char('k') | KeyCode::Char('K') => {
                 // Keep existing worklogs, launch wizard as-is
-                logger::log(
-                    "▶️  Keeping existing worklogs, starting wizard...".to_string(),
-                );
+                logger::log("▶️  Keeping existing worklogs, starting wizard...".to_string());
                 self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 // Reset: delete all unpushed worklogs, then launch
                 logger::log("🗑️  Resetting unpushed worklogs before wizard launch...".to_string());
-                let to_delete = LocalWorklogService::production()
-                    .get_all_local_worklogs_by_status(vec![
+                let to_delete =
+                    LocalWorklogService::production().get_all_local_worklogs_by_status(vec![
                         LocalWorklogState::Created,
                         LocalWorklogState::Staged,
                     ]);
                 for wl in &to_delete {
                     LocalWorklogService::production().remove_local_worklog(wl);
                 }
-                logger::log(format!("🗑️  Deleted {} unpushed worklog(s)", to_delete.len()));
+                logger::log(format!(
+                    "🗑️  Deleted {} unpushed worklog(s)",
+                    to_delete.len()
+                ));
                 self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
             }
             KeyCode::Esc => {
@@ -1554,9 +1561,13 @@ impl Tui {
             let rt = tokio::runtime::Runtime::new().unwrap();
             let result = rt.block_on(async {
                 // Get the history entry first
-                if let Some(history) = LocalWorklogService::production().get_worklog_history(&history_id) {
+                if let Some(history) =
+                    LocalWorklogService::production().get_worklog_history(&history_id)
+                {
                     info!("Reverting worklog history: {}", history_id);
-                    LocalWorklogService::production().revert_worklog_history(&history).await;
+                    LocalWorklogService::production()
+                        .revert_worklog_history(&history)
+                        .await;
                     info!("Successfully reverted worklog history: {}", history_id);
                     Ok(())
                 } else {

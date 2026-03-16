@@ -514,8 +514,8 @@ pub(in crate::tui) fn render_gap_fill_confirmation(frame: &mut Frame, state: &Ga
 
     // Add preview of gaps (max 10 lines)
     for (date, hours) in state.gaps.iter().take(10) {
-        let existing =
-            wtf_lib::services::worklogs_service::LocalWorklogService::production().calculate_daily_total(*date);
+        let existing = wtf_lib::services::worklogs_service::LocalWorklogService::production()
+            .calculate_daily_total(*date);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(

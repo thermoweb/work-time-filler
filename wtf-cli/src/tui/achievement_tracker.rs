@@ -84,7 +84,9 @@ impl AchievementTracker {
             // Check each worklog in this push, fetching them one by one
             // Early exit as soon as we find one >60 days old
             for worklog_id in &entry.local_worklogs_id {
-                if let Some(worklog) = LocalWorklogService::production().get_local_worklog_by_id(worklog_id) {
+                if let Some(worklog) =
+                    LocalWorklogService::production().get_local_worklog_by_id(worklog_id)
+                {
                     if worklog.started < sixty_days_ago {
                         return true; // Found one! No need to check more
                     }
@@ -152,7 +154,8 @@ impl AchievementTracker {
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 
         // Collect all dates that have at least one pushed worklog
-        let logged_dates: HashSet<NaiveDate> = LocalWorklogService::production().get_all_local_worklogs()
+        let logged_dates: HashSet<NaiveDate> = LocalWorklogService::production()
+            .get_all_local_worklogs()
             .into_iter()
             .filter(|w| w.status == wtf_lib::models::data::LocalWorklogState::Pushed)
             .map(|w| w.started.date_naive())
@@ -207,7 +210,9 @@ impl AchievementTracker {
         if let Some(entry) = LocalWorklogService::production().get_history_by_id(history_id) {
             // Check each worklog in this push
             for worklog_id in &entry.local_worklogs_id {
-                if let Some(worklog) = LocalWorklogService::production().get_local_worklog_by_id(worklog_id) {
+                if let Some(worklog) =
+                    LocalWorklogService::production().get_local_worklog_by_id(worklog_id)
+                {
                     // Check if worklog has a meeting link
                     if let Some(meeting_id) = &worklog.meeting_id {
                         // Find the meeting in tui data

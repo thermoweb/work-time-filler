@@ -123,8 +123,8 @@ impl BoardService {
     }
 
     pub fn production() -> Self {
-        let boards_db = GenericDatabase::new(&DATABASE, "boards")
-            .expect("could not initialize board database");
+        let boards_db =
+            GenericDatabase::new(&DATABASE, "boards").expect("could not initialize board database");
         Self::new(boards_db)
     }
 
@@ -158,7 +158,10 @@ impl SprintService {
         Self::new(sprints_db)
     }
 
-    pub fn get_sprint(&self, sprint_id: &str) -> Result<Option<Sprint>, Box<dyn Error + Send + Sync>> {
+    pub fn get_sprint(
+        &self,
+        sprint_id: &str,
+    ) -> Result<Option<Sprint>, Box<dyn Error + Send + Sync>> {
         self.sprints_db.get(sprint_id)
     }
 
@@ -189,14 +192,18 @@ impl JiraService {
         boards_db: GenericDatabase<Board>,
         sprints_db: GenericDatabase<Sprint>,
     ) -> Self {
-        Self { issues_db, boards_db, sprints_db }
+        Self {
+            issues_db,
+            boards_db,
+            sprints_db,
+        }
     }
 
     pub fn production() -> Self {
         let issues_db = GenericDatabase::new(&DATABASE, "issues")
             .expect("could not initialize issues database");
-        let boards_db = GenericDatabase::new(&DATABASE, "boards")
-            .expect("could not initialize board database");
+        let boards_db =
+            GenericDatabase::new(&DATABASE, "boards").expect("could not initialize board database");
         let sprints_db = GenericDatabase::new(&DATABASE, "sprints")
             .expect("could not initialize sprint database");
         Self::new(issues_db, boards_db, sprints_db)
@@ -251,7 +258,8 @@ impl JiraService {
     }
 
     pub fn get_followed_boards(&self) -> Result<Vec<Board>, Box<dyn Error + Send + Sync>> {
-        Ok(self.boards_db
+        Ok(self
+            .boards_db
             .get_all()?
             .iter()
             .filter(|b| b.followed)
@@ -281,7 +289,8 @@ impl JiraService {
 
     pub async fn get_issue_by_key(&self, key: &str) -> Option<Issue> {
         debug!("check issue with key '{}'", key);
-        match self.issues_db
+        match self
+            .issues_db
             .get_all()
             .unwrap_or_default()
             .iter()
