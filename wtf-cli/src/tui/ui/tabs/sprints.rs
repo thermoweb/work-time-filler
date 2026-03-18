@@ -194,24 +194,34 @@ fn hours_to_braille(hours: f64, daily_limit: f64) -> &'static str {
 
 /// Convert hours to color
 
-/// Sprints tab - Three-column layout: worklog wall | sprint list | sprint details
+/// Sprints tab - Two-column layout: (sprint list / worklog wall) | sprint details
 pub(in crate::tui) fn render_sprints_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_sprint_index;
 
-    let chunks = Layout::default()
+    // Split into left and right columns
+    let columns = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(28), // Worklog activity wall (left)
-            Constraint::Percentage(42), // Sprint list (middle)
-            Constraint::Percentage(30), // Sprint details + activity (right)
+            Constraint::Percentage(50), // Left: sprint list + worklog wall
+            Constraint::Percentage(50), // Right: sprint details + activity
         ])
         .split(*area);
 
-    render_worklog_wall(frame, &chunks[0], data);
-    render_sprint_list_expanded(frame, &chunks[1], data, selected_index);
+    // Left column: sprint list on top, worklog wall at bottom
+    let left_rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(5),     // Sprint list
+            Constraint::Length(8),  // Worklog wall (5 rows + borders)
+        ])
+        .split(columns[0]);
 
+    render_sprint_list_expanded(frame, &left_rows[0], data, selected_index);
+    render_worklog_wall(frame, &left_rows[1], data);
+
+    // Right column: sprint details + activity
     if let Some(sprint) = data.all_sprints.get(selected_index) {
-        render_sprint_details_with_activity(frame, &chunks[2], sprint, data);
+        render_sprint_details_with_activity(frame, &columns[1], sprint, data);
     }
 }
 
