@@ -300,13 +300,15 @@ impl LocalWorklogService {
             .sum()
     }
 
-    /// Find days in a date range that have gaps (less than daily_limit hours logged)
+    /// Find days in a date range that have gaps (less than daily_limit hours logged).
+    /// `is_absent` is a predicate returning true for days that should be skipped (e.g. holidays, leave).
     pub fn find_gap_days(
         &self,
         start_date: NaiveDate,
         end_date: NaiveDate,
         daily_limit: f64,
         min_threshold: f64,
+        is_absent: &dyn Fn(NaiveDate) -> bool,
     ) -> Vec<(NaiveDate, f64)> {
         use chrono::Datelike;
 
@@ -316,6 +318,11 @@ impl LocalWorklogService {
         while current_date <= end_date {
             let weekday = current_date.weekday().num_days_from_monday();
             if weekday >= 5 {
+                current_date = current_date.succ_opt().unwrap_or(current_date);
+                continue;
+            }
+
+            if is_absent(current_date) {
                 current_date = current_date.succ_opt().unwrap_or(current_date);
                 continue;
             }
@@ -494,6 +501,7 @@ mod tests {
             NaiveDate::from_ymd_opt(2024, 1, 14).unwrap(),
             8.0,
             0.0,
+            &|_| false,
         );
         assert!(gaps.is_empty());
     }
@@ -507,9 +515,25 @@ mod tests {
             NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(),
             8.0,
             0.5,
+            &|_| false,
         );
         assert_eq!(gaps.len(), 1);
         assert!((gaps[0].1 - 8.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_find_gap_days_skips_absent_day() {
+        let svc = make_local_service();
+        // 2024-01-10 is Wednesday — absent, should be skipped
+        let absent_day = NaiveDate::from_ymd_opt(2024, 1, 10).unwrap();
+        let gaps = svc.find_gap_days(
+            absent_day,
+            absent_day,
+            8.0,
+            0.0,
+            &|date| date == absent_day,
+        );
+        assert!(gaps.is_empty());
     }
 
     #[test]

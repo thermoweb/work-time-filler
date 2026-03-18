@@ -134,7 +134,7 @@ impl GoogleEvent {
             .clone()
             .unwrap_or_else(|| "No Title".to_string());
 
-        if title.contains("Absence") {
+        if title.contains("Absence") || title.contains("Absent") {
             // Safely extract absence data
             return if let (Some(id), Some(start_dt), Some(end_dt)) = (
                 event.id.clone(),

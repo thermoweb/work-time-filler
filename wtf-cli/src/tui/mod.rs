@@ -1290,11 +1290,13 @@ impl Tui {
                             self.data.all_sprints.iter().find(|s| s.id == sprint_id)
                         {
                             if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                                let meetings_svc = MeetingsService::production();
                                 let gaps = LocalWorklogService::production().find_gap_days(
                                     start.date_naive(),
                                     end.date_naive(),
                                     self.data.daily_hours_limit,
                                     6.0, // Skip days already over 6h
+                                    &|date| meetings_svc.is_absent(date),
                                 );
 
                                 if gaps.is_empty() {

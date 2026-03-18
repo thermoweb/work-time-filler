@@ -219,12 +219,18 @@ impl Tui {
 
             if let Some(sprint) = sprint {
                 if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                    // Get all linked meetings in sprint date range
+                    let meetings_svc = MeetingsService::production();
+                    // Get all linked meetings in sprint date range, skipping absent days
                     let meetings_to_log: Vec<_> = self
                         .data
                         .all_meetings
                         .iter()
-                        .filter(|m| m.jira_link.is_some() && m.start >= start && m.start <= end)
+                        .filter(|m| {
+                            m.jira_link.is_some()
+                                && m.start >= start
+                                && m.start <= end
+                                && !meetings_svc.is_absent(m.start.date_naive())
+                        })
                         .cloned()
                         .collect();
 
