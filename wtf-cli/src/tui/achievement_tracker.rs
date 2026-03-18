@@ -66,6 +66,9 @@ impl AchievementTracker {
                     candidates.push(Achievement::AutoLinkMaster);
                 }
             }
+            AppEvent::MeetingColorLinked => {
+                candidates.push(Achievement::ColorCoder);
+            }
             _ => {}
         }
 

@@ -17,7 +17,7 @@ use crate::tasks::worklog_tasks::MeetingWorklogTask;
 use crate::tasks::Task;
 
 use super::super::{
-    types::{FetchStatus, IssueSelectionState},
+    types::{AppEvent, FetchStatus, IssueSelectionState},
     Tui,
 };
 
@@ -167,6 +167,7 @@ impl Tui {
 
         let jira_regex = Regex::new(r"([A-Z]+-\d+)").unwrap();
         let mut linked_count = 0;
+        let mut color_linked = false;
 
         // Get all unlinked meetings
         let unlinked_meetings: Vec<_> = self
@@ -259,6 +260,7 @@ impl Tui {
                                 m.jira_link = Some(key.clone());
                                 MeetingsService::production().save(&m);
                                 linked_count += 1;
+                                color_linked = true;
                                 continue;
                             }
                         }
@@ -291,6 +293,10 @@ impl Tui {
         }
 
         logger::log(format!("✅ Auto-linked {} meeting(s)", linked_count));
+
+        if color_linked {
+            self.event_bus.publish(AppEvent::MeetingColorLinked);
+        }
 
         // Refresh data to show the updates
         self.refresh_data();

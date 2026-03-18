@@ -5,26 +5,17 @@ use serde::{Deserialize, Serialize};
 /// Achievement identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Achievement {
-    /// Complete your first wizard run
     ChroniesApprentice,
-    /// View the About popup (easter egg)
     AboutClicker,
-    /// Secret: Type "chronie" to summon the wizard
     ChroniesFriend,
-    /// Revert worklogs for the first time
     TheUndoer,
-    /// Log work for a day more than 60 days in the past
     TimelineFixer,
-    /// Push worklogs 3+ times for the same day
     GitSquashMaster,
-    /// Have 10+ meetings all auto-linked
     AutoLinkMaster,
-    /// Log time for a meeting you declined
     DeclinedButLogged,
-    /// Push a worklog started after 10pm or before 6am
     NightOwl,
-    /// Cover 90%+ of working days in a full calendar quarter
     QuarterCrunch,
+    ColorCoder,
 }
 
 impl Achievement {
@@ -41,6 +32,7 @@ impl Achievement {
             Achievement::DeclinedButLogged,
             Achievement::NightOwl,
             Achievement::QuarterCrunch,
+            Achievement::ColorCoder,
         ]
     }
 
@@ -123,6 +115,14 @@ impl Achievement {
                 category: AchievementCategory::Consistency,
                 chronie_message: "A whole quarter with barely a gap? You're a time-logging machine! 📊",
             },
+            Achievement::ColorCoder => AchievementMeta {
+                id: *self,
+                name: "Color Coder",
+                description: "Auto-link a meeting using a calendar color label",
+                icon: "🎨",
+                category: AchievementCategory::Productivity,
+                chronie_message: "Color-coding your calendar for automatic linking? Chronie is impressed by your organizational genius! 🎨",
+            },
         }
     }
 
@@ -179,6 +179,7 @@ impl Achievement {
             Achievement::DeclinedButLogged => "declined_but_logged".to_string(),
             Achievement::NightOwl => "night_owl".to_string(),
             Achievement::QuarterCrunch => "quarter_crunch".to_string(),
+            Achievement::ColorCoder => "color_coder".to_string(),
         }
     }
 }

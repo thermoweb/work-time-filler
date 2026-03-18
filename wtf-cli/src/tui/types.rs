@@ -49,6 +49,9 @@ pub enum AppEvent {
         achievement: wtf_lib::Achievement,
     },
 
+    // Linking events
+    MeetingColorLinked,
+
     // Secret sequence events
     SecretSequenceTriggered {
         sequence_name: String,
