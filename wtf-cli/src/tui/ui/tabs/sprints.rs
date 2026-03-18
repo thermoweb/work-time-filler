@@ -211,8 +211,8 @@ pub(in crate::tui) fn render_sprints_tab(frame: &mut Frame, area: &Rect, data: &
     let left_rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(5),     // Sprint list
-            Constraint::Length(8),  // Worklog wall (5 rows + borders)
+            Constraint::Min(5),    // Sprint list
+            Constraint::Length(8), // Worklog wall (5 rows + borders)
         ])
         .split(columns[0]);
 

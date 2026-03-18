@@ -286,7 +286,10 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
                 format!(" {}", indicator),
                 Style::default().fg(theme().highlight),
             ),
-            Span::styled("● ", Style::default().fg(gc_color(&(color_idx + 1).to_string()))),
+            Span::styled(
+                "● ",
+                Style::default().fg(gc_color(&(color_idx + 1).to_string())),
+            ),
             Span::styled(format!("{:<26}", color_name), label_style),
             Span::styled(value_str, Style::default().fg(value_color)),
         ]));

@@ -264,16 +264,13 @@ fn render_meetings_list(
                 Span::styled(time_str, base_style.fg(Color::DarkGray)),
                 Span::raw("  "),
                 {
-                    let circle_color = meeting
-                        .color_id
-                        .as_deref()
-                        .map(|cid| {
-                            if is_declined || is_untracked {
-                                Color::DarkGray
-                            } else {
-                                gc_color(cid)
-                            }
-                        });
+                    let circle_color = meeting.color_id.as_deref().map(|cid| {
+                        if is_declined || is_untracked {
+                            Color::DarkGray
+                        } else {
+                            gc_color(cid)
+                        }
+                    });
                     if let Some(c) = circle_color {
                         Span::styled("● ", Style::default().fg(c))
                     } else {
