@@ -25,12 +25,13 @@ impl Tui {
                 return;
             }
 
-            // Check for existing unpushed worklogs from a previous session
-            let existing_unpushed = LocalWorklogService::production()
-                .get_all_local_worklogs_by_status(vec![
-                    LocalWorklogState::Created,
-                    LocalWorklogState::Staged,
-                ]);
+            // Check for existing unpushed worklogs within this sprint's date range
+            let existing_unpushed = if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                LocalWorklogService::production()
+                    .get_unpushed_in_range(start.date_naive(), end.date_naive())
+            } else {
+                vec![]
+            };
             if !existing_unpushed.is_empty() {
                 logger::log(format!(
                     "⚠️  Found {} unpushed worklog(s) from a previous session",
@@ -235,15 +236,36 @@ impl Tui {
                         .collect();
 
                     let count = meetings_to_log.len();
+                    let wl_svc = LocalWorklogService::production();
+                    let mut created = 0;
+                    let mut skipped = 0;
 
-                    // Create worklogs
+                    // Create worklogs, skipping meetings that already have one
                     for meeting in meetings_to_log {
                         if let Some(issue_key) = &meeting.jira_link {
-                            self.create_worklog_from_meeting(&meeting, issue_key);
+                            if wl_svc
+                                .get_local_worklogs_on_day_for_meeting(
+                                    &meeting.id,
+                                    meeting.start.date_naive(),
+                                )
+                                .is_empty()
+                            {
+                                self.create_worklog_from_meeting(&meeting, issue_key);
+                                created += 1;
+                            } else {
+                                skipped += 1;
+                            }
                         }
                     }
 
-                    logger::log(format!("✅ Created worklogs from {} meetings", count));
+                    if skipped > 0 {
+                        logger::log(format!(
+                            "✅ Created worklogs from {}/{} meetings ({} already logged, skipped)",
+                            created, count, skipped
+                        ));
+                    } else {
+                        logger::log(format!("✅ Created worklogs from {} meetings", created));
+                    }
                 }
             }
         }

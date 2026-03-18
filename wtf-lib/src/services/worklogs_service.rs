@@ -117,6 +117,22 @@ impl LocalWorklogService {
             .collect::<Vec<_>>()
     }
 
+    /// Return all Created/Staged worklogs whose start date falls within [start, end].
+    pub fn get_unpushed_in_range(&self, start: NaiveDate, end: NaiveDate) -> Vec<LocalWorklog> {
+        self.worklogs_db
+            .get_all()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|wl| {
+                matches!(
+                    wl.status,
+                    LocalWorklogState::Created | LocalWorklogState::Staged
+                ) && wl.started.date_naive() >= start
+                    && wl.started.date_naive() <= end
+            })
+            .collect()
+    }
+
     pub fn save_local_worklog(&self, local_worklog: LocalWorklog) {
         if let Err(e) = self.worklogs_db.insert(&local_worklog) {
             error!("Failed to save local worklog '{}': {}", local_worklog.id, e);

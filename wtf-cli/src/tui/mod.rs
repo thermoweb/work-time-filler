@@ -41,7 +41,6 @@ use crate::tasks::Task;
 use data::TuiData;
 use once_cell::sync::Lazy;
 use tab_controller::TabController;
-use wtf_lib::models::data::LocalWorklogState;
 use wtf_lib::services::jira_service::JiraService;
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;
@@ -1461,18 +1460,24 @@ impl Tui {
                 self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
             }
             KeyCode::Char('r') | KeyCode::Char('R') => {
-                // Reset: delete all unpushed worklogs, then launch
-                logger::log("🗑️  Resetting unpushed worklogs before wizard launch...".to_string());
-                let to_delete =
-                    LocalWorklogService::production().get_all_local_worklogs_by_status(vec![
-                        LocalWorklogState::Created,
-                        LocalWorklogState::Staged,
-                    ]);
+                // Reset: delete unpushed worklogs within this sprint's date range, then launch
+                logger::log("🗑️  Resetting unpushed worklogs for this sprint...".to_string());
+                let to_delete = self
+                    .data
+                    .all_sprints
+                    .iter()
+                    .find(|s| s.id == prompt.sprint_id)
+                    .and_then(|s| s.start.zip(s.end))
+                    .map(|(start, end)| {
+                        LocalWorklogService::production()
+                            .get_unpushed_in_range(start.date_naive(), end.date_naive())
+                    })
+                    .unwrap_or_default();
                 for wl in &to_delete {
                     LocalWorklogService::production().remove_local_worklog(wl);
                 }
                 logger::log(format!(
-                    "🗑️  Deleted {} unpushed worklog(s)",
+                    "🗑️  Deleted {} unpushed worklog(s) for this sprint",
                     to_delete.len()
                 ));
                 self.do_launch_wizard(prompt.sprint_id, &prompt.sprint_name);
