@@ -90,19 +90,39 @@ impl TabController for SettingsTab {
 pub(in crate::tui) const FIELD_COUNT: usize = 19;
 
 /// Terminal display colors for the 11 Google Calendar event colors (same order as GOOGLE_CALENDAR_EVENT_COLORS).
-pub(super) const GC_TERM_COLORS: [Color; 11] = [
-    Color::LightBlue, // Lavender
-    Color::Green,     // Sage
-    Color::Magenta,   // Grape
-    Color::LightRed,  // Flamingo
-    Color::Yellow,    // Banana
-    Color::Red,       // Tangerine
-    Color::Cyan,      // Peacock
-    Color::DarkGray,  // Graphite
-    Color::Blue,      // Blueberry
-    Color::DarkGray,  // Basil (no exact dark-green, reuse DarkGray)
-    Color::Red,       // Tomato
-];
+pub(super) fn gc_color(color_id: &str) -> Color {
+    match color_id {
+        "1" => Color::Rgb(121, 134, 203), // Lavender
+        "2" => Color::Rgb(51, 182, 121),  // Sage
+        "3" => Color::Rgb(142, 36, 170),  // Grape
+        "4" => Color::Rgb(229, 57, 53),   // Flamingo
+        "5" => Color::Rgb(240, 185, 0),   // Banana
+        "6" => Color::Rgb(246, 109, 13),  // Tangerine
+        "7" => Color::Rgb(3, 155, 229),   // Peacock
+        "8" => Color::Rgb(97, 97, 97),    // Graphite
+        "9" => Color::Rgb(63, 81, 181),   // Blueberry
+        "10" => Color::Rgb(11, 128, 67),  // Basil
+        "11" => Color::Rgb(213, 0, 0),    // Tomato
+        _ => Color::Gray,
+    }
+}
+
+pub(super) fn gc_color_name(color_id: &str) -> &'static str {
+    match color_id {
+        "1" => "Lavender",
+        "2" => "Sage",
+        "3" => "Grape",
+        "4" => "Flamingo",
+        "5" => "Banana",
+        "6" => "Tangerine",
+        "7" => "Peacock",
+        "8" => "Graphite",
+        "9" => "Blueberry",
+        "10" => "Basil",
+        "11" => "Tomato",
+        _ => "Custom",
+    }
+}
 
 /// Get the display value for a field from the config
 pub(in crate::tui) fn get_field_value(field_idx: usize, config: &Config) -> String {
@@ -266,7 +286,7 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
                 format!(" {}", indicator),
                 Style::default().fg(theme().highlight),
             ),
-            Span::styled("● ", Style::default().fg(GC_TERM_COLORS[color_idx])),
+            Span::styled("● ", Style::default().fg(gc_color(&(color_idx + 1).to_string()))),
             Span::styled(format!("{:<26}", color_name), label_style),
             Span::styled(value_str, Style::default().fg(value_color)),
         ]));

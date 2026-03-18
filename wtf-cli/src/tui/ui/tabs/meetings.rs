@@ -1,4 +1,4 @@
-use super::settings::GC_TERM_COLORS;
+use super::settings::{gc_color, gc_color_name};
 use chrono::Local;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -263,18 +263,15 @@ fn render_meetings_list(
                 Span::raw(" "),
                 Span::styled(time_str, base_style.fg(Color::DarkGray)),
                 Span::raw("  "),
-                // Colored circle for meetings with a Google Calendar color
                 {
                     let circle_color = meeting
                         .color_id
                         .as_deref()
-                        .and_then(|cid| cid.parse::<usize>().ok())
-                        .filter(|&idx| idx >= 1 && idx <= 11)
-                        .map(|idx| {
+                        .map(|cid| {
                             if is_declined || is_untracked {
                                 Color::DarkGray
                             } else {
-                                GC_TERM_COLORS[idx - 1]
+                                gc_color(cid)
                             }
                         });
                     if let Some(c) = circle_color {
@@ -469,20 +466,8 @@ fn render_meeting_details(
 
     // Color label
     if let Some(color_id) = &meeting.color_id {
-        let (label, color) = match color_id.as_str() {
-            "1" => ("Lavender", Color::Rgb(121, 134, 203)),
-            "2" => ("Sage", Color::Rgb(51, 182, 121)),
-            "3" => ("Grape", Color::Rgb(142, 36, 170)),
-            "4" => ("Flamingo", Color::Rgb(229, 57, 53)),
-            "5" => ("Banana", Color::Rgb(240, 185, 0)),
-            "6" => ("Tangerine", Color::Rgb(246, 109, 13)),
-            "7" => ("Peacock", Color::Rgb(3, 155, 229)),
-            "8" => ("Graphite", Color::Rgb(97, 97, 97)),
-            "9" => ("Blueberry", Color::Rgb(63, 81, 181)),
-            "10" => ("Basil", Color::Rgb(11, 128, 67)),
-            "11" => ("Tomato", Color::Rgb(213, 0, 0)),
-            _ => ("Custom", Color::Gray),
-        };
+        let label = gc_color_name(color_id.as_str());
+        let color = gc_color(color_id.as_str());
         lines.push(Line::from(vec![
             Span::styled(
                 "Color: ",
