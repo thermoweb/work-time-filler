@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::tui::data::TuiData;
+use crate::tui::data::{DayActivity, TuiData};
 use crate::tui::helpers;
 use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
@@ -194,35 +194,25 @@ fn hours_to_braille(hours: f64, daily_limit: f64) -> &'static str {
 
 /// Convert hours to color
 
-/// Sprints tab - Split view with details and activity
+/// Sprints tab - Three-column layout: worklog wall | sprint list | sprint details
 pub(in crate::tui) fn render_sprints_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_sprint_index;
 
     let chunks = Layout::default()
-        .direction(Direction::Vertical)
+        .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Min(10),   // Top: List + Details (more space now)
-            Constraint::Length(8), // Worklog wall (5 rows + borders)
+            Constraint::Percentage(28), // Worklog activity wall (left)
+            Constraint::Percentage(42), // Sprint list (middle)
+            Constraint::Percentage(30), // Sprint details + activity (right)
         ])
         .split(*area);
 
-    // Split top area into list and details (60/40)
-    let top_chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(60), // Sprint list
-            Constraint::Percentage(40), // Sprint details
-        ])
-        .split(chunks[0]);
-
-    render_sprint_list_expanded(frame, &top_chunks[0], data, selected_index);
+    render_worklog_wall(frame, &chunks[0], data);
+    render_sprint_list_expanded(frame, &chunks[1], data, selected_index);
 
     if let Some(sprint) = data.all_sprints.get(selected_index) {
-        render_sprint_details_with_activity(frame, &top_chunks[1], sprint, data);
+        render_sprint_details_with_activity(frame, &chunks[2], sprint, data);
     }
-
-    // Worklog wall
-    render_worklog_wall(frame, &chunks[1], data);
 }
 
 fn render_sprint_list_expanded(
@@ -598,26 +588,7 @@ fn render_sprint_activity_compact(frame: &mut Frame, area: &Rect, sprint: &Sprin
     // Render left column
     let mut left_lines = Vec::new();
     for activity in left_activities.iter() {
-        let bar = create_activity_bar(activity.hours, data.daily_hours_limit);
-        let date_str = activity.date.format("%b %d").to_string();
-
-        let color = if activity.is_absence {
-            Style::default().fg(Color::DarkGray)
-        } else {
-            get_activity_color(activity.hours)
-        };
-
-        let line = Line::from(vec![
-            Span::styled(date_str, Style::default().fg(Color::Gray)),
-            Span::raw(" "),
-            Span::styled(bar, color),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:.1}h", activity.hours),
-                Style::default().fg(Color::White),
-            ),
-        ]);
-        left_lines.push(line);
+        left_lines.push(build_activity_line(activity, data.daily_hours_limit));
     }
 
     let left_paragraph = Paragraph::new(left_lines).alignment(Alignment::Left);
@@ -627,30 +598,36 @@ fn render_sprint_activity_compact(frame: &mut Frame, area: &Rect, sprint: &Sprin
     if !right_activities.is_empty() {
         let mut right_lines = Vec::new();
         for activity in right_activities.iter() {
-            let bar = create_activity_bar(activity.hours, data.daily_hours_limit);
-            let date_str = activity.date.format("%b %d").to_string();
-
-            let color = if activity.is_absence {
-                Style::default().fg(Color::DarkGray)
-            } else {
-                get_activity_color(activity.hours)
-            };
-
-            let line = Line::from(vec![
-                Span::styled(date_str, Style::default().fg(Color::Gray)),
-                Span::raw(" "),
-                Span::styled(bar, color),
-                Span::raw(" "),
-                Span::styled(
-                    format!("{:.1}h", activity.hours),
-                    Style::default().fg(Color::White),
-                ),
-            ]);
-            right_lines.push(line);
+            right_lines.push(build_activity_line(activity, data.daily_hours_limit));
         }
 
         let right_paragraph = Paragraph::new(right_lines).alignment(Alignment::Left);
         frame.render_widget(right_paragraph, columns[1]);
+    }
+}
+
+fn build_activity_line<'a>(activity: &DayActivity, daily_limit: f64) -> Line<'a> {
+    let date_str = activity.date.format("%b %d").to_string();
+
+    if activity.is_absence {
+        let bar = create_activity_bar(daily_limit, daily_limit); // 100% fill
+        Line::from(vec![
+            Span::styled(date_str, Style::default().fg(Color::Gray)),
+            Span::raw(" "),
+            Span::styled(bar, Style::default().fg(Color::DarkGray)),
+        ])
+    } else {
+        let bar = create_activity_bar(activity.hours, daily_limit);
+        Line::from(vec![
+            Span::styled(date_str, Style::default().fg(Color::Gray)),
+            Span::raw(" "),
+            Span::styled(bar, get_activity_color(activity.hours)),
+            Span::raw(" "),
+            Span::styled(
+                format!("{:.1}h", activity.hours),
+                Style::default().fg(Color::White),
+            ),
+        ])
     }
 }
 
