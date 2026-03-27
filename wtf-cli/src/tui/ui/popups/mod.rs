@@ -85,6 +85,6 @@ pub(in crate::tui) fn render_all(frame: &mut Frame, tui: &crate::tui::Tui) {
 
     // Render about popup if active (should be on top of everything)
     if tui.show_about_popup {
-        render_about_popup(frame, &tui.about_image);
+        render_about_popup(frame, &tui.about_image, &tui.image_picker);
     }
 }

@@ -169,6 +169,7 @@ pub(in crate::tui) fn render_sprint_follow_popup(frame: &mut Frame, state: &Spri
 pub(in crate::tui) fn render_about_popup(
     frame: &mut Frame,
     about_image: &Option<image::DynamicImage>,
+    image_picker: &Option<ratatui_image::picker::Picker>,
 ) {
     let area = frame.area();
     let popup_width = 120.min(area.width.saturating_sub(4));
@@ -201,7 +202,7 @@ pub(in crate::tui) fn render_about_popup(
     };
 
     // Render the logo image if available on the left side
-    if let Some(img) = about_image {
+    if let (Some(img), Some(picker)) = (about_image, image_picker) {
         // Logo area on the left with minimal padding
         let logo_width = 44;
         let left_padding = 1;
@@ -212,9 +213,6 @@ pub(in crate::tui) fn render_about_popup(
             height: 20.min(inner_area.height),
         };
 
-        // Use the best available protocol for highest resolution
-        use ratatui_image::picker::Picker;
-        let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
         let mut dyn_img = picker.new_resize_protocol(img.clone());
         let image_widget = ratatui_image::StatefulImage::new();
         frame.render_stateful_widget(image_widget, logo_area, &mut dyn_img);

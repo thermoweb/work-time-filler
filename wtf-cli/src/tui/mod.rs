@@ -18,9 +18,7 @@ use achievement_tracker::AchievementTracker;
 use crate::{error, info};
 
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
-    },
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -104,6 +102,7 @@ impl Tui {
             unlink_confirmation_meeting_id: None,
             show_about_popup: false,
             about_image,
+            image_picker: None,
             fetch_status: FetchStatus::Idle,
             event_bus,
             key_sequence_buffer: VecDeque::with_capacity(20),
@@ -125,10 +124,24 @@ impl Tui {
         // Setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        execute!(stdout, EnterAlternateScreen)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
+
+        // Initialize image picker once, after entering the alternate screen.
+        // Must not be called during rendering as it sends terminal escape sequences.
+        if self.about_image.is_some() {
+            use ratatui_image::picker::{Picker, ProtocolType};
+            let is_konsole = std::env::var("KONSOLE_VERSION").is_ok();
+            let mut picker =
+                Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+            // Konsole's Kitty protocol support is buggy; force Sixel which it handles well.
+            if is_konsole && picker.protocol_type() == ProtocolType::Kitty {
+                picker.set_protocol_type(ProtocolType::Sixel);
+            }
+            self.image_picker = Some(picker);
+        }
 
         // Run the main loop
         let res = self.main_loop(&mut terminal);
@@ -137,8 +150,7 @@ impl Tui {
         disable_raw_mode()?;
         execute!(
             terminal.backend_mut(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
+            LeaveAlternateScreen
         )?;
         terminal.show_cursor()?;
 
@@ -584,6 +596,9 @@ impl Tui {
                 let mut event_bus = std::mem::take(&mut self.event_bus);
                 event_bus.process_events(self);
                 self.event_bus = event_bus;
+            } else {
+                // Force full clear to remove protocol-rendered image
+                self.needs_full_clear = true;
             }
 
             return;
@@ -609,6 +624,8 @@ impl Tui {
         if self.show_about_popup {
             if key.code == KeyCode::Esc {
                 self.show_about_popup = false;
+                // Force full clear to remove protocol-rendered image
+                self.needs_full_clear = true;
             }
             return;
         }

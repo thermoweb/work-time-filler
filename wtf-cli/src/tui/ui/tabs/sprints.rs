@@ -151,8 +151,11 @@ fn render_worklog_wall(frame: &mut Frame, area: &Rect, data: &TuiData) {
 
         for &(hours, is_absence, is_separator) in weekday_row {
             if is_separator {
-                // Draw vertical separator
-                line_spans.push(Span::styled("│", Style::default().fg(Color::Blue)));
+                // Draw vertical separator (year boundary)
+                line_spans.push(Span::styled(
+                    "│",
+                    Style::default().fg(theme().border),
+                ));
             } else {
                 let braille = hours_to_braille(hours, data.daily_hours_limit);
                 let color = if is_absence {
@@ -269,10 +272,10 @@ fn render_sprint_list_expanded(
     for (i, sprint) in data.all_sprints.iter().enumerate() {
         let is_selected = i == selected_index;
 
-        let icon = match sprint.state {
-            SprintState::Active => "🟢",
-            SprintState::Future => "🔵",
-            SprintState::Closed => "⚫",
+        let icon_color = match sprint.state {
+            SprintState::Active => Color::Green,
+            SprintState::Future => Color::LightBlue,
+            SprintState::Closed => Color::DarkGray,
         };
 
         let capacity_hours = sprint.workdays as f64 * data.daily_hours_limit;
@@ -335,7 +338,7 @@ fn render_sprint_list_expanded(
         let line = Line::from(vec![
             Span::styled(indicator, base_style.fg(Color::Yellow)),
             Span::raw(" "),
-            Span::raw(format!("{} ", icon)),
+            Span::styled("● ", base_style.fg(icon_color)),
             Span::styled(
                 format!("{:<24}", truncate_string(&sprint.name, 24)),
                 base_style.fg(Color::White),
@@ -357,7 +360,7 @@ fn render_sprint_list_expanded(
                 status_text,
                 base_style.fg(match sprint.state {
                     SprintState::Active => Color::Green,
-                    SprintState::Future => Color::Blue,
+                    SprintState::Future => Color::LightBlue,
                     SprintState::Closed => Color::Gray,
                 }),
             ),

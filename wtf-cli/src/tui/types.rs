@@ -256,6 +256,7 @@ pub struct Tui {
     pub(crate) unlink_confirmation_meeting_id: Option<String>,
     pub(crate) show_about_popup: bool,
     pub(crate) about_image: Option<image::DynamicImage>,
+    pub(crate) image_picker: Option<ratatui_image::picker::Picker>,
     pub(crate) fetch_status: FetchStatus,
 
     // EventBus - Centralized event system
