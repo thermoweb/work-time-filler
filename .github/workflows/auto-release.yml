@@ -1,18 +1,14 @@
 name: Auto Release on Push to Main
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - '**/*.rs'
-      - 'Cargo.toml'
-      - 'wtf-cli/Cargo.toml'
-      - 'wtf-lib/Cargo.toml'
 
-# Skip if this is the bot's own version-bump commit
 jobs:
   release:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,19 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Checkout the branch tip so we get any format commits CI may have pushed
+          ref: ${{ github.event.workflow_run.head_branch }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Auto-format code
-        run: cargo fmt --all
 
       - name: Read current version
         id: version
@@ -86,7 +73,6 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Cargo.toml
           git commit -m "chore: bump version to ${{ steps.next.outputs.next }} [skip ci]"
-          git pull --rebase --autostash
           git push
 
       - name: Create tag
