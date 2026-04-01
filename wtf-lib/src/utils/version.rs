@@ -1,14 +1,46 @@
 /// Checks GitHub releases for a newer version than the one currently running.
-/// Returns `Some(tag)` if a newer version is available, `None` otherwise (including on error).
+/// Returns `Some(tag)` if a newer stable release is available, `None` otherwise (including on error).
 pub async fn check_latest_version() -> Option<String> {
-    let client = reqwest::Client::builder()
+    check_version_from_url("https://api.github.com/repos/thermoweb/work-time-filler/releases/latest").await
+}
+
+/// Like `check_latest_version` but also considers pre-release versions.
+/// Returns `Some(tag)` if a newer release (stable or pre-release) is available.
+pub async fn check_latest_prerelease_version() -> Option<String> {
+    let client = build_client()?;
+
+    let releases: serde_json::Value = client
+        .get("https://api.github.com/repos/thermoweb/work-time-filler/releases")
+        .send()
+        .await
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+
+    // Releases are sorted newest-first; take the first one
+    let tag = releases.get(0)?.get("tag_name")?.as_str()?;
+    let latest = tag.trim_start_matches('v');
+    let current = env!("CARGO_PKG_VERSION");
+
+    if is_newer(latest, current) {
+        Some(tag.to_string())
+    } else {
+        None
+    }
+}
+
+fn build_client() -> Option<reqwest::Client> {
+    reqwest::Client::builder()
         .user_agent(concat!("wtf/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(5))
         .build()
-        .ok()?;
+        .ok()
+}
 
-    let resp: serde_json::Value = client
-        .get("https://api.github.com/repos/thermoweb/work-time-filler/releases/latest")
+async fn check_version_from_url(url: &str) -> Option<String> {
+    let resp: serde_json::Value = build_client()?
+        .get(url)
         .send()
         .await
         .ok()?
@@ -17,7 +49,6 @@ pub async fn check_latest_version() -> Option<String> {
         .ok()?;
 
     let tag = resp.get("tag_name")?.as_str()?;
-    // Strip leading 'v' for comparison
     let latest = tag.trim_start_matches('v');
     let current = env!("CARGO_PKG_VERSION");
 

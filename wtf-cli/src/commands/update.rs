@@ -13,12 +13,19 @@ impl Command for UpdateCommand {
         "update"
     }
 
-    async fn execute(&self, _matches: &ArgMatches) {
+    async fn execute(&self, matches: &ArgMatches) {
+        let allow_prerelease = matches.get_flag("unstable");
         let current = env!("CARGO_PKG_VERSION");
         println!("Current version: {}", current.cyan());
         println!("Checking for updates...");
 
-        match wtf_lib::utils::version::check_latest_version().await {
+        let latest = if allow_prerelease {
+            wtf_lib::utils::version::check_latest_prerelease_version().await
+        } else {
+            wtf_lib::utils::version::check_latest_version().await
+        };
+
+        match latest {
             None => {
                 println!("{}", "✅ Already up to date.".green());
             }
@@ -31,6 +38,8 @@ impl Command for UpdateCommand {
                         "install",
                         "--git",
                         REPO_URL,
+                        "--tag",
+                        &tag,
                         "--locked",
                         "wtf-cli",
                         "--force",
@@ -61,6 +70,13 @@ impl Command for UpdateCommand {
     }
 
     fn clap_command(&self) -> ClapCommand {
-        ClapCommand::new(self.name()).about("Update wtf to the latest version")
+        ClapCommand::new(self.name())
+            .about("Update wtf to the latest version")
+            .arg(
+                clap::Arg::new("unstable")
+                    .long("unstable")
+                    .help("Allow updating to pre-release versions")
+                    .action(clap::ArgAction::SetTrue),
+            )
     }
 }
