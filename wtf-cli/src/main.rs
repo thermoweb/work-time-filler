@@ -8,6 +8,7 @@ use crate::commands::issue::IssueCommand;
 use crate::commands::meeting::MeetingCommand;
 use crate::commands::sprint::SprintCommand;
 use crate::commands::tui::TuiCommand;
+use crate::commands::update::UpdateCommand;
 use crate::commands::worklog::LogCommand;
 use crate::commands::{Command, CommandRegistry};
 
@@ -35,6 +36,7 @@ async fn main() {
     registry.register(ConfigCommand);
     registry.register(MeetingCommand);
     registry.register(LogCommand);
+    registry.register(UpdateCommand);
 
     let app = commands::build_app(&registry);
     let matches = app.get_matches();

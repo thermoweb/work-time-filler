@@ -8,6 +8,7 @@ pub mod issue;
 pub mod meeting;
 pub mod sprint;
 pub mod tui;
+pub mod update;
 pub mod worklog;
 
 use async_trait::async_trait;

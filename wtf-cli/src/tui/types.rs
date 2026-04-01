@@ -231,6 +231,16 @@ impl Tab {
             }
         }
     }
+
+    pub(in crate::tui) fn handle_scroll(self, tui: &mut Tui, scroll_up: bool) {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let key = if scroll_up {
+            KeyEvent::new(KeyCode::Up, KeyModifiers::empty())
+        } else {
+            KeyEvent::new(KeyCode::Down, KeyModifiers::empty())
+        };
+        self.handle_key(tui, key);
+    }
 }
 
 pub struct Tui {

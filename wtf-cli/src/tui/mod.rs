@@ -18,7 +18,7 @@ use achievement_tracker::AchievementTracker;
 use crate::{error, info};
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, MouseEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -124,7 +124,11 @@ impl Tui {
         // Setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen)?;
+        execute!(
+            stdout,
+            EnterAlternateScreen,
+            event::EnableMouseCapture
+        )?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
@@ -150,7 +154,8 @@ impl Tui {
         disable_raw_mode()?;
         execute!(
             terminal.backend_mut(),
-            LeaveAlternateScreen
+            LeaveAlternateScreen,
+            event::DisableMouseCapture
         )?;
         terminal.show_cursor()?;
 
@@ -292,7 +297,7 @@ impl Tui {
                 self.update_receiver = None;
                 if let Some(tag) = result {
                     logger::log(format!(
-                        "🆕 New version {} available! Update: cargo install --git https://github.com/thermoweb/work-time-filler --locked wtf-cli --force",
+                        "🆕 New version {} available! Run `wtf update` to upgrade.",
                         tag
                     ));
                 }
@@ -339,6 +344,9 @@ impl Tui {
                 match event::read()? {
                     Event::Key(key) if key.kind == KeyEventKind::Press => {
                         self.handle_key(key);
+                    }
+                    Event::Mouse(mouse) => {
+                        self.handle_mouse(mouse);
                     }
                     Event::Resize(_, _) => {
                         terminal.clear()?;
@@ -687,6 +695,15 @@ impl Tui {
                 self.current_tab.handle_key(self, key);
             }
         }
+    }
+
+    fn handle_mouse(&mut self, mouse: event::MouseEvent) {
+        let scroll_up = match mouse.kind {
+            MouseEventKind::ScrollUp => true,
+            MouseEventKind::ScrollDown => false,
+            _ => return,
+        };
+        self.current_tab.handle_scroll(self, scroll_up);
     }
 
     fn handle_update(&mut self) {

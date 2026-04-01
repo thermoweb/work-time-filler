@@ -14,6 +14,7 @@ use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::{SprintFollowState, Tui};
+use crate::logger;
 use wtf_lib::models::data::{Sprint, SprintState};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -64,6 +65,23 @@ impl TabController for SprintsTab {
             }
             KeyCode::Char('w') | KeyCode::Char('W') => {
                 tui.launch_wizard();
+            }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                if let Some(sprint) = tui.data.all_sprints.get(tui.data.ui_state.selected_sprint_index) {
+                    let sprint_id = sprint.id.to_string();
+                    let sprint_name = sprint.name.clone();
+                    match wtf_lib::services::jira_service::JiraService::production()
+                        .unfollow_sprint(&sprint_id)
+                    {
+                        Ok(_) => {
+                            logger::log(format!("✅ Unfollowed sprint: {}", sprint_name));
+                            tui.refresh_data();
+                        }
+                        Err(e) => {
+                            logger::log(format!("❌ Failed to unfollow sprint: {}", e));
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -234,7 +252,7 @@ fn render_sprint_list_expanded(
     data: &TuiData,
     selected_index: usize,
 ) {
-    let shortcuts = build_shortcut_help(&[("W", "izard"), ("A", "dd/follow"), ("F", "ill")]);
+    let shortcuts = build_shortcut_help(&[("W", "izard"), ("A", "dd/follow"), ("X", " unfollow"), ("F", "ill")]);
     let mut title_spans = vec![
         Span::raw("📊 Followed Sprints ("),
         Span::raw(data.all_sprints.len().to_string()),
