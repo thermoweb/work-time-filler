@@ -8,13 +8,13 @@ use ratatui::{
     Frame,
 };
 
+use crate::logger;
 use crate::tui::data::{DayActivity, TuiData};
 use crate::tui::helpers;
 use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::{SprintFollowState, Tui};
-use crate::logger;
 use wtf_lib::models::data::{Sprint, SprintState};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -67,7 +67,11 @@ impl TabController for SprintsTab {
                 tui.launch_wizard();
             }
             KeyCode::Char('x') | KeyCode::Char('X') => {
-                if let Some(sprint) = tui.data.all_sprints.get(tui.data.ui_state.selected_sprint_index) {
+                if let Some(sprint) = tui
+                    .data
+                    .all_sprints
+                    .get(tui.data.ui_state.selected_sprint_index)
+                {
                     let sprint_id = sprint.id.to_string();
                     let sprint_name = sprint.name.clone();
                     match wtf_lib::services::jira_service::JiraService::production()
@@ -170,10 +174,7 @@ fn render_worklog_wall(frame: &mut Frame, area: &Rect, data: &TuiData) {
         for &(hours, is_absence, is_separator) in weekday_row {
             if is_separator {
                 // Draw vertical separator (year boundary)
-                line_spans.push(Span::styled(
-                    "│",
-                    Style::default().fg(theme().border),
-                ));
+                line_spans.push(Span::styled("│", Style::default().fg(theme().border)));
             } else {
                 let braille = hours_to_braille(hours, data.daily_hours_limit);
                 let color = if is_absence {
@@ -252,7 +253,12 @@ fn render_sprint_list_expanded(
     data: &TuiData,
     selected_index: usize,
 ) {
-    let shortcuts = build_shortcut_help(&[("W", "izard"), ("A", "dd/follow"), ("X", " unfollow"), ("F", "ill")]);
+    let shortcuts = build_shortcut_help(&[
+        ("W", "izard"),
+        ("A", "dd/follow"),
+        ("X", " unfollow"),
+        ("F", "ill"),
+    ]);
     let mut title_spans = vec![
         Span::raw("📊 Followed Sprints ("),
         Span::raw(data.all_sprints.len().to_string()),

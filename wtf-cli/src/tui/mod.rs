@@ -124,11 +124,7 @@ impl Tui {
         // Setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
-        execute!(
-            stdout,
-            EnterAlternateScreen,
-            event::EnableMouseCapture
-        )?;
+        execute!(stdout, EnterAlternateScreen, event::EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
@@ -138,8 +134,7 @@ impl Tui {
         if self.about_image.is_some() {
             use ratatui_image::picker::{Picker, ProtocolType};
             let is_konsole = std::env::var("KONSOLE_VERSION").is_ok();
-            let mut picker =
-                Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+            let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
             // Konsole's Kitty protocol support is buggy; force Sixel which it handles well.
             if is_konsole && picker.protocol_type() == ProtocolType::Kitty {
                 picker.set_protocol_type(ProtocolType::Sixel);
