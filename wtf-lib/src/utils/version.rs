@@ -1,7 +1,10 @@
 /// Checks GitHub releases for a newer version than the one currently running.
 /// Returns `Some(tag)` if a newer stable release is available, `None` otherwise (including on error).
 pub async fn check_latest_version() -> Option<String> {
-    check_version_from_url("https://api.github.com/repos/thermoweb/work-time-filler/releases/latest").await
+    check_version_from_url(
+        "https://api.github.com/repos/thermoweb/work-time-filler/releases/latest",
+    )
+    .await
 }
 
 /// Like `check_latest_version` but also considers pre-release versions.
