@@ -23,6 +23,17 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Auto-format code
+        run: cargo fmt --all
+
       - name: Read current version
         id: version
         run: |
@@ -73,8 +84,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml
-          git commit -m "chore: bump version to ${{ steps.next.outputs.next }} [skip ci]"
+          git add -A
+          git commit -m "chore: bump version to ${{ steps.next.outputs.next }} [skip ci]" || echo "Nothing to commit"
           git push
 
       - name: Create tag
