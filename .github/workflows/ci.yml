@@ -31,8 +31,35 @@ jobs:
       - name: Tests
         run: cargo test --workspace
 
-      - name: Format check
-        run: cargo fmt --all -- --check
+  format:
+    name: Auto-format
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Auto-format code
+        run: cargo fmt --all
+
+      - name: Commit formatting changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet || git commit -am "style: auto-format code [skip ci]"
+          git push
 
   coverage:
     name: Code Coverage
