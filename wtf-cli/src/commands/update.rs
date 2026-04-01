@@ -34,6 +34,8 @@ impl Command for UpdateCommand {
                         "--locked",
                         "wtf-cli",
                         "--force",
+                        "--config",
+                        "net.git-fetch-with-cli=true",
                     ])
                     .status();
 
