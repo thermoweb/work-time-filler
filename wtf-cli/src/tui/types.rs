@@ -282,6 +282,8 @@ pub struct Tui {
     pub(super) push_progress_receiver: Option<Receiver<String>>,
     pub(super) data_refresh_receiver: Option<Receiver<super::data::TuiData>>,
     pub(super) update_receiver: Option<Receiver<Option<String>>>,
+    /// Receives resolved (issue_id, title) pairs for Settings color label lookups.
+    pub(super) settings_issue_title_receiver: Option<Receiver<(String, Option<String>)>>,
 
     pub(super) status_clear_time: Option<std::time::Instant>,
     pub(super) needs_full_clear: bool,

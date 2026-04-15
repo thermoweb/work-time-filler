@@ -112,6 +112,7 @@ impl Tui {
             push_progress_receiver: None,
             data_refresh_receiver: None,
             update_receiver: Some(update_receiver),
+            settings_issue_title_receiver: None,
             status_clear_time: None,
             needs_full_clear: false,
             should_quit: false,
@@ -170,6 +171,8 @@ impl Tui {
         self.handle_update_check();
         self.check_and_clear_status_timer();
         self.wizard_update_animation();
+        self.handle_settings_issue_title_lookups();
+        self.trigger_color_label_title_lookups();
 
         // Process EventBus events (temporarily take ownership to avoid borrow issues)
         let mut event_bus = std::mem::replace(&mut self.event_bus, EventBus::new());
@@ -300,7 +303,97 @@ impl Tui {
         }
     }
 
-    /// Auto-clear status messages after timeout
+    /// Drain the settings issue title channel and update the cache.
+    fn handle_settings_issue_title_lookups(&mut self) {
+        use crate::tui::data::IssueTitleState;
+        use std::sync::mpsc::TryRecvError;
+        if let Some(receiver) = &self.settings_issue_title_receiver {
+            loop {
+                match receiver.try_recv() {
+                    Ok((key, Some(title))) => {
+                        self.data
+                            .ui_state
+                            .settings_color_issue_titles
+                            .insert(key, IssueTitleState::Found(title));
+                    }
+                    Ok((key, None)) => {
+                        self.data
+                            .ui_state
+                            .settings_color_issue_titles
+                            .insert(key, IssueTitleState::NotFound);
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        self.settings_issue_title_receiver = None;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Spawn a background thread to look up Jira titles for any color label issue IDs
+    /// that are not yet in the cache. Skips the reserved "notrack" keyword.
+    fn trigger_color_label_title_lookups(&mut self) {
+        use crate::tui::data::IssueTitleState;
+        if self.current_tab != Tab::Settings || self.settings_issue_title_receiver.is_some() {
+            return;
+        }
+
+        let issue_ids: Vec<String> = self
+            .data
+            .config
+            .google
+            .as_ref()
+            .map(|g| {
+                g.color_labels
+                    .values()
+                    .filter(|v| {
+                        !v.is_empty()
+                            && *v != "notrack"
+                            && !self
+                                .data
+                                .ui_state
+                                .settings_color_issue_titles
+                                .contains_key(*v)
+                    })
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if issue_ids.is_empty() {
+            return;
+        }
+
+        for id in &issue_ids {
+            self.data
+                .ui_state
+                .settings_color_issue_titles
+                .insert(id.clone(), IssueTitleState::Loading);
+        }
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.settings_issue_title_receiver = Some(rx);
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let jira_client = wtf_lib::client::jira_client::JiraClient::create();
+                for issue_id in issue_ids {
+                    let title = jira_client
+                        .get_issue(&issue_id)
+                        .await
+                        .ok()
+                        .map(|issue| issue.fields.summary);
+                    if tx.send((issue_id, title)).is_err() {
+                        break;
+                    }
+                }
+            });
+        });
+    }
+
     fn check_and_clear_status_timer(&mut self) {
         if let Some(clear_time) = self.status_clear_time {
             let timeout = if matches!(self.fetch_status, FetchStatus::Error(_)) {
@@ -1674,6 +1767,8 @@ impl Tui {
                         g.color_labels.insert(color_name, value);
                     }
                 }
+                // Drop the lookup receiver so a fresh fetch is triggered for the new value.
+                self.settings_issue_title_receiver = None;
             }
             _ => {}
         }

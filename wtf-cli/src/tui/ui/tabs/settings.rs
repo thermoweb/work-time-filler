@@ -7,6 +7,7 @@ use ratatui::{
     Frame,
 };
 
+use crate::tui::data::IssueTitleState;
 use crate::tui::data::TuiData;
 use crate::tui::tab_controller::TabController;
 use crate::tui::theme::theme;
@@ -260,8 +261,15 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
             let raw = get_field_value(field_idx, config);
             if raw.is_empty() {
                 "(not set)".to_string()
-            } else {
+            } else if raw == "notrack" {
                 raw
+            } else {
+                match state.settings_color_issue_titles.get(&raw) {
+                    Some(IssueTitleState::Found(title)) => format!("{}  · {}", raw, title),
+                    Some(IssueTitleState::Loading) => format!("{}  ⟳", raw),
+                    Some(IssueTitleState::NotFound) => format!("{}  ✗", raw),
+                    None => raw,
+                }
             }
         };
 

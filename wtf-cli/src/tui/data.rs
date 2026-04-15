@@ -10,6 +10,14 @@ use wtf_lib::services::jira_service::{IssueService, JiraService};
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::{LocalWorklogService, WorklogsService};
 
+/// State of a Jira issue title lookup for the Settings color label display.
+#[derive(Debug, Clone)]
+pub enum IssueTitleState {
+    Loading,
+    Found(String),
+    NotFound,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum GitHubIssueValidation {
     Cached,
@@ -50,6 +58,10 @@ pub struct TabUiState {
     pub settings_show_sensitive: std::collections::HashSet<usize>,
     pub settings_dirty: bool,
     pub settings_status: Option<String>,
+    /// Cache of resolved Jira issue titles for color label lookups.
+    /// Key: issue ID (e.g. "PROJ-123"), Value: current lookup state.
+    /// Missing from map = not yet requested; "notrack" is never added.
+    pub settings_color_issue_titles: HashMap<String, IssueTitleState>,
 }
 
 impl Default for TabUiState {
@@ -70,6 +82,7 @@ impl Default for TabUiState {
             settings_show_sensitive: std::collections::HashSet::new(),
             settings_dirty: false,
             settings_status: None,
+            settings_color_issue_titles: HashMap::new(),
         }
     }
 }
