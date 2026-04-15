@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::{Datelike, Local};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -448,22 +448,49 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
 
     // Calculate burn rate
     let (avg_per_day, need_per_day, status_text, status_color) =
-        if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+        if let (Some(_start), Some(end)) = (sprint.start, sprint.end) {
             let today = Local::now().date_naive();
-            let start_date = start.date_naive();
             let end_date = end.date_naive();
-            let total_days = (end_date - start_date).num_days() + 1;
-            let elapsed_days = (today - start_date).num_days().max(0).min(total_days);
             let remaining_days = (end_date - today).num_days().max(0);
 
-            let avg = if elapsed_days > 0 {
-                logged_hours / elapsed_days as f64
+            // Count remaining weekdays (Mon–Fri) from tomorrow to end_date
+            let remaining_workdays = if today < end_date {
+                let mut count = 0i64;
+                let mut d = today.succ_opt().unwrap_or(today);
+                while d <= end_date {
+                    let wd = d.weekday();
+                    if wd != chrono::Weekday::Sat && wd != chrono::Weekday::Sun {
+                        count += 1;
+                    }
+                    d = d.succ_opt().unwrap_or(d);
+                }
+                count
+            } else {
+                0
+            };
+
+            // Count distinct days where work was actually logged (excludes weekends/absences)
+            let worked_days = data
+                .sprint_activities
+                .get(&sprint.id)
+                .map(|activities| {
+                    activities
+                        .iter()
+                        .filter(|a| !a.is_absence && a.hours > 0.0 && a.date <= today)
+                        .map(|a| a.date)
+                        .collect::<std::collections::HashSet<_>>()
+                        .len()
+                })
+                .unwrap_or(0);
+
+            let avg = if worked_days > 0 {
+                logged_hours / worked_days as f64
             } else {
                 0.0
             };
 
-            let need = if remaining_days > 0 {
-                remaining_hours / remaining_days as f64
+            let need = if remaining_workdays > 0 {
+                remaining_hours / remaining_workdays as f64
             } else {
                 0.0
             };
@@ -512,7 +539,7 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
         Line::from(""),
         Line::from(format!("Duration: {} - {}", start_str, end_str)),
         Line::from(format!(
-            "Workdays: {} days ({:.0}h capacity)",
+            "Workdays: {} days ({:.1}h capacity)",
             sprint.workdays, capacity_hours
         )),
         Line::from(""),
@@ -524,7 +551,7 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
             ),
             Span::raw(" / "),
             Span::styled(
-                format!("{:.0}h", capacity_hours),
+                format!("{:.1}h", capacity_hours),
                 Style::default().fg(Color::White),
             ),
             Span::raw(format!("  ({:.0}%)", percentage)),
