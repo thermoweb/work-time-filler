@@ -93,13 +93,14 @@ impl Tui {
         let mut linked_count = 0;
 
         if let Some(wizard) = &mut self.wizard_state {
-            // Get all unlinked, non-untracked meetings
+            // Get all unlinked, non-untracked, non-declined meetings
             let unlinked_meetings: Vec<_> = self
                 .data
                 .all_meetings
                 .iter()
                 .filter(|m| {
                     m.jira_link.is_none()
+                        && m.my_response_status.as_deref() != Some("declined")
                         && !wtf_lib::utils::meetings::is_untracked(
                             m,
                             &self.data.config,
@@ -167,13 +168,14 @@ impl Tui {
                 .and_then(|s| s.start.zip(s.end))
         });
 
-        // Get unlinked, non-untracked meetings filtered to the sprint's date range
+        // Get unlinked, non-untracked, non-declined meetings filtered to the sprint's date range
         let unlinked_meetings: Vec<_> = self
             .data
             .all_meetings
             .iter()
             .filter(|m| {
                 m.jira_link.is_none()
+                    && m.my_response_status.as_deref() != Some("declined")
                     && !wtf_lib::utils::meetings::is_untracked(
                         m,
                         &self.data.config,
