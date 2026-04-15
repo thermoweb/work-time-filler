@@ -19,8 +19,7 @@ impl Command for UpdateCommand {
             Some(("list", sub_matches)) => {
                 let include_prerelease = sub_matches.get_flag("unstable");
                 println!("Fetching available versions...");
-                let mut versions =
-                    wtf_lib::utils::version::list_versions(include_prerelease).await;
+                let mut versions = wtf_lib::utils::version::list_versions(include_prerelease).await;
                 versions.sort_by(|a, b| {
                     let a = a.trim_start_matches('v');
                     let b = b.trim_start_matches('v');
@@ -73,7 +72,8 @@ impl Command for UpdateCommand {
                             eprintln!("{}", "❌ No versions found.".red());
                             return;
                         }
-                        match inquire::Select::new("Select version to install:", versions).prompt() {
+                        match inquire::Select::new("Select version to install:", versions).prompt()
+                        {
                             Ok(v) => Some(v),
                             Err(_) => {
                                 println!("Cancelled.");
