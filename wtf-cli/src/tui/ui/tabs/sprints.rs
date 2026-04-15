@@ -305,7 +305,7 @@ fn render_sprint_list_expanded(
         let capacity_hours = sprint.workdays as f64 * data.daily_hours_limit;
         let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
         let percentage = if capacity_hours > 0.0 {
-            (logged_hours / capacity_hours * 100.0).min(100.0) as u16
+            ((logged_hours / capacity_hours * 100.0).min(100.0).round()) as u16
         } else {
             0
         };
@@ -376,7 +376,7 @@ fn render_sprint_list_expanded(
             ),
             Span::raw(" "),
             Span::styled(
-                format!("{:>5.1}h/{:<4.0}h", logged_hours, capacity_hours),
+                format!("{:>5.1}h/{:.1}h", logged_hours, capacity_hours),
                 base_style.fg(Color::DarkGray),
             ),
             Span::raw(" "),
