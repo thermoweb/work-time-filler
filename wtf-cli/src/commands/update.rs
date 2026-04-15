@@ -75,6 +75,7 @@ impl Command for UpdateCommand {
             .arg(
                 clap::Arg::new("unstable")
                     .long("unstable")
+                    .short('u')
                     .help("Allow updating to pre-release versions")
                     .action(clap::ArgAction::SetTrue),
             )
