@@ -1,3 +1,39 @@
+/// Fetches all available release tags from GitHub.
+/// If `include_prerelease` is false, only stable releases are returned.
+pub async fn list_versions(include_prerelease: bool) -> Vec<String> {
+    let client = match build_client() {
+        Some(c) => c,
+        None => return vec![],
+    };
+
+    let response = client
+        .get("https://api.github.com/repos/thermoweb/work-time-filler/releases")
+        .send()
+        .await;
+
+    let releases: serde_json::Value = match response.ok().map(|r| async move { r.json().await }) {
+        Some(fut) => match fut.await.ok() {
+            Some(v) => v,
+            None => return vec![],
+        },
+        None => return vec![],
+    };
+
+    releases
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter(|r| {
+            include_prerelease
+                || !r
+                    .get("prerelease")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+        })
+        .filter_map(|r| r.get("tag_name")?.as_str().map(str::to_string))
+        .collect()
+}
+
 /// Checks GitHub releases for a newer version than the one currently running.
 /// Returns `Some(tag)` if a newer stable release is available, `None` otherwise (including on error).
 pub async fn check_latest_version() -> Option<String> {
