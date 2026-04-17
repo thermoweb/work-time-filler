@@ -114,8 +114,13 @@ impl JiraClient {
         let mut worklogs: Vec<JiraWorklog> = fetcher.collect();
 
         // Get current user email for filtering (JQL might not work on this endpoint)
-        let config = Config::load().expect("Failed to load config");
-        let current_user_email = config.jira.username.clone();
+        let current_user_email = match Config::load() {
+            Ok(config) => config.jira.username.clone(),
+            Err(e) => {
+                error!("Failed to load config for worklog filtering: {}", e);
+                return vec![];
+            }
+        };
 
         // Filter to only include worklogs by current user
         worklogs.retain(|w| w.author.email_address == current_user_email);
@@ -152,14 +157,17 @@ impl JiraClient {
             .json(&worklog)
             .send()
             .await
-            .unwrap();
+            .map_err(|e| ApiError(e.to_string()))?;
         if response.status().is_success() {
             trace!("response : {:?}", response);
             debug!("Time logged successfully on issue {}", issue_key);
             match response.headers().get("location") {
                 Some(location) => {
                     trace!("location : {:?}", location);
-                    let worklog = self.get_worklog(location.to_str().unwrap()).await;
+                    let location_str = location
+                        .to_str()
+                        .map_err(|e| ApiError(format!("Invalid location header: {}", e)))?;
+                    let worklog = self.get_worklog(location_str).await;
                     debug!("Worklog: {:?}", worklog);
                     return Ok(worklog);
                 }
@@ -183,7 +191,7 @@ impl JiraClient {
             .header("Authorization", &self.auth_header)
             .send()
             .await
-            .unwrap();
+            .map_err(|e| ApiError(e.to_string()))?;
 
         let status = response.status();
         debug!("DELETE response status: {}", status);
@@ -206,18 +214,26 @@ impl JiraClient {
 
     pub async fn get_worklog(&self, url: &str) -> Option<JiraWorklog> {
         debug!("Fetching worklog from {}", url);
-        let response = self
+        let response = match self
             .client
             .get(url.to_string())
             .header("Authorization", &self.auth_header)
             .send()
             .await
-            .unwrap();
+        {
+            Ok(r) => r,
+            Err(e) => {
+                error!("Error fetching worklog from {}: {}", url, e);
+                return None;
+            }
+        };
 
         if response.status().is_success() {
             trace!("Response : {:?}", response);
-            let worklog: JiraWorklog = response.json().await.unwrap();
-            return Some(worklog);
+            match response.json().await {
+                Ok(worklog) => return Some(worklog),
+                Err(e) => error!("Error deserializing worklog: {}", e),
+            }
         }
         None
     }
@@ -231,11 +247,14 @@ impl JiraClient {
             .header("Authorization", &self.auth_header)
             .send()
             .await
-            .unwrap();
+            .map_err(|e| ApiError(e.to_string()))?;
 
         if response.status().is_success() {
             debug!("getting issue from jira with key: {}", issue_id);
-            let issue: JiraIssue = response.json().await.unwrap();
+            let issue: JiraIssue = response
+                .json()
+                .await
+                .map_err(|e| ApiError(format!("Failed to deserialize issue: {}", e)))?;
             Ok(issue)
         } else {
             debug!("getting error from jira with key: {:?}", response);
