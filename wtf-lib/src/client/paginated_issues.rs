@@ -57,12 +57,12 @@ impl<'a> PaginatedIssues<'a> {
 
     async fn fetch_page(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut url = format!(
-            "{}//rest/api/latest/search/jql?jql={}&fields=created,summary,status",
+            "{}/rest/api/latest/search/jql?jql={}&fields=created,summary,status",
             self.base_url, self.jql
         );
 
         if let Some(token) = &self.next_page_token {
-            url.push_str(&format!("?nextPageToken={}", token));
+            url.push_str(&format!("&nextPageToken={}", token));
         }
 
         let response = self
@@ -82,8 +82,8 @@ impl<'a> PaginatedIssues<'a> {
 
     async fn fetch_total(&self) -> Result<usize, Box<dyn std::error::Error>> {
         let url = format!(
-            "{}/{}",
-            self.base_url, "/rest/api/3/search/approximate-count"
+            "{}/rest/api/3/search/approximate-count",
+            self.base_url
         );
         let body = serde_json::json!({ "jql": self.jql });
 
