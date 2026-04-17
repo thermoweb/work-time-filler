@@ -193,7 +193,7 @@ impl SensitiveString {
     }
 
     pub fn decode_str(s: &str) -> Result<SensitiveString, Box<dyn Error>> {
-        let re = Regex::new(r"enc\[(\w+)]")?;
+        let re = Regex::new(r"enc\[([A-Za-z0-9\-_=]+)]")?;
         if let Some(caps) = re.captures(s) {
             if let Some(base64_str) = caps.get(1) {
                 let decoded_bytes = URL_SAFE.decode(base64_str.as_str())?;
@@ -221,6 +221,84 @@ impl Serialize for SensitiveString {
         S: Serializer,
     {
         serializer.serialize_str(&self.encode())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_decode_roundtrip_simple() {
+        let original = "my_api_token_12345";
+        let s = SensitiveString::new(original.to_string());
+        let encoded = s.encode();
+        assert!(encoded.starts_with("enc["), "encoded form should start with enc[");
+        let decoded = SensitiveString::decode_str(&encoded).expect("decode should succeed");
+        assert_eq!(decoded.reveal(), original);
+    }
+
+    #[test]
+    fn test_encode_decode_roundtrip_with_dash_in_base64() {
+        // These strings are known to produce `-` or `=` in URL-safe base64 output,
+        // which the old regex `\w+` would silently truncate.
+        let cases = [
+            "abc",          // base64: YWJj (no special chars, baseline)
+            "abcd",         // base64: YWJjZA== (has =)
+            // "~" encodes to fn4= in standard base64, but in URL_SAFE it stays fn4=
+            // We use a string that encodes with a dash: the bytes [0xfb] produce -
+            // In Rust we express this as a known token value that does produce a dash.
+            "some long api token that may produce dashes or equals in base64",
+            "ATATT3xFfGF0_YFake-Token-That-Looks-Real",
+        ];
+        for original in &cases {
+            let s = SensitiveString::new(original.to_string());
+            let encoded = s.encode();
+            let decoded = SensitiveString::decode_str(&encoded)
+                .unwrap_or_else(|_| panic!("decode failed for: {:?}  encoded as: {}", original, encoded));
+            assert_eq!(decoded.reveal(), *original, "roundtrip failed for: {:?}", original);
+        }
+    }
+
+    #[test]
+    fn test_encode_produces_dash_and_roundtrips() {
+        // Build a value whose UTF-8 bytes produce a `-` in URL-safe base64.
+        // 0xFB in the first byte position maps to `-` in the output.
+        // We create a String from raw bytes via from_utf8_lossy to avoid compile-time escaping issues.
+        let raw = String::from_utf8_lossy(&[0xfb, 0xff, 0x00]).to_string();
+        let s = SensitiveString::new(raw.clone());
+        let encoded = s.encode();
+        assert!(encoded.contains('-') || encoded.contains('='),
+            "expected URL-safe base64 chars in: {}", encoded);
+        let decoded = SensitiveString::decode_str(&encoded)
+            .unwrap_or_else(|_| panic!("decode failed for encoded: {}", encoded));
+        assert_eq!(decoded.reveal(), raw);
+    }
+
+    #[test]
+    fn test_decode_str_returns_err_for_plain_string() {
+        // A plain (non-encoded) string should fail to decode
+        let result = SensitiveString::decode_str("plain_token_value");
+        assert!(result.is_err(), "plain string should not decode");
+    }
+
+    #[test]
+    fn test_from_str_falls_back_to_plain_for_non_encoded() {
+        // FromStr should store the raw value when it's not an enc[...] token
+        let s: SensitiveString = "plain_token".parse().unwrap();
+        assert_eq!(s.reveal(), "plain_token");
+    }
+
+    #[test]
+    fn test_display_hides_value() {
+        let s = SensitiveString::new("super_secret".to_string());
+        assert_eq!(format!("{}", s), "[HIDDEN]");
+    }
+
+    #[test]
+    fn test_debug_hides_value() {
+        let s = SensitiveString::new("super_secret".to_string());
+        assert!(format!("{:?}", s).contains("[HIDDEN]"));
     }
 }
 
