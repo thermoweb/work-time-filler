@@ -1,4 +1,5 @@
 use crate::tasks::Task;
+use crate::logger;
 use anyhow::Result;
 use chrono::{DateTime, Datelike, Months, NaiveDate, Utc, Weekday};
 use colored::Colorize;
@@ -69,7 +70,8 @@ impl Task for FetchJiraIssues {
             Some(multi) => multi.clone(),
         };
 
-        // Helper: emit a sub-progress update through the TUI channel (if wired up)
+        // Emit a sub-progress update through the TUI channel (if wired up).
+        // Shows per-sprint/board progress — simple and honest (no estimated totals).
         let emit = |done: usize, total: usize| {
             if let Some((ref tx, ref label, step, total_steps)) = self.sub_tx {
                 let _ = tx.send(FetchStatus::Fetching(
@@ -82,7 +84,6 @@ impl Task for FetchJiraIssues {
         };
 
         let mut issues_to_store = Vec::new();
-        let mut total_fetched = 0usize;
 
         for sprint in &self.sprints {
             match jira_client.get_all_issues_v2(&sprint.id.to_string()).await {
@@ -98,17 +99,30 @@ impl Task for FetchJiraIssues {
                             summary: issue.fields.summary,
                         });
                         sprint_done += 1;
-                        total_fetched += 1;
-                        emit(total_fetched, total_fetched + (sprint_total - sprint_done));
+                        emit(sprint_done, sprint_total);
                     }
+                    logger::log(format!(
+                        "✅ Sprint '{}': {} issues fetched",
+                        sprint.name, sprint_done
+                    ));
                 }
-                Err(e) => eprintln!("Error fetching sprint issues: {:?}", e),
+                Err(e) => {
+                    logger::log(format!("⚠️  Sprint '{}': failed to fetch issues — {}", sprint.name, e));
+                }
             }
         }
 
-        for board in JiraService::production()
-            .get_followed_boards()
-            .unwrap()
+        let boards = match JiraService::production().get_followed_boards() {
+            Ok(b) => b,
+            Err(e) => {
+                logger::log(format!("⚠️  Could not load followed boards: {}", e));
+                let _ = mp.clear();
+                IssueService::production().save_all_issues(issues_to_store);
+                return Ok(());
+            }
+        };
+
+        for board in boards
             .iter()
             .filter(|b| b.board_type == BoardType::Kanban || b.board_type == BoardType::Scrum)
             .cloned()
@@ -143,17 +157,24 @@ impl Task for FetchJiraIssues {
                                 summary: issue.fields.summary,
                             });
                             board_done += 1;
-                            total_fetched += 1;
-                            emit(total_fetched, total_fetched + (board_total - board_done));
+                            emit(board_done, board_total);
                         }
+                        logger::log(format!(
+                            "✅ Board '{}': {} issues fetched",
+                            board.name, board_done
+                        ));
                     }
-                    Err(e) => eprintln!("Error fetching board issues: {:?}", e),
+                    Err(e) => {
+                        logger::log(format!(
+                            "⚠️  Board '{}': failed to fetch issues — {}",
+                            board.name, e
+                        ));
+                    }
                 }
             }
         }
 
-        mp.println(format!("{} issues fetched", issues_to_store.len()))
-            .unwrap();
+        logger::log(format!("📦 {} issues saved total", issues_to_store.len()));
         IssueService::production().save_all_issues(issues_to_store);
         Ok(())
     }
@@ -216,8 +237,7 @@ impl Task for FetchJiraBoard {
             }
             Err(e) => eprintln!("Error: {:?}", e),
         }
-        mp.println(format!("{} boards fetched", boards_added))
-            .unwrap();
+        logger::log(format!("✅ {} boards fetched", boards_added));
         let boards = BoardService::production().get_all_boards();
         if !self.skip_follow_prompt
             && boards
@@ -276,9 +296,15 @@ impl FetchJiraSprint {
 
 impl Task for FetchJiraSprint {
     async fn execute(&self) -> Result<(), Box<dyn Error>> {
-        let boards = JiraService::production().get_followed_boards().unwrap();
+        let boards = match JiraService::production().get_followed_boards() {
+            Ok(b) => b,
+            Err(e) => {
+                logger::log(format!("⚠️  Could not load followed boards: {}", e));
+                return Ok(());
+            }
+        };
         if boards.is_empty() {
-            println!("No boards found.");
+            logger::log("No boards found.".to_string());
             return Ok(());
         }
         let mb = match &self.multi_bar {
@@ -328,14 +354,12 @@ impl Task for FetchJiraSprint {
                 _ => debug!("no sprints attached to this board"),
             }
         }
-        mb.println(format!("{} sprints fetched", sprint_counts))
-            .unwrap();
+        logger::log(format!("✅ {} sprints fetched", sprint_counts));
         if auto_followed_count > 0 {
-            mb.println(format!(
-                "Auto-followed {} sprints matching pattern",
+            logger::log(format!(
+                "🔔 Auto-followed {} sprints matching pattern",
                 auto_followed_count
-            ))
-            .unwrap();
+            ));
         }
         Ok(())
     }
@@ -706,8 +730,7 @@ impl Task for FetchJiraWorklogs {
         }
 
         sprint_progress.finish_and_clear();
-        mp.println(format!("{} worklogs fetched.", total_worklogs))
-            .ok();
+        logger::log(format!("✅ {} worklogs fetched", total_worklogs));
 
         Ok(())
     }

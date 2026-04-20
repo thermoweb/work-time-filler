@@ -184,49 +184,64 @@ impl Tui {
 
     /// Handle fetch status updates - bridge channel to EventBus
     fn handle_fetch_status(&mut self) {
+        if self.fetch_receiver.is_none() {
+            return;
+        }
+
+        // Drain all pending messages and act on the last one.
+        // Without draining, a flood of sub-progress messages would queue up and
+        // the status bar would show "phantom progress" long after the work is done.
+        let mut last_status: Option<FetchStatus> = None;
         if let Some(receiver) = &self.fetch_receiver {
-            match receiver.try_recv() {
-                Ok(status) => {
-                    self.fetch_status = status.clone();
-                    match status {
-                        FetchStatus::Complete => {
-                            let auto_link_tabs = matches!(
-                                self.fetch_tab,
-                                Some(Tab::Sprints) | Some(Tab::Meetings)
-                            );
-                            self.fetch_tab = None;
-                            if auto_link_tabs {
-                                self.pending_auto_link = true;
-                            }
-                            self.refresh_data();
-                            self.fetch_receiver = None;
-                            self.status_clear_time = Some(std::time::Instant::now());
-                            self.event_bus
-                                .publish(AppEvent::FetchComplete(self.data.clone()));
-                        }
-                        FetchStatus::Error(err) => {
-                            self.fetch_receiver = None;
-                            self.fetch_tab = None;
-                            self.status_clear_time = Some(std::time::Instant::now());
-                            self.event_bus.publish(AppEvent::FetchError(err));
-                        }
-                        _ => {}
+            loop {
+                match receiver.try_recv() {
+                    Ok(status) => {
+                        last_status = Some(status);
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        // Fetch thread crashed without sending a final status — clear the
+                        // receiver so the TUI doesn't loop forever in Fetching...
+                        self.fetch_receiver = None;
+                        self.fetch_tab = None;
+                        self.fetch_status = FetchStatus::Error(
+                            "Fetch thread terminated unexpectedly".to_string(),
+                        );
+                        self.status_clear_time = Some(std::time::Instant::now());
+                        self.event_bus.publish(AppEvent::FetchError(
+                            "Fetch thread terminated unexpectedly".to_string(),
+                        ));
+                        return;
                     }
                 }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    // Fetch thread crashed without sending a final status — clear the
-                    // receiver so the TUI doesn't loop forever in Fetching...
-                    self.fetch_receiver = None;
-                    self.fetch_tab = None;
-                    self.fetch_status =
-                        FetchStatus::Error("Fetch thread terminated unexpectedly".to_string());
-                    self.status_clear_time = Some(std::time::Instant::now());
-                    self.event_bus.publish(AppEvent::FetchError(
-                        "Fetch thread terminated unexpectedly".to_string(),
-                    ));
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => {}
             }
+        }
+
+        let Some(status) = last_status else { return };
+        self.fetch_status = status.clone();
+        match status {
+            FetchStatus::Complete => {
+                let auto_link_tabs = matches!(
+                    self.fetch_tab,
+                    Some(Tab::Sprints) | Some(Tab::Meetings)
+                );
+                self.fetch_tab = None;
+                if auto_link_tabs {
+                    self.pending_auto_link = true;
+                }
+                self.refresh_data();
+                self.fetch_receiver = None;
+                self.status_clear_time = Some(std::time::Instant::now());
+                self.event_bus
+                    .publish(AppEvent::FetchComplete(self.data.clone()));
+            }
+            FetchStatus::Error(err) => {
+                self.fetch_receiver = None;
+                self.fetch_tab = None;
+                self.status_clear_time = Some(std::time::Instant::now());
+                self.event_bus.publish(AppEvent::FetchError(err));
+            }
+            _ => {}
         }
     }
 
