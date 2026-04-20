@@ -241,10 +241,8 @@ impl Tui {
         self.fetch_status = status.clone();
         match status {
             FetchStatus::Complete => {
-                let auto_link_tabs = matches!(
-                    self.fetch_tab,
-                    Some(Tab::Sprints) | Some(Tab::Meetings)
-                );
+                let auto_link_tabs =
+                    matches!(self.fetch_tab, Some(Tab::Sprints) | Some(Tab::Meetings));
                 self.fetch_tab = None;
                 if auto_link_tabs {
                     self.pending_auto_link = true;
@@ -889,7 +887,10 @@ impl Tui {
 
                         // Fetch boards
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching boards...".to_string(), 1, TOTAL, None,
+                            "Fetching boards...".to_string(),
+                            1,
+                            TOTAL,
+                            None,
                         ));
                         let _ = FetchJiraBoard::new()
                             .with_progress(mp.clone())
@@ -899,7 +900,10 @@ impl Tui {
 
                         // Fetch sprints
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching sprints...".to_string(), 2, TOTAL, None,
+                            "Fetching sprints...".to_string(),
+                            2,
+                            TOTAL,
+                            None,
                         ));
                         let _ = FetchJiraSprint::new()
                             .with_progress(mp.clone())
@@ -908,7 +912,10 @@ impl Tui {
 
                         // Fetch issues
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching issues...".to_string(), 3, TOTAL, None,
+                            "Fetching issues...".to_string(),
+                            3,
+                            TOTAL,
+                            None,
                         ));
                         let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraIssues::new(sprints.clone())
@@ -919,7 +926,10 @@ impl Tui {
 
                         // Fetch worklogs
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching worklogs...".to_string(), 4, TOTAL, None,
+                            "Fetching worklogs...".to_string(),
+                            4,
+                            TOTAL,
+                            None,
                         ));
                         let _ = FetchJiraWorklogs::new(sprints)
                             .with_progress(mp.clone())
@@ -928,7 +938,10 @@ impl Tui {
 
                         // Fetch Google meetings
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching meetings...".to_string(), 5, TOTAL, None,
+                            "Fetching meetings...".to_string(),
+                            5,
+                            TOTAL,
+                            None,
                         ));
                         if let Err(e) = fetch_google_meetings(Some(mp.clone())).await {
                             let _ = sender.send(FetchStatus::Error(e));
@@ -937,7 +950,10 @@ impl Tui {
 
                         // Fetch GitHub events
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching GitHub events...".to_string(), 6, TOTAL, None,
+                            "Fetching GitHub events...".to_string(),
+                            6,
+                            TOTAL,
+                            None,
                         ));
                         let _ = FetchGithubEventsTask::new().execute().await;
 
@@ -945,7 +961,10 @@ impl Tui {
                     }
                     Tab::Meetings => {
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching Google Calendar events...".to_string(), 1, 1, None,
+                            "Fetching Google Calendar events...".to_string(),
+                            1,
+                            1,
+                            None,
                         ));
                         match fetch_google_meetings(Some(mp.clone())).await {
                             Ok(_) => {
@@ -958,7 +977,10 @@ impl Tui {
                     }
                     Tab::Worklogs => {
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching worklogs...".to_string(), 1, 1, None,
+                            "Fetching worklogs...".to_string(),
+                            1,
+                            1,
+                            None,
                         ));
                         let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraWorklogs::new(sprints)
@@ -969,7 +991,10 @@ impl Tui {
                     }
                     Tab::GitHub => {
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching GitHub events...".to_string(), 1, 1, None,
+                            "Fetching GitHub events...".to_string(),
+                            1,
+                            1,
+                            None,
                         ));
                         match FetchGithubEventsTask::new().execute().await {
                             Ok(_) => {

@@ -1,5 +1,6 @@
-use crate::tasks::Task;
 use crate::logger;
+use crate::tasks::Task;
+use crate::tui::FetchStatus;
 use anyhow::Result;
 use chrono::{DateTime, Datelike, Months, NaiveDate, Utc, Weekday};
 use colored::Colorize;
@@ -25,7 +26,6 @@ use wtf_lib::models::jira::{format_comment, JiraSprint};
 use wtf_lib::services::jira_service::{BoardService, IssueService, JiraService, SprintService};
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::WorklogsService;
-use crate::tui::FetchStatus;
 
 pub struct FetchJiraIssues {
     pub sprints: Vec<Sprint>,
@@ -107,7 +107,10 @@ impl Task for FetchJiraIssues {
                     ));
                 }
                 Err(e) => {
-                    logger::log(format!("⚠️  Sprint '{}': failed to fetch issues — {}", sprint.name, e));
+                    logger::log(format!(
+                        "⚠️  Sprint '{}': failed to fetch issues — {}",
+                        sprint.name, e
+                    ));
                 }
             }
         }

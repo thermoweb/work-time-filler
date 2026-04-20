@@ -34,7 +34,8 @@ impl Tui {
 
         let count = staged_worklogs.len();
         logger::log(format!("🚀 Starting push of {} worklogs...", count));
-        self.fetch_status = FetchStatus::Fetching(format!("Pushing {} worklogs to Jira...", count), 0, 0, None);
+        self.fetch_status =
+            FetchStatus::Fetching(format!("Pushing {} worklogs to Jira...", count), 0, 0, None);
 
         // Create worklog history BEFORE pushing to Jira for safety
         // This ensures we can revert even if the push crashes

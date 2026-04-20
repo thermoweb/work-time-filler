@@ -29,7 +29,10 @@ impl Tui {
                 use wtf_lib::services::github_service::GitHubService;
 
                 let _ = sender.send(FetchStatus::Fetching(
-                    "Syncing GitHub events...".to_string(), 1, 1, None,
+                    "Syncing GitHub events...".to_string(),
+                    1,
+                    1,
+                    None,
                 ));
 
                 // Check if GitHub CLI is configured
@@ -103,8 +106,8 @@ impl Tui {
 
             let requested_hours = time_per_issue as f64 / 3600.0;
             let session_date = session.start_time.date_naive();
-            let existing_hours =
-                LocalWorklogService::production().calculate_daily_total(session_date, &self.data.jira_worklogs);
+            let existing_hours = LocalWorklogService::production()
+                .calculate_daily_total(session_date, &self.data.jira_worklogs);
 
             // Check if this would exceed daily limit
             if existing_hours + requested_hours > self.data.daily_hours_limit {

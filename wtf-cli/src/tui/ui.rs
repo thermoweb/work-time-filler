@@ -201,7 +201,13 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
                 let bar_width = 10usize;
                 let filled = ((*step * bar_width) / *total).min(bar_width);
                 let empty = bar_width - filled;
-                let bar = format!(" [{}{}] {}/{}", "█".repeat(filled), "░".repeat(empty), step, total);
+                let bar = format!(
+                    " [{}{}] {}/{}",
+                    "█".repeat(filled),
+                    "░".repeat(empty),
+                    step,
+                    total
+                );
                 spans.push(Span::styled(bar, Style::default().fg(theme().fg_muted)));
             }
 
@@ -211,12 +217,12 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
                     let bar_width = 10usize;
                     let filled = ((*sub_done * bar_width) / *sub_total).min(bar_width);
                     let empty = bar_width - filled;
-                    let bar = format!(
-                        "  ({}/{})",
-                        sub_done, sub_total
-                    );
+                    let bar = format!("  ({}/{})", sub_done, sub_total);
                     let progress = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
-                    spans.push(Span::styled(progress, Style::default().fg(theme().highlight)));
+                    spans.push(Span::styled(
+                        progress,
+                        Style::default().fg(theme().highlight),
+                    ));
                     spans.push(Span::styled(bar, Style::default().fg(theme().fg_muted)));
                 }
             }

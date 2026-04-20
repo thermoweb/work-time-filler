@@ -37,7 +37,10 @@ impl Tui {
 
             runtime.block_on(async {
                 let _ = sender.send(FetchStatus::Fetching(
-                    "Creating worklogs from meetings...".to_string(), 1, 1, None,
+                    "Creating worklogs from meetings...".to_string(),
+                    1,
+                    1,
+                    None,
                 ));
 
                 let sprints = JiraService::production().get_followed_sprint();

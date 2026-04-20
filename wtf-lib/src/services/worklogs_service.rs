@@ -568,7 +568,14 @@ mod tests {
         let svc = make_local_service();
         // 2024-01-10 is Wednesday — absent, should be skipped
         let absent_day = NaiveDate::from_ymd_opt(2024, 1, 10).unwrap();
-        let gaps = svc.find_gap_days(absent_day, absent_day, 8.0, 0.0, &|date| date == absent_day, &[]);
+        let gaps = svc.find_gap_days(
+            absent_day,
+            absent_day,
+            8.0,
+            0.0,
+            &|date| date == absent_day,
+            &[],
+        );
         assert!(gaps.is_empty());
     }
 
