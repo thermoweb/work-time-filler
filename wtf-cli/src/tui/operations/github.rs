@@ -16,7 +16,7 @@ use super::super::{
 impl Tui {
     pub(in crate::tui) fn handle_github_sync(&mut self) {
         // Don't start a new fetch if one is already in progress
-        if matches!(self.fetch_status, FetchStatus::Fetching(_)) {
+        if matches!(self.fetch_status, FetchStatus::Fetching(_, _, _)) {
             return;
         }
 
@@ -29,7 +29,7 @@ impl Tui {
                 use wtf_lib::services::github_service::GitHubService;
 
                 let _ = sender.send(FetchStatus::Fetching(
-                    "Syncing GitHub events...".to_string(),
+                    "Syncing GitHub events...".to_string(), 1, 1,
                 ));
 
                 // Check if GitHub CLI is configured

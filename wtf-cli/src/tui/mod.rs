@@ -32,6 +32,7 @@ use std::time::Duration;
 
 use crate::commands::fetch::fetch_google_meetings;
 use crate::logger::{self, collecting_logger};
+use crate::tasks::github_tasks::FetchGithubEventsTask;
 use crate::tasks::jira_tasks::{
     FetchJiraBoard, FetchJiraIssues, FetchJiraSprint, FetchJiraWorklogs,
 };
@@ -107,6 +108,7 @@ impl Tui {
             event_bus,
             key_sequence_buffer: VecDeque::with_capacity(20),
             fetch_receiver: None,
+            fetch_tab: None,
             revert_receiver: None,
             push_receiver: None,
             push_progress_receiver: None,
@@ -183,24 +185,47 @@ impl Tui {
     /// Handle fetch status updates - bridge channel to EventBus
     fn handle_fetch_status(&mut self) {
         if let Some(receiver) = &self.fetch_receiver {
-            if let Ok(status) = receiver.try_recv() {
-                self.fetch_status = status.clone();
-                match status {
-                    FetchStatus::Complete => {
-                        self.pending_auto_link = true;
-                        self.refresh_data();
-                        self.fetch_receiver = None;
-                        self.status_clear_time = Some(std::time::Instant::now());
-                        self.event_bus
-                            .publish(AppEvent::FetchComplete(self.data.clone()));
+            match receiver.try_recv() {
+                Ok(status) => {
+                    self.fetch_status = status.clone();
+                    match status {
+                        FetchStatus::Complete => {
+                            let auto_link_tabs = matches!(
+                                self.fetch_tab,
+                                Some(Tab::Sprints) | Some(Tab::Meetings)
+                            );
+                            self.fetch_tab = None;
+                            if auto_link_tabs {
+                                self.pending_auto_link = true;
+                            }
+                            self.refresh_data();
+                            self.fetch_receiver = None;
+                            self.status_clear_time = Some(std::time::Instant::now());
+                            self.event_bus
+                                .publish(AppEvent::FetchComplete(self.data.clone()));
+                        }
+                        FetchStatus::Error(err) => {
+                            self.fetch_receiver = None;
+                            self.fetch_tab = None;
+                            self.status_clear_time = Some(std::time::Instant::now());
+                            self.event_bus.publish(AppEvent::FetchError(err));
+                        }
+                        _ => {}
                     }
-                    FetchStatus::Error(err) => {
-                        self.fetch_receiver = None;
-                        self.status_clear_time = Some(std::time::Instant::now());
-                        self.event_bus.publish(AppEvent::FetchError(err));
-                    }
-                    _ => {}
                 }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    // Fetch thread crashed without sending a final status — clear the
+                    // receiver so the TUI doesn't loop forever in Fetching...
+                    self.fetch_receiver = None;
+                    self.fetch_tab = None;
+                    self.fetch_status =
+                        FetchStatus::Error("Fetch thread terminated unexpectedly".to_string());
+                    self.status_clear_time = Some(std::time::Instant::now());
+                    self.event_bus.publish(AppEvent::FetchError(
+                        "Fetch thread terminated unexpectedly".to_string(),
+                    ));
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
             }
         }
     }
@@ -796,7 +821,7 @@ impl Tui {
 
     fn handle_update(&mut self) {
         // Don't start a new fetch if one is already in progress
-        if matches!(self.fetch_status, FetchStatus::Fetching(_)) {
+        if matches!(self.fetch_status, FetchStatus::Fetching(_, _, _)) {
             return;
         }
 
@@ -804,6 +829,7 @@ impl Tui {
         self.fetch_receiver = Some(receiver);
 
         let tab = self.current_tab;
+        self.fetch_tab = Some(tab);
 
         // Spawn background thread to run async fetch
         thread::spawn(move || {
@@ -816,29 +842,31 @@ impl Tui {
 
                 match tab {
                     Tab::Sprints => {
-                        // Fetch all for sprints tab (main tab now)
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching all data...".to_string()));
+                        // 6 steps: boards, sprints, issues, worklogs, meetings, github
+                        const TOTAL: usize = 6;
 
                         // Fetch boards
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching boards...".to_string()));
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching boards...".to_string(), 1, TOTAL,
+                        ));
                         let _ = FetchJiraBoard::new()
                             .with_progress(mp.clone())
                             .execute()
                             .await;
 
                         // Fetch sprints
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching sprints...".to_string()));
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching sprints...".to_string(), 2, TOTAL,
+                        ));
                         let _ = FetchJiraSprint::new()
                             .with_progress(mp.clone())
                             .execute()
                             .await;
 
                         // Fetch issues
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching issues...".to_string()));
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching issues...".to_string(), 3, TOTAL,
+                        ));
                         let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraIssues::new(sprints.clone())
                             .with_progress(mp.clone())
@@ -846,29 +874,34 @@ impl Tui {
                             .await;
 
                         // Fetch worklogs
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching worklogs...".to_string()));
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching worklogs...".to_string(), 4, TOTAL,
+                        ));
                         let _ = FetchJiraWorklogs::new(sprints)
                             .with_progress(mp.clone())
                             .execute()
                             .await;
 
                         // Fetch Google meetings
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching meetings...".to_string()));
-                        match fetch_google_meetings(Some(mp.clone())).await {
-                            Ok(_) => {
-                                let _ = sender.send(FetchStatus::Complete);
-                            }
-                            Err(e) => {
-                                let _ = sender.send(FetchStatus::Error(e));
-                            }
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching meetings...".to_string(), 5, TOTAL,
+                        ));
+                        if let Err(e) = fetch_google_meetings(Some(mp.clone())).await {
+                            let _ = sender.send(FetchStatus::Error(e));
+                            return;
                         }
+
+                        // Fetch GitHub events
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching GitHub events...".to_string(), 6, TOTAL,
+                        ));
+                        let _ = FetchGithubEventsTask::new().execute().await;
+
+                        let _ = sender.send(FetchStatus::Complete);
                     }
                     Tab::Meetings => {
-                        // Fetch google meetings only
                         let _ = sender.send(FetchStatus::Fetching(
-                            "Fetching Google Calendar events...".to_string(),
+                            "Fetching Google Calendar events...".to_string(), 1, 1,
                         ));
                         match fetch_google_meetings(Some(mp.clone())).await {
                             Ok(_) => {
@@ -880,9 +913,9 @@ impl Tui {
                         }
                     }
                     Tab::Worklogs => {
-                        // Fetch worklogs only
-                        let _ =
-                            sender.send(FetchStatus::Fetching("Fetching worklogs...".to_string()));
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching worklogs...".to_string(), 1, 1,
+                        ));
                         let sprints = JiraService::production().get_followed_sprint();
                         let _ = FetchJiraWorklogs::new(sprints)
                             .with_progress(mp.clone())
@@ -891,8 +924,17 @@ impl Tui {
                         let _ = sender.send(FetchStatus::Complete);
                     }
                     Tab::GitHub => {
-                        // For now, no fetch action on GitHub tab
-                        let _ = sender.send(FetchStatus::Complete);
+                        let _ = sender.send(FetchStatus::Fetching(
+                            "Fetching GitHub events...".to_string(), 1, 1,
+                        ));
+                        match FetchGithubEventsTask::new().execute().await {
+                            Ok(_) => {
+                                let _ = sender.send(FetchStatus::Complete);
+                            }
+                            Err(e) => {
+                                let _ = sender.send(FetchStatus::Error(e.to_string()));
+                            }
+                        }
                     }
                     Tab::History => {
                         // No fetch action on History tab, it's local data

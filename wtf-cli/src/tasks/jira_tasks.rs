@@ -365,7 +365,10 @@ fn into_sprint(sprint: &JiraSprint) -> Sprint {
             "active" => Active,
             "closed" => Closed,
             "future" => Future,
-            _ => panic!(),
+            other => {
+                log::warn!("Unknown sprint state '{}', treating as Closed", other);
+                Closed
+            }
         },
         name: sprint.name.clone(),
         start: sprint.start_date,
@@ -392,7 +395,10 @@ fn count_workdays(start: NaiveDate, end: NaiveDate, absences: Vec<Absence>) -> i
         {
             workdays += 1;
         }
-        current_date = current_date.succ_opt().unwrap();
+        current_date = match current_date.succ_opt() {
+            Some(next) => next,
+            None => break,
+        };
     }
     workdays
 }

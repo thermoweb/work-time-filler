@@ -24,7 +24,7 @@ use super::super::{
 impl Tui {
     pub(in crate::tui) fn handle_meeting_log(&mut self) {
         // Don't start a new operation if fetch is already in progress
-        if matches!(self.fetch_status, FetchStatus::Fetching(_)) {
+        if matches!(self.fetch_status, FetchStatus::Fetching(_, _, _)) {
             return;
         }
 
@@ -37,7 +37,7 @@ impl Tui {
 
             runtime.block_on(async {
                 let _ = sender.send(FetchStatus::Fetching(
-                    "Creating worklogs from meetings...".to_string(),
+                    "Creating worklogs from meetings...".to_string(), 1, 1,
                 ));
 
                 let sprints = JiraService::production().get_followed_sprint();

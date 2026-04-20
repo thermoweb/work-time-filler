@@ -121,7 +121,7 @@ impl EventBus {
 #[derive(Debug, Clone)]
 pub enum FetchStatus {
     Idle,
-    Fetching(String), // Message describing what's being fetched
+    Fetching(String, usize, usize), // Message, current step (1-based), total steps
     Complete,
     Error(String),
 }
@@ -273,6 +273,7 @@ pub struct Tui {
 
     // Channel receivers for async operations (bridge to EventBus)
     pub(super) fetch_receiver: Option<Receiver<FetchStatus>>,
+    pub(super) fetch_tab: Option<Tab>, // Which tab initiated the current fetch
     pub(super) revert_receiver: Option<Receiver<Result<(), String>>>,
     pub(super) push_receiver: Option<Receiver<(String, String)>>,
     pub(super) push_progress_receiver: Option<Receiver<String>>,
