@@ -104,7 +104,7 @@ impl Tui {
             let requested_hours = time_per_issue as f64 / 3600.0;
             let session_date = session.start_time.date_naive();
             let existing_hours =
-                LocalWorklogService::production().calculate_daily_total(session_date);
+                LocalWorklogService::production().calculate_daily_total(session_date, &self.data.jira_worklogs);
 
             // Check if this would exceed daily limit
             if existing_hours + requested_hours > self.data.daily_hours_limit {

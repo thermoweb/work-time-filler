@@ -305,19 +305,42 @@ impl LocalWorklogService {
         Ok(())
     }
 
-    /// Calculate total hours logged for a specific date
-    pub fn calculate_daily_total(&self, date: NaiveDate) -> f64 {
-        self.worklogs_db
-            .get_all()
-            .unwrap_or_default()
+    /// Calculate total hours logged for a specific date.
+    ///
+    /// Combines local worklogs (pending or pushed through wtf) with any Jira-fetched
+    /// worklogs that were not created via wtf (i.e. logged directly in Jira).
+    /// Pushed local worklogs already have a Jira counterpart, so those are excluded
+    /// from `jira_worklogs` to avoid double-counting.
+    pub fn calculate_daily_total(&self, date: NaiveDate, jira_worklogs: &[Worklog]) -> f64 {
+        let local_worklogs = self.worklogs_db.get_all().unwrap_or_default();
+
+        // Jira IDs that correspond to a pushed local worklog (already counted locally).
+        let pushed_jira_ids: std::collections::HashSet<&str> = local_worklogs
+            .iter()
+            .filter_map(|wl| wl.worklog_id.as_deref())
+            .collect();
+
+        let local_hours: f64 = local_worklogs
             .iter()
             .filter(|wl| wl.started.date_naive() == date)
             .map(|wl| wl.time_spent_seconds as f64 / 3600.0)
-            .sum()
+            .sum();
+
+        // Add hours from worklogs logged directly in Jira (not via wtf).
+        let jira_only_hours: f64 = jira_worklogs
+            .iter()
+            .filter(|wl| {
+                wl.started.date_naive() == date && !pushed_jira_ids.contains(wl.id.as_str())
+            })
+            .map(|wl| wl.time_spent_seconds as f64 / 3600.0)
+            .sum();
+
+        local_hours + jira_only_hours
     }
 
     /// Find days in a date range that have gaps (less than daily_limit hours logged).
     /// `is_absent` is a predicate returning true for days that should be skipped (e.g. holidays, leave).
+    /// `jira_worklogs` are Jira-fetched worklogs used to account for time logged directly in Jira.
     pub fn find_gap_days(
         &self,
         start_date: NaiveDate,
@@ -325,6 +348,7 @@ impl LocalWorklogService {
         daily_limit: f64,
         min_threshold: f64,
         is_absent: &dyn Fn(NaiveDate) -> bool,
+        jira_worklogs: &[Worklog],
     ) -> Vec<(NaiveDate, f64)> {
         use chrono::Datelike;
 
@@ -343,7 +367,7 @@ impl LocalWorklogService {
                 continue;
             }
 
-            let existing_hours = self.calculate_daily_total(current_date);
+            let existing_hours = self.calculate_daily_total(current_date, jira_worklogs);
 
             if existing_hours >= min_threshold {
                 current_date = current_date.succ_opt().unwrap_or(current_date);
@@ -504,7 +528,7 @@ mod tests {
         svc.save_local_worklog(local_worklog("wl-b", jan10, 1800)); // 0.5h
         svc.save_local_worklog(local_worklog("wl-c", jan11, 7200)); // 2h on different day
 
-        let total = svc.calculate_daily_total(NaiveDate::from_ymd_opt(2024, 1, 10).unwrap());
+        let total = svc.calculate_daily_total(NaiveDate::from_ymd_opt(2024, 1, 10).unwrap(), &[]);
         assert!((total - 1.5).abs() < 0.001);
     }
 
@@ -518,6 +542,7 @@ mod tests {
             8.0,
             0.0,
             &|_| false,
+            &[],
         );
         assert!(gaps.is_empty());
     }
@@ -532,6 +557,7 @@ mod tests {
             8.0,
             0.5,
             &|_| false,
+            &[],
         );
         assert_eq!(gaps.len(), 1);
         assert!((gaps[0].1 - 8.0).abs() < 0.001);
@@ -542,7 +568,7 @@ mod tests {
         let svc = make_local_service();
         // 2024-01-10 is Wednesday — absent, should be skipped
         let absent_day = NaiveDate::from_ymd_opt(2024, 1, 10).unwrap();
-        let gaps = svc.find_gap_days(absent_day, absent_day, 8.0, 0.0, &|date| date == absent_day);
+        let gaps = svc.find_gap_days(absent_day, absent_day, 8.0, 0.0, &|date| date == absent_day, &[]);
         assert!(gaps.is_empty());
     }
 

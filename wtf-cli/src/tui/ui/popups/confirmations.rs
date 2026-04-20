@@ -448,7 +448,11 @@ pub(in crate::tui) fn render_worklog_creation_confirmation(
     frame.render_widget(paragraph, popup_area);
 }
 
-pub(in crate::tui) fn render_gap_fill_confirmation(frame: &mut Frame, state: &GapFillConfirmation) {
+pub(in crate::tui) fn render_gap_fill_confirmation(
+    frame: &mut Frame,
+    state: &GapFillConfirmation,
+    jira_worklogs: &[wtf_lib::models::data::Worklog],
+) {
     let area = frame.area();
 
     // Calculate popup size
@@ -515,7 +519,7 @@ pub(in crate::tui) fn render_gap_fill_confirmation(frame: &mut Frame, state: &Ga
     // Add preview of gaps (max 10 lines)
     for (date, hours) in state.gaps.iter().take(10) {
         let existing = wtf_lib::services::worklogs_service::LocalWorklogService::production()
-            .calculate_daily_total(*date);
+            .calculate_daily_total(*date, jira_worklogs);
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(

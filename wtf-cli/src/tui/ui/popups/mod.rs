@@ -75,7 +75,7 @@ pub(in crate::tui) fn render_all(frame: &mut Frame, tui: &crate::tui::Tui) {
 
     // Render gap fill confirmation if active (also used by wizard gap filling)
     if let Some(state) = &tui.gap_fill_confirmation {
-        render_gap_fill_confirmation(frame, state);
+        render_gap_fill_confirmation(frame, state, &tui.data.jira_worklogs);
     }
 
     // Render sprint follow popup if active

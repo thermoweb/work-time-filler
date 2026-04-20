@@ -1504,6 +1504,7 @@ impl Tui {
                                     self.data.daily_hours_limit,
                                     6.0, // Skip days already over 6h
                                     &|date| meetings_svc.is_absent(date),
+                                    &self.data.jira_worklogs,
                                 );
 
                                 if gaps.is_empty() {
