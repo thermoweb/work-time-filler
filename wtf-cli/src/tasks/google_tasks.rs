@@ -195,8 +195,10 @@ fn from_google(event: Event) -> Option<wtf_lib::models::data::Meeting> {
 
         debug!("extended properties: {:?}", event.extended_properties);
 
+        let id = event.id?;
+
         return Some(wtf_lib::models::data::Meeting {
-            id: event.id.unwrap(),
+            id,
             start,
             end,
             title: event.summary,
