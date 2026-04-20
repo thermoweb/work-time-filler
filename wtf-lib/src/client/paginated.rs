@@ -53,7 +53,10 @@ where
             current_items: None,
             is_last: false,
         };
-        tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(fetcher.fetch_page())).unwrap_or_else(|err| {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(fetcher.fetch_page())
+        })
+        .unwrap_or_else(|err| {
             eprintln!("Failed to fetch paginated items: {}", err);
         });
 
@@ -155,7 +158,9 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // debug!("PaginatedFetcher::next : {:?}", self);
         if self.current_items.is_none() {
-            let fetch_result = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(self.fetch_page()));
+            let fetch_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(self.fetch_page())
+            });
             if let Err(_) = fetch_result {
                 return None;
             }
@@ -165,7 +170,9 @@ where
             if let Some(item) = items.pop() {
                 return Some(item);
             } else if !self.is_last {
-                let fetch_result = tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(self.fetch_page()));
+                let fetch_result = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(self.fetch_page())
+                });
                 if let Err(_) = fetch_result {
                     return None;
                 }

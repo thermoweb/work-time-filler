@@ -233,7 +233,10 @@ mod tests {
         let original = "my_api_token_12345";
         let s = SensitiveString::new(original.to_string());
         let encoded = s.encode();
-        assert!(encoded.starts_with("enc["), "encoded form should start with enc[");
+        assert!(
+            encoded.starts_with("enc["),
+            "encoded form should start with enc["
+        );
         let decoded = SensitiveString::decode_str(&encoded).expect("decode should succeed");
         assert_eq!(decoded.reveal(), original);
     }
@@ -243,8 +246,8 @@ mod tests {
         // These strings are known to produce `-` or `=` in URL-safe base64 output,
         // which the old regex `\w+` would silently truncate.
         let cases = [
-            "abc",          // base64: YWJj (no special chars, baseline)
-            "abcd",         // base64: YWJjZA== (has =)
+            "abc",  // base64: YWJj (no special chars, baseline)
+            "abcd", // base64: YWJjZA== (has =)
             // "~" encodes to fn4= in standard base64, but in URL_SAFE it stays fn4=
             // We use a string that encodes with a dash: the bytes [0xfb] produce -
             // In Rust we express this as a known token value that does produce a dash.
@@ -254,9 +257,15 @@ mod tests {
         for original in &cases {
             let s = SensitiveString::new(original.to_string());
             let encoded = s.encode();
-            let decoded = SensitiveString::decode_str(&encoded)
-                .unwrap_or_else(|_| panic!("decode failed for: {:?}  encoded as: {}", original, encoded));
-            assert_eq!(decoded.reveal(), *original, "roundtrip failed for: {:?}", original);
+            let decoded = SensitiveString::decode_str(&encoded).unwrap_or_else(|_| {
+                panic!("decode failed for: {:?}  encoded as: {}", original, encoded)
+            });
+            assert_eq!(
+                decoded.reveal(),
+                *original,
+                "roundtrip failed for: {:?}",
+                original
+            );
         }
     }
 
@@ -268,8 +277,11 @@ mod tests {
         let raw = String::from_utf8_lossy(&[0xfb, 0xff, 0x00]).to_string();
         let s = SensitiveString::new(raw.clone());
         let encoded = s.encode();
-        assert!(encoded.contains('-') || encoded.contains('='),
-            "expected URL-safe base64 chars in: {}", encoded);
+        assert!(
+            encoded.contains('-') || encoded.contains('='),
+            "expected URL-safe base64 chars in: {}",
+            encoded
+        );
         let decoded = SensitiveString::decode_str(&encoded)
             .unwrap_or_else(|_| panic!("decode failed for encoded: {}", encoded));
         assert_eq!(decoded.reveal(), raw);

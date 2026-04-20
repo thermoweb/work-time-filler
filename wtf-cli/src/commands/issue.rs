@@ -100,7 +100,10 @@ impl Command for IssueLogTimeCommand {
         let duration = match parse_duration(time) {
             Ok(duration) => duration,
             Err(_) => {
-                eprintln!("Invalid duration '{}'. Expected format: <number><unit> (e.g. 1h, 30m, 2d)", time);
+                eprintln!(
+                    "Invalid duration '{}'. Expected format: <number><unit> (e.g. 1h, 30m, 2d)",
+                    time
+                );
                 return;
             }
         };

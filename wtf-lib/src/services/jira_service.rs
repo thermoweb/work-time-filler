@@ -91,40 +91,40 @@ impl IssueService {
             }
             Err(e) => {
                 let should_remove_local = match &e {
-                        JiraError::ApiError(msg) => {
-                            // Parse the leading status code (e.g. "404 Not Found - ...")
-                            let status_code = msg
-                                .splitn(2, ' ')
-                                .next()
-                                .and_then(|s| s.parse::<u16>().ok());
-                            match status_code {
-                                // Worklog no longer exists or request is malformed — remove locally
-                                Some(404) | Some(400) => true,
-                                // Auth/permission errors — keep locally, user can fix credentials
-                                Some(401) | Some(403) => {
-                                    error!(
-                                        "Permission denied deleting worklog '{}' from issue '{}': {}",
-                                        worklog_id, issue_key, msg
-                                    );
-                                    false
-                                }
-                                _ => {
-                                    error!(
-                                        "Failed to delete worklog '{}' from issue '{}': {:?}",
-                                        worklog_id, issue_key, e
-                                    );
-                                    false
-                                }
+                    JiraError::ApiError(msg) => {
+                        // Parse the leading status code (e.g. "404 Not Found - ...")
+                        let status_code = msg
+                            .splitn(2, ' ')
+                            .next()
+                            .and_then(|s| s.parse::<u16>().ok());
+                        match status_code {
+                            // Worklog no longer exists or request is malformed — remove locally
+                            Some(404) | Some(400) => true,
+                            // Auth/permission errors — keep locally, user can fix credentials
+                            Some(401) | Some(403) => {
+                                error!(
+                                    "Permission denied deleting worklog '{}' from issue '{}': {}",
+                                    worklog_id, issue_key, msg
+                                );
+                                false
+                            }
+                            _ => {
+                                error!(
+                                    "Failed to delete worklog '{}' from issue '{}': {:?}",
+                                    worklog_id, issue_key, e
+                                );
+                                false
                             }
                         }
-                        _ => {
-                            error!(
-                                "Failed to delete worklog '{}' from issue '{}': {:?}",
-                                worklog_id, issue_key, e
-                            );
-                            false
-                        }
-                    };
+                    }
+                    _ => {
+                        error!(
+                            "Failed to delete worklog '{}' from issue '{}': {:?}",
+                            worklog_id, issue_key, e
+                        );
+                        false
+                    }
+                };
                 if should_remove_local {
                     debug!(
                         "worklog '{}' not found or invalid in Jira ({}), removing from local database",

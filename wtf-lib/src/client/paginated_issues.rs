@@ -81,10 +81,7 @@ impl<'a> PaginatedIssues<'a> {
     }
 
     async fn fetch_total(&self) -> Result<usize, Box<dyn std::error::Error>> {
-        let url = format!(
-            "{}/rest/api/3/search/approximate-count",
-            self.base_url
-        );
+        let url = format!("{}/rest/api/3/search/approximate-count", self.base_url);
         let body = serde_json::json!({ "jql": self.jql });
 
         let response = self
@@ -111,7 +108,11 @@ impl<'a> Iterator for PaginatedIssues<'a> {
         }
 
         if !self.finished {
-            tokio::task::block_in_place(|| tokio::runtime::Handle::current().block_on(self.fetch_page()).ok())?;
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(self.fetch_page())
+                    .ok()
+            })?;
 
             if let Some(issue) = self.current_items.pop() {
                 self.yielded_items += 1;
