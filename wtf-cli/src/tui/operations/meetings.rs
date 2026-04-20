@@ -11,6 +11,7 @@ use wtf_lib::config::GOOGLE_CALENDAR_EVENT_COLORS;
 use wtf_lib::models::data::Issue;
 use wtf_lib::services::jira_service::{IssueService, JiraService};
 use wtf_lib::services::meetings_service::MeetingsService;
+use wtf_lib::utils::meetings::is_untracked;
 
 use crate::logger;
 use crate::tasks::worklog_tasks::MeetingWorklogTask;
@@ -172,12 +173,15 @@ impl Tui {
         let mut linked_count = 0;
         let mut color_linked = false;
 
-        // Get all unlinked meetings
+        // Get all unlinked, tracked meetings
         let unlinked_meetings: Vec<_> = self
             .data
             .all_meetings
             .iter()
-            .filter(|m| m.jira_link.is_none())
+            .filter(|m| {
+                m.jira_link.is_none()
+                    && !is_untracked(m, &self.data.config, &self.data.untracked_meeting_ids)
+            })
             .collect();
 
         // Collect keys referenced in meeting titles/descriptions but not in local cache

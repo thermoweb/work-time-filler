@@ -190,19 +190,30 @@ impl AchievementTracker {
         false
     }
 
-    /// Check if user has 10+ meetings and all are auto-linked (no unlinked meetings)
+    /// Check if user has 10+ tracked meetings and all are auto-linked (no unlinked tracked meetings)
     fn has_perfect_auto_linking(tui: &Tui) -> bool {
-        let all_meetings = &tui.data.all_meetings;
+        use wtf_lib::utils::meetings::is_untracked;
 
-        // Need at least 10 meetings
-        if all_meetings.len() < 10 {
+        let tracked_meetings: Vec<_> = tui
+            .data
+            .all_meetings
+            .iter()
+            .filter(|m| {
+                !is_untracked(
+                    m,
+                    &tui.data.config,
+                    &tui.data.untracked_meeting_ids,
+                )
+            })
+            .collect();
+
+        // Need at least 10 tracked meetings
+        if tracked_meetings.len() < 10 {
             return false;
         }
 
-        // Check if ALL meetings are linked (none have jira_link = None)
-        let all_linked = all_meetings.iter().all(|m| m.jira_link.is_some());
-
-        all_linked
+        // Check if ALL tracked meetings are linked
+        tracked_meetings.iter().all(|m| m.jira_link.is_some())
     }
 
     /// Check if the specified push contains a worklog linked to a declined meeting
