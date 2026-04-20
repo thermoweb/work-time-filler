@@ -297,11 +297,22 @@ impl Command for LogPushCommand {
                 )
                 .await
             {
-                Ok(result) => {
+                Ok(Some(jira_worklog)) => {
                     wl.status = Pushed;
-                    if let Some(jira_worklog) = result {
-                        wl.worklog_id = Some(jira_worklog.id);
-                    }
+                    wl.worklog_id = Some(jira_worklog.id);
+                    LocalWorklogService::production().save_local_worklog(wl.clone());
+                    local_worklogs_id.push(wl.id);
+                }
+                Ok(None) => {
+                    // The worklog was created in Jira (2xx response) but no Location header
+                    // was returned, so we couldn't fetch its ID. Mark as Pushed so it isn't
+                    // re-pushed, but warn that it can't be reverted through the app.
+                    eprintln!(
+                        "⚠️  Worklog for '{}' was pushed to Jira but no worklog ID was returned. \
+                        It cannot be reverted through wtf — delete it manually in Jira if needed.",
+                        wl.issue_id
+                    );
+                    wl.status = Pushed;
                     LocalWorklogService::production().save_local_worklog(wl.clone());
                     local_worklogs_id.push(wl.id);
                 }
