@@ -319,7 +319,9 @@ impl Command for LogPushCommand {
                 Err(err) => eprintln!("{:?}", err),
             }
         }
-        LocalWorklogService::production().historize(local_worklogs_id.clone());
+        if !local_worklogs_id.is_empty() {
+            LocalWorklogService::production().historize(local_worklogs_id.clone());
+        }
     }
 
     fn clap_command(&self) -> ClapCommand {
