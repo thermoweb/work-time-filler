@@ -67,8 +67,6 @@ pub trait EventSubscriber {
 pub struct EventBus {
     pending_events: VecDeque<AppEvent>,
     subscribers: Vec<Box<dyn EventSubscriber>>,
-    #[allow(dead_code)]
-    history: Vec<AppEvent>, // For debugging/replay
 }
 
 impl Default for EventBus {
@@ -82,13 +80,11 @@ impl EventBus {
         Self {
             pending_events: VecDeque::new(),
             subscribers: Vec::new(),
-            history: Vec::new(),
         }
     }
 
     /// Publish an event (can be called from anywhere, including background threads)
     pub fn publish(&mut self, event: AppEvent) {
-        self.history.push(event.clone());
         self.pending_events.push_back(event);
     }
 
