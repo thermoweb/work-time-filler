@@ -49,7 +49,12 @@ cargo install --path wtf-cli --locked
 
 **To update to the latest version:**
 ```bash
-cargo install --git https://github.com/thermoweb/work-time-filler.git --locked wtf-cli --force
+wtf update                        # Update to latest stable release
+wtf update --unstable             # Update to latest pre-release
+wtf update --version 0.2.0        # Install a specific version
+wtf update --version              # Interactive version picker
+wtf update list                   # List all available versions
+wtf update list --unstable        # Include pre-release versions
 ```
 
 The `wtf` command is now available globally! 🎉
@@ -182,32 +187,84 @@ Note that for this credentials, if it's not in "production" mode, you have to ad
 
 ```bash
 # Setup
-wtf init                   # Interactive setup wizard
+wtf init                           # Interactive setup wizard
 
 # Launch TUI
-wtf tui                    # Launch the TUI (or just 'wtf')
+wtf tui                            # Launch the TUI (or just 'wtf')
+
+# Update wtf
+wtf update                         # Update to latest stable release
+wtf update --unstable              # Update to latest pre-release (short: -u)
+wtf update --version 0.2.0         # Install a specific version (short: -v)
+wtf update --version               # Interactive version picker
+wtf update list                    # List all available versions
+wtf update list --unstable         # Include pre-release versions in list
 
 # Fetch data
-wtf fetch all              # Fetch everything
-wtf fetch board            # Fetch boards only
-wtf fetch sprint           # Fetch sprints only
-wtf fetch issue            # Fetch issues only
-wtf fetch worklog          # Fetch worklogs only
-wtf fetch google           # Sync Google Calendar
+wtf fetch all                      # Fetch everything
+wtf fetch board                    # Fetch boards only
+wtf fetch sprint                   # Fetch sprints only
+wtf fetch issue                    # Fetch issues only
+wtf fetch worklog                  # Fetch worklogs only
+wtf fetch google                   # Sync Google Calendar
+
+# Manage boards
+wtf board list                     # List followed boards
+wtf board list --all               # List all available boards
+wtf board fetch                    # Fetch boards from Jira
+wtf board add <id>                 # Follow a board
+wtf board rm <id>                  # Unfollow a board
 
 # Manage sprints
-wtf sprint list            # List all sprints
-wtf sprint follow <id>     # Follow a sprint
-wtf sprint unfollow <id>   # Unfollow a sprint
+wtf sprint list                    # List followed sprints
+wtf sprint list --all              # List all sprints
+wtf sprint fetch                   # Fetch sprints from Jira
+wtf sprint add <id> [<id>...]      # Follow one or more sprints
+wtf sprint rm <id> [<id>...]       # Unfollow sprint(s), or 'all' to unfollow all
+wtf sprint status <id>             # Show daily worklog status for a sprint
+wtf sprint clear-worklogs <id>     # Delete ALL worklogs for a sprint (Jira + local)
+wtf sprint clear-worklogs <id> --dry-run  # Preview what would be deleted
+
+# Manage issues
+wtf issue list                     # List all local issues
+wtf issue fetch                    # Fetch issues from Jira
+wtf issue log-time <key> <time>    # Log time directly on a Jira issue (e.g. 1h30m)
 
 # Manage meetings
-wtf meeting list           # List all meetings
-wtf meeting link <id>      # Link meeting to issue
-wtf meeting clear          # Clear all meetings
+wtf meeting list                   # List meetings for followed sprints
+wtf meeting list --all             # List all meetings
+wtf meeting list -s <sprint-id>    # List meetings for a specific sprint
+wtf meeting link                   # Interactively link meetings to Jira issues
+wtf meeting log                    # Create worklogs from linked meetings
+wtf meeting clear                  # Clear all meetings from the local database
 
-# Worklog operations
-wtf worklog push           # Push staged worklogs to Jira
-wtf worklog list           # List local worklogs
+# Manage Google Calendar
+wtf google fetch                   # Fetch events from Google Calendar
+
+# Manage GitHub activity
+wtf github fetch                   # Fetch GitHub events for followed sprints
+wtf github log                     # Create worklogs from GitHub activity
+wtf github sessions                # Show stored GitHub work sessions
+wtf github sessions -d 2025-01-15  # Filter sessions by date
+wtf github events                  # Show stored GitHub events
+wtf github events -d 2025-01-15    # Filter events by date
+
+# Worklog operations (alias: wtf wl)
+wtf worklog list                   # List staged/created worklogs
+wtf worklog list --all             # List all worklogs including pushed
+wtf worklog add -w <id> [<id>...]  # Stage worklog(s) for push (use 'all' for all)
+wtf worklog rm -w <id> [<id>...]   # Unstage worklog(s) (use 'all' for all)
+wtf worklog push                   # Push staged worklogs to Jira
+wtf worklog reset                  # Delete all unpushed (created/staged) worklogs
+wtf worklog revert <history-id>    # Revert a pushed worklog history entry
+wtf worklog history                # Show push history
+wtf worklog history --detailed     # Show history with individual worklog details
+wtf worklog cleanup                # Remove local duplicates already in Jira
+wtf worklog cleanup --dry-run      # Preview duplicates without deleting
+
+# Configuration
+wtf config list                    # Show current configuration
+wtf config list --show-sensitive   # Reveal sensitive values (API token, etc.)
 ```
 
 ## ⌨️ TUI Keyboard Shortcuts
