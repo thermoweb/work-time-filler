@@ -1,5 +1,6 @@
 use crate::client::jira_client::JiraClient;
 use crate::models::data::{Board, Issue, Sprint, Worklog};
+use crate::models::jira::JiraError;
 use crate::services::worklogs_service::WorklogsService;
 use crate::storage::database::{GenericDatabase, DATABASE};
 use chrono::{DateTime, Duration, Utc};
@@ -89,22 +90,47 @@ impl IssueService {
                 );
             }
             Err(e) => {
-                let err_str = format!("{:?}", e);
-                if err_str.contains("404")
-                    || err_str.contains("Not Found")
-                    || err_str.contains("400")
-                    || err_str.contains("autorisation")
-                {
+                let should_remove_local = match &e {
+                        JiraError::ApiError(msg) => {
+                            // Parse the leading status code (e.g. "404 Not Found - ...")
+                            let status_code = msg
+                                .splitn(2, ' ')
+                                .next()
+                                .and_then(|s| s.parse::<u16>().ok());
+                            match status_code {
+                                // Worklog no longer exists or request is malformed — remove locally
+                                Some(404) | Some(400) => true,
+                                // Auth/permission errors — keep locally, user can fix credentials
+                                Some(401) | Some(403) => {
+                                    error!(
+                                        "Permission denied deleting worklog '{}' from issue '{}': {}",
+                                        worklog_id, issue_key, msg
+                                    );
+                                    false
+                                }
+                                _ => {
+                                    error!(
+                                        "Failed to delete worklog '{}' from issue '{}': {:?}",
+                                        worklog_id, issue_key, e
+                                    );
+                                    false
+                                }
+                            }
+                        }
+                        _ => {
+                            error!(
+                                "Failed to delete worklog '{}' from issue '{}': {:?}",
+                                worklog_id, issue_key, e
+                            );
+                            false
+                        }
+                    };
+                if should_remove_local {
                     debug!(
-                        "worklog '{}' error from Jira ({}), removing from local database anyway",
-                        worklog_id, err_str
+                        "worklog '{}' not found or invalid in Jira ({}), removing from local database",
+                        worklog_id, e
                     );
                     WorklogsService::production().remove_worklog(worklog_id);
-                } else {
-                    error!(
-                        "Failed to delete worklog '{}' from issue '{}': {:?}",
-                        worklog_id, issue_key, e
-                    );
                 }
             }
         }

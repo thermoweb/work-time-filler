@@ -165,6 +165,16 @@ pub enum JiraError {
     RequestError(reqwest::Error),
 }
 
+impl fmt::Display for JiraError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JiraError::ApiError(msg) => write!(f, "API error: {}", msg),
+            JiraError::DeserializeError(msg) => write!(f, "Deserialize error: {}", msg),
+            JiraError::RequestError(e) => write!(f, "Request error: {}", e),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct JiraSprint {
