@@ -125,6 +125,19 @@ impl Tui {
     }
 
     pub fn run(&mut self) -> io::Result<()> {
+        // Install a panic hook that restores the terminal before printing the panic message.
+        // Without this, any crash leaves the terminal in raw/alternate-screen mode.
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let _ = disable_raw_mode();
+            let _ = execute!(
+                io::stdout(),
+                LeaveAlternateScreen,
+                event::DisableMouseCapture
+            );
+            original_hook(info);
+        }));
+
         // Setup terminal
         enable_raw_mode()?;
         let mut stdout = io::stdout();
