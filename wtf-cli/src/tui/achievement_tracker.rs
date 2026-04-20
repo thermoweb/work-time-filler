@@ -198,13 +198,7 @@ impl AchievementTracker {
             .data
             .all_meetings
             .iter()
-            .filter(|m| {
-                !is_untracked(
-                    m,
-                    &tui.data.config,
-                    &tui.data.untracked_meeting_ids,
-                )
-            })
+            .filter(|m| !is_untracked(m, &tui.data.config, &tui.data.untracked_meeting_ids))
             .collect();
 
         // Need at least 10 tracked meetings
