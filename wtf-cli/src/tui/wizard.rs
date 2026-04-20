@@ -89,7 +89,7 @@ impl Tui {
 
         logger::log("🔗 Step 1/7: Auto-linking meetings...".to_string());
 
-        let jira_regex = Regex::new(r"([A-Z]+-\d+)").unwrap();
+        let jira_regex = Regex::new(r"(?i)([A-Z]+-\d+)").unwrap();
         let mut linked_count = 0;
 
         if let Some(wizard) = &mut self.wizard_state {

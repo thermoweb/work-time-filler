@@ -165,7 +165,7 @@ impl Tui {
     pub(in crate::tui) fn auto_link_meetings(&mut self) {
         logger::log("🔗 Auto-linking meetings...".to_string());
 
-        let jira_regex = Regex::new(r"([A-Z]+-\d+)").unwrap();
+        let jira_regex = Regex::new(r"(?i)([A-Z]+-\d+)").unwrap();
         let mut linked_count = 0;
         let mut color_linked = false;
 
