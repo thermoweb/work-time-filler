@@ -16,94 +16,30 @@ impl FetchGithubEventsTask {
 
 impl Task for FetchGithubEventsTask {
     async fn execute(&self) -> Result<(), Box<dyn Error>> {
-        logger::log("Syncing GitHub events for followed sprints...".to_string());
-
         // Check if GitHub CLI is configured
         if !GitHubService::is_configured() {
-            logger::log("❌ GitHub CLI is not installed or configured".to_string());
-            logger::log("Please install gh CLI: https://cli.github.com/".to_string());
-            logger::log("Then run: gh auth login".to_string());
-            return Err("GitHub CLI not configured".into());
+            logger::log("⚠️  GitHub: CLI not installed or configured (skipping)".to_string());
+            return Ok(());
         }
 
         // Get followed sprints
         let sprints = JiraService::production().get_followed_sprint();
         if sprints.is_empty() {
-            logger::log(
-                "No followed sprints found. Use 'wtf sprint follow' to follow sprints.".to_string(),
-            );
             return Ok(());
         }
-
-        logger::log(format!(
-            "Fetching events for {} sprint(s)...",
-            sprints.len()
-        ));
 
         // Sync events and sessions to database
         let (events_saved, sessions_saved) =
             GitHubService::production().sync_events_for_sprints(&sprints)?;
 
         if events_saved == 0 {
-            logger::log("No GitHub events found in sprint date ranges.".to_string());
-            return Ok(());
+            logger::log("✅ GitHub: no new events found".to_string());
+        } else {
+            logger::log(format!(
+                "✅ GitHub: {} events, {} sessions synced",
+                events_saved, sessions_saved
+            ));
         }
-
-        logger::log(format!(
-            "✅ Saved {} events and {} sessions to database",
-            events_saved, sessions_saved
-        ));
-
-        // Get sessions from database to display summary
-        let all_sessions = GitHubService::production().get_all_sessions()?;
-        let mut sessions_by_day: std::collections::HashMap<String, Vec<_>> =
-            std::collections::HashMap::new();
-
-        for session in all_sessions {
-            sessions_by_day
-                .entry(session.date.to_string())
-                .or_insert_with(Vec::new)
-                .push(session);
-        }
-
-        logger::log(format!("Calculated {} work days", sessions_by_day.len()));
-
-        // Display summary
-        logger::log("\n📊 GitHub Activity Summary:\n".to_string());
-
-        let mut days: Vec<_> = sessions_by_day.keys().collect();
-        days.sort();
-
-        for day in days {
-            if let Some(sessions) = sessions_by_day.get(day) {
-                let total_hours: f64 = sessions.iter().map(|s| s.duration_hours()).sum();
-
-                logger::log(format!(
-                    "  {} - {:.1}h ({} sessions)",
-                    day,
-                    total_hours,
-                    sessions.len()
-                ));
-
-                for session in sessions {
-                    let issues_str = if !session.jira_issues.is_empty() {
-                        format!(" [{}]", session.jira_issues)
-                    } else {
-                        String::new()
-                    };
-
-                    logger::log(format!(
-                        "    • {:.1}h - {} on {}{}",
-                        session.duration_hours(),
-                        session.description,
-                        session.repo,
-                        issues_str
-                    ));
-                }
-            }
-        }
-
-        logger::log("\n✅ Use 'wtf github log' to create worklogs from these events".to_string());
 
         Ok(())
     }

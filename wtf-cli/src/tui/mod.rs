@@ -119,6 +119,7 @@ impl Tui {
             needs_full_clear: false,
             should_quit: false,
             pending_auto_link: false,
+            log_scroll_offset: 0,
             log_collector,
         }
     }
@@ -818,6 +819,13 @@ impl Tui {
                     self.needs_full_clear = true;
                 }
             }
+            // Log panel scrolling (available globally)
+            KeyCode::PageUp => {
+                self.log_scroll_offset = self.log_scroll_offset.saturating_add(3);
+            }
+            KeyCode::PageDown => {
+                self.log_scroll_offset = self.log_scroll_offset.saturating_sub(3);
+            }
             // Tab-specific navigation and actions
             _ => {
                 self.current_tab.handle_key(self, key);
@@ -866,6 +874,7 @@ impl Tui {
                         ));
                         let _ = FetchJiraBoard::new()
                             .with_progress(mp.clone())
+                            .without_follow_prompt()
                             .execute()
                             .await;
 

@@ -40,7 +40,7 @@ pub fn render(frame: &mut Frame, tui: &super::Tui, logs: &[String]) {
     tui.current_tab.render(tui, frame, &main_chunks[1]);
 
     // Render logs panel
-    render_logs_panel(frame, &main_chunks[2], logs);
+    render_logs_panel(frame, &main_chunks[2], logs, tui.log_scroll_offset);
 
     // Render status bar at bottom
     render_status_bar(frame, &main_chunks[3], &tui.data, &tui.fetch_status);
@@ -106,21 +106,38 @@ fn render_tab_bar(frame: &mut Frame, area: &Rect, tui: &super::Tui) {
     frame.render_widget(paragraph, *area);
 }
 
-fn render_logs_panel(frame: &mut Frame, area: &Rect, logs: &[String]) {
+fn render_logs_panel(frame: &mut Frame, area: &Rect, logs: &[String], scroll_offset: usize) {
+    let max_lines = area.height.saturating_sub(2) as usize; // subtract top+bottom border
+    let total_logs = logs.len();
+
+    // Clamp offset so we can't scroll past the top
+    let offset = scroll_offset.min(total_logs.saturating_sub(max_lines));
+    let scrolled = offset > 0;
+
+    let title = if scrolled {
+        format!("📝 Logs  ↑{} (PgDn to return)", offset)
+    } else if total_logs > max_lines {
+        "📝 Logs  (PgUp to scroll)".to_string()
+    } else {
+        "📝 Logs".to_string()
+    };
+
     let block = Block::default()
-        .title("📝 Logs")
+        .title(title)
         .borders(Borders::ALL)
         .style(Style::default().fg(theme().border).bg(theme().bg_primary));
 
     let inner = block.inner(*area);
     frame.render_widget(block, *area);
 
-    // Show logs that fit in the inner area (account for borders)
-    let max_logs = inner.height as usize;
-    let recent_logs: Vec<Line> = logs
+    // Show a window of logs: newest at bottom unless scrolled up
+    let visible: Vec<Line> = logs
         .iter()
         .rev()
-        .take(max_logs)
+        .skip(offset)
+        .take(max_lines)
+        .collect::<Vec<_>>()
+        .into_iter()
         .rev()
         .map(|log| {
             Line::from(Span::styled(
@@ -130,7 +147,7 @@ fn render_logs_panel(frame: &mut Frame, area: &Rect, logs: &[String]) {
         })
         .collect();
 
-    let paragraph = Paragraph::new(recent_logs).alignment(Alignment::Left);
+    let paragraph = Paragraph::new(visible).alignment(Alignment::Left);
     frame.render_widget(paragraph, inner);
 }
 
@@ -267,7 +284,14 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
                         .fg(theme().highlight)
                         .add_modifier(Modifier::BOLD),
                 ),
-                Span::raw(" Switch"),
+                Span::raw(" Switch  "),
+                Span::styled(
+                    "[PgUp/Dn]",
+                    Style::default()
+                        .fg(theme().highlight)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" Logs"),
             ])
         }
     };
