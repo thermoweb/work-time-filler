@@ -14,6 +14,9 @@ impl From<ParseIntError> for DurationParserError {
 }
 
 pub fn parse_duration(time_str: &str) -> Result<Duration, DurationParserError> {
+    if time_str.is_empty() {
+        return Err(DurationParserError::InvalidFormat);
+    }
     let (num_str, unit) = time_str.split_at(time_str.len() - 1);
     let num = num_str.parse::<i64>()?;
 
@@ -69,6 +72,14 @@ mod tests {
         assert!(matches!(
             parse_duration("abch"),
             Err(DurationParserError::ParseError(_))
+        ));
+    }
+
+    #[test]
+    fn test_empty_string() {
+        assert!(matches!(
+            parse_duration(""),
+            Err(DurationParserError::InvalidFormat)
         ));
     }
 }

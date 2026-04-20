@@ -99,7 +99,10 @@ impl Command for IssueLogTimeCommand {
         let time = matches.get_one::<String>("time").unwrap();
         let duration = match parse_duration(time) {
             Ok(duration) => duration,
-            Err(_e) => panic!("OH !"),
+            Err(_) => {
+                eprintln!("Invalid duration '{}'. Expected format: <number><unit> (e.g. 1h, 30m, 2d)", time);
+                return;
+            }
         };
         let issue_key = matches.get_one::<String>("issue-key").unwrap();
 
