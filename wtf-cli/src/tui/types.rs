@@ -121,7 +121,7 @@ impl EventBus {
 #[derive(Debug, Clone)]
 pub enum FetchStatus {
     Idle,
-    Fetching(String, usize, usize), // Message, current step (1-based), total steps
+    Fetching(String, usize, usize, Option<(usize, usize)>), // message, step, total_steps, sub-progress (done, total)
     Complete,
     Error(String),
 }

@@ -158,7 +158,7 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
 
     // Render status/shortcuts in the center
     let content = match fetch_status {
-        FetchStatus::Fetching(message, step, total) => {
+        FetchStatus::Fetching(message, step, total, sub) => {
             // Show spinner and message when fetching
             let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
             let frame_idx = (std::time::SystemTime::now()
@@ -179,13 +179,29 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
                 Span::styled(message, Style::default().fg(theme().info)),
             ];
 
-            // Show progress bar when total > 1 (multi-step fetch)
+            // Overall step bar (multi-step fetches only)
             if *total > 1 {
-                let bar_width = 12usize;
+                let bar_width = 10usize;
                 let filled = ((*step * bar_width) / *total).min(bar_width);
                 let empty = bar_width - filled;
                 let bar = format!(" [{}{}] {}/{}", "█".repeat(filled), "░".repeat(empty), step, total);
                 spans.push(Span::styled(bar, Style::default().fg(theme().fg_muted)));
+            }
+
+            // Sub-step bar (per-item progress within the current step)
+            if let Some((sub_done, sub_total)) = sub {
+                if *sub_total > 0 {
+                    let bar_width = 10usize;
+                    let filled = ((*sub_done * bar_width) / *sub_total).min(bar_width);
+                    let empty = bar_width - filled;
+                    let bar = format!(
+                        "  ({}/{})",
+                        sub_done, sub_total
+                    );
+                    let progress = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
+                    spans.push(Span::styled(progress, Style::default().fg(theme().highlight)));
+                    spans.push(Span::styled(bar, Style::default().fg(theme().fg_muted)));
+                }
             }
 
             Line::from(spans)

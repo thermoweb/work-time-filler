@@ -9,6 +9,7 @@ use log::{debug, info};
 use regex::Regex;
 use std::error::Error;
 use std::fmt;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::time::Duration;
 use tabled::settings::object::Columns;
@@ -23,10 +24,14 @@ use wtf_lib::models::jira::{format_comment, JiraSprint};
 use wtf_lib::services::jira_service::{BoardService, IssueService, JiraService, SprintService};
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::WorklogsService;
+use crate::tui::FetchStatus;
 
 pub struct FetchJiraIssues {
     pub sprints: Vec<Sprint>,
     pub multi_progress: Option<MultiProgress>,
+    /// When set, sub-step progress is reported through this sender.
+    /// Carries (sender, step_label, overall_step, overall_total).
+    sub_tx: Option<(Sender<FetchStatus>, String, usize, usize)>,
 }
 
 impl FetchJiraIssues {
@@ -34,11 +39,24 @@ impl FetchJiraIssues {
         Self {
             sprints: sprints.clone(),
             multi_progress: None,
+            sub_tx: None,
         }
     }
 
     pub fn with_progress(mut self, progress: MultiProgress) -> Self {
         self.multi_progress = Some(progress);
+        self
+    }
+
+    /// Attach a sender so the task can stream per-issue progress into the TUI status bar.
+    pub fn with_sub_progress(
+        mut self,
+        tx: Sender<FetchStatus>,
+        label: impl Into<String>,
+        step: usize,
+        total_steps: usize,
+    ) -> Self {
+        self.sub_tx = Some((tx, label.into(), step, total_steps));
         self
     }
 }
@@ -50,44 +68,43 @@ impl Task for FetchJiraIssues {
             None => MultiProgress::new(),
             Some(multi) => multi.clone(),
         };
-        let sprint_progress = mp.add(ProgressBar::new(self.sprints.len() as u64));
-        let default_style = ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
-            .unwrap()
-            .progress_chars("#>-");
-        sprint_progress.set_style(default_style.clone());
-        sprint_progress.enable_steady_tick(Duration::from_millis(100));
+
+        // Helper: emit a sub-progress update through the TUI channel (if wired up)
+        let emit = |done: usize, total: usize| {
+            if let Some((ref tx, ref label, step, total_steps)) = self.sub_tx {
+                let _ = tx.send(FetchStatus::Fetching(
+                    label.clone(),
+                    step,
+                    total_steps,
+                    Some((done, total)),
+                ));
+            }
+        };
+
         let mut issues_to_store = Vec::new();
+        let mut total_fetched = 0usize;
+
         for sprint in &self.sprints {
-            sprint_progress.inc(1);
-            sprint_progress.set_message(format!("fetching issues for sprint #{}", sprint.id));
             match jira_client.get_all_issues_v2(&sprint.id.to_string()).await {
                 Ok(issue_fetcher) => {
-                    if issue_fetcher.len() == 0 {
-                        mp.println(format!("No issues found for sprint '{}'.", sprint.id))
-                            .unwrap();
-                    } else {
-                        let issue_progress = mp.add(ProgressBar::new(issue_fetcher.len() as u64));
-                        issue_progress.set_style(default_style.clone());
-                        issue_progress.enable_steady_tick(Duration::from_millis(100));
-                        for issue in issue_fetcher {
-                            issue_progress.set_message(format!("issue {}", issue.key));
-                            issues_to_store.push(Issue {
-                                key: issue.key.clone(),
-                                id: issue.id,
-                                created: issue.fields.created,
-                                status: issue.fields.status.name,
-                                summary: issue.fields.summary,
-                            });
-                            issue_progress.inc(1);
-                        }
-                        issue_progress.finish_and_clear();
+                    let sprint_total = issue_fetcher.len();
+                    let mut sprint_done = 0usize;
+                    for issue in issue_fetcher {
+                        issues_to_store.push(Issue {
+                            key: issue.key.clone(),
+                            id: issue.id,
+                            created: issue.fields.created,
+                            status: issue.fields.status.name,
+                            summary: issue.fields.summary,
+                        });
+                        sprint_done += 1;
+                        total_fetched += 1;
+                        emit(total_fetched, total_fetched + (sprint_total - sprint_done));
                     }
                 }
-                Err(e) => eprintln!("Error: {:?}", e),
+                Err(e) => eprintln!("Error fetching sprint issues: {:?}", e),
             }
         }
-        sprint_progress.finish_and_clear();
 
         for board in JiraService::production()
             .get_followed_boards()
@@ -115,32 +132,22 @@ impl Task for FetchJiraIssues {
                 };
                 match fetch_result {
                     Ok(issue_fetcher) => {
-                        if issue_fetcher.len() == 0 {
-                            mp.println(format!(
-                                "No backlog issues found for project '{}'.",
-                                project_name
-                            ))
-                            .unwrap();
-                        } else {
-                            let issue_progress =
-                                mp.add(ProgressBar::new(issue_fetcher.len() as u64));
-                            issue_progress.set_style(default_style.clone());
-                            issue_progress.enable_steady_tick(Duration::from_millis(100));
-                            for issue in issue_fetcher {
-                                issue_progress.set_message(format!("issue {}", issue.key));
-                                issues_to_store.push(Issue {
-                                    key: issue.key.clone(),
-                                    id: issue.id,
-                                    created: issue.fields.created,
-                                    status: issue.fields.status.name,
-                                    summary: issue.fields.summary,
-                                });
-                                issue_progress.inc(1);
-                            }
-                            issue_progress.finish_and_clear();
+                        let board_total = issue_fetcher.len();
+                        let mut board_done = 0usize;
+                        for issue in issue_fetcher {
+                            issues_to_store.push(Issue {
+                                key: issue.key.clone(),
+                                id: issue.id,
+                                created: issue.fields.created,
+                                status: issue.fields.status.name,
+                                summary: issue.fields.summary,
+                            });
+                            board_done += 1;
+                            total_fetched += 1;
+                            emit(total_fetched, total_fetched + (board_total - board_done));
                         }
                     }
-                    Err(e) => eprintln!("Error: {:?}", e),
+                    Err(e) => eprintln!("Error fetching board issues: {:?}", e),
                 }
             }
         }
