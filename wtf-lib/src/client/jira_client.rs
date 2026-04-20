@@ -268,24 +268,28 @@ impl JiraClient {
     ) -> Result<PaginatedFetcher<'_, JiraSprint>, JiraError> {
         debug!("fetching all sprints");
         let endpoint = format!("/rest/agile/latest/board/{}/sprint?", board_id);
-        let fetcher: PaginatedFetcher<JiraSprint> = PaginatedFetcher::new(
+        let fetcher: PaginatedFetcher<JiraSprint> = PaginatedFetcher::initialize(
             &self.client,
             self.base_url.clone(),
             self.auth_header.clone(),
             endpoint,
             |start_at| format!("startAt={}", start_at),
-        );
+        )
+        .await
+        .map_err(|e| ApiError(e.to_string()))?;
         Ok(fetcher)
     }
 
     pub async fn get_all_boards(&self) -> Result<PaginatedFetcher<'_, JiraBoard>, JiraError> {
-        let fetcher: PaginatedFetcher<JiraBoard> = PaginatedFetcher::new(
+        let fetcher: PaginatedFetcher<JiraBoard> = PaginatedFetcher::initialize(
             &self.client,
             self.base_url.clone(),
             self.auth_header.clone(),
             "/rest/agile/1.0/board?".to_string(),
             |start_at| format!("startAt={}", start_at),
-        );
+        )
+        .await
+        .map_err(|e| ApiError(e.to_string()))?;
         Ok(fetcher)
     }
 
