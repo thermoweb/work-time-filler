@@ -201,18 +201,24 @@ impl Tui {
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                        // Fetch thread crashed without sending a final status — clear the
-                        // receiver so the TUI doesn't loop forever in Fetching...
-                        self.fetch_receiver = None;
-                        self.fetch_tab = None;
-                        self.fetch_status = FetchStatus::Error(
-                            "Fetch thread terminated unexpectedly".to_string(),
-                        );
-                        self.status_clear_time = Some(std::time::Instant::now());
-                        self.event_bus.publish(AppEvent::FetchError(
-                            "Fetch thread terminated unexpectedly".to_string(),
-                        ));
-                        return;
+                        // The sender was dropped. This can happen in two cases:
+                        // 1. Thread ended normally: Complete/Error was sent, then sender dropped.
+                        //    In this case last_status already holds the final message — just break.
+                        // 2. Thread panicked without sending anything: last_status is None.
+                        //    Treat as a crash.
+                        if last_status.is_none() {
+                            self.fetch_receiver = None;
+                            self.fetch_tab = None;
+                            self.fetch_status = FetchStatus::Error(
+                                "Fetch thread terminated unexpectedly".to_string(),
+                            );
+                            self.status_clear_time = Some(std::time::Instant::now());
+                            self.event_bus.publish(AppEvent::FetchError(
+                                "Fetch thread terminated unexpectedly".to_string(),
+                            ));
+                            return;
+                        }
+                        break;
                     }
                 }
             }
