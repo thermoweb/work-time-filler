@@ -33,6 +33,23 @@ impl Identifiable for Sprint {
     }
 }
 
+impl Sprint {
+    /// Returns true if the meeting falls within this sprint, expanding sprint
+    /// boundaries to full UTC days so meetings at the start/end of the day
+    /// are not missed due to the sprint's configured hour offsets.
+    pub fn contains_meeting(&self, meeting: &Meeting) -> bool {
+        if let (Some(start), Some(end)) = (self.start, self.end) {
+            let day_start = Utc
+                .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+            let day_end = Utc
+                .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+            meeting.is_between(day_start, day_end)
+        } else {
+            false
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
 pub enum SprintState {
     Active,
@@ -413,5 +430,140 @@ impl GitHubSession {
     /// Get duration in hours
     pub fn duration_hours(&self) -> f64 {
         self.duration_seconds as f64 / 3600.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+
+    fn make_sprint(start: DateTime<Utc>, end: DateTime<Utc>) -> Sprint {
+        Sprint {
+            id: 1,
+            name: "Test Sprint".to_string(),
+            state: SprintState::Active,
+            start: Some(start),
+            end: Some(end),
+            followed: true,
+            workdays: 10,
+        }
+    }
+
+    fn make_meeting(start: DateTime<Utc>, end: DateTime<Utc>) -> Meeting {
+        Meeting {
+            id: "m1".to_string(),
+            title: None,
+            description: None,
+            start,
+            end,
+            attendees: None,
+            jira_link: None,
+            recurrence: None,
+            logs: HashMap::new(),
+            my_response_status: None,
+            color_id: None,
+        }
+    }
+
+    // Sprint configured with 9 AM start on Jan 10, 5 PM end on Jan 14.
+    fn default_sprint() -> Sprint {
+        make_sprint(
+            Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 14, 17, 0, 0).unwrap(),
+        )
+    }
+
+    #[test]
+    fn meeting_well_inside_sprint_is_included() {
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 11, 10, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 11, 11, 0, 0).unwrap(),
+        );
+        assert!(sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_completely_outside_sprint_is_excluded() {
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 20, 10, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 20, 11, 0, 0).unwrap(),
+        );
+        assert!(!sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_before_sprint_hour_on_start_day_is_included() {
+        // Sprint starts at 9 AM on Jan 10 — a meeting at 8 AM should still be included
+        // because we expand the sprint boundary to midnight.
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 10, 8, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 10, 8, 30, 0).unwrap(),
+        );
+        assert!(sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_after_sprint_hour_on_end_day_is_included() {
+        // Sprint ends at 5 PM on Jan 14 — a meeting at 6 PM should still be included
+        // because we expand the sprint boundary to 23:59:59.
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 14, 18, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 14, 19, 0, 0).unwrap(),
+        );
+        assert!(sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_spanning_into_sprint_start_is_included() {
+        // Meeting starts before the sprint start day but ends on it.
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 9, 23, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 10, 1, 0, 0).unwrap(),
+        );
+        assert!(sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_one_day_before_sprint_is_excluded() {
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 9, 10, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 9, 11, 0, 0).unwrap(),
+        );
+        assert!(!sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn sprint_without_dates_excludes_all_meetings() {
+        let sprint = Sprint {
+            id: 2,
+            name: "Undated".to_string(),
+            state: SprintState::Future,
+            start: None,
+            end: None,
+            followed: false,
+            workdays: 0,
+        };
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 10, 10, 0, 0).unwrap(),
+        );
+        assert!(!sprint.contains_meeting(&m));
+    }
+
+    #[test]
+    fn meeting_one_day_after_sprint_is_excluded() {
+        let sprint = default_sprint();
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2024, 1, 15, 9, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2024, 1, 15, 10, 0, 0).unwrap(),
+        );
+        assert!(!sprint.contains_meeting(&m));
     }
 }

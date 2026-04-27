@@ -159,13 +159,12 @@ impl Tui {
         // Refresh data to see the newly linked meetings
         self.refresh_data();
 
-        // Get sprint date range for filtering
-        let sprint_range = self.wizard_state.as_ref().and_then(|w| {
+        let sprint_for_filter = self.wizard_state.as_ref().and_then(|w| {
             self.data
                 .all_sprints
                 .iter()
                 .find(|s| s.id == w.sprint_id)
-                .and_then(|s| s.start.zip(s.end))
+                .cloned()
         });
 
         // Get unlinked, non-untracked, non-declined meetings filtered to the sprint's date range
@@ -181,9 +180,10 @@ impl Tui {
                         &self.data.config,
                         &self.data.untracked_meeting_ids,
                     )
-                    && sprint_range
-                        .map(|(start, end)| m.start >= start && m.start <= end)
-                        .unwrap_or(true) // No date range on sprint → show all
+                    && sprint_for_filter
+                        .as_ref()
+                        .map(|sprint| sprint.contains_meeting(m))
+                        .unwrap_or(true)
             })
             .cloned()
             .collect();
@@ -221,53 +221,50 @@ impl Tui {
                 .find(|s| s.id == wizard.sprint_id);
 
             if let Some(sprint) = sprint {
-                if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                    let meetings_svc = MeetingsService::production();
-                    // Get all linked meetings in sprint date range, skipping absent days
-                    let meetings_to_log: Vec<_> = self
-                        .data
-                        .all_meetings
-                        .iter()
-                        .filter(|m| {
-                            m.jira_link.is_some()
-                                && m.start >= start
-                                && m.start <= end
-                                && !meetings_svc.is_absent(m.start.date_naive())
-                        })
-                        .cloned()
-                        .collect();
+                let meetings_svc = MeetingsService::production();
+                // Get all linked meetings in sprint date range, skipping absent days
+                let meetings_to_log: Vec<_> = self
+                    .data
+                    .all_meetings
+                    .iter()
+                    .filter(|m| {
+                        m.jira_link.is_some()
+                            && sprint.contains_meeting(m)
+                            && !meetings_svc.is_absent(m.start.date_naive())
+                    })
+                    .cloned()
+                    .collect();
 
-                    let count = meetings_to_log.len();
-                    let wl_svc = LocalWorklogService::production();
-                    let mut created = 0;
-                    let mut skipped = 0;
+                let count = meetings_to_log.len();
+                let wl_svc = LocalWorklogService::production();
+                let mut created = 0;
+                let mut skipped = 0;
 
-                    // Create worklogs, skipping meetings that already have one
-                    for meeting in meetings_to_log {
-                        if let Some(issue_key) = &meeting.jira_link {
-                            if wl_svc
-                                .get_local_worklogs_on_day_for_meeting(
-                                    &meeting.id,
-                                    meeting.start.date_naive(),
-                                )
-                                .is_empty()
-                            {
-                                self.create_worklog_from_meeting(&meeting, issue_key);
-                                created += 1;
-                            } else {
-                                skipped += 1;
-                            }
+                // Create worklogs, skipping meetings that already have one
+                for meeting in meetings_to_log {
+                    if let Some(issue_key) = &meeting.jira_link {
+                        if wl_svc
+                            .get_local_worklogs_on_day_for_meeting(
+                                &meeting.id,
+                                meeting.start.date_naive(),
+                            )
+                            .is_empty()
+                        {
+                            self.create_worklog_from_meeting(&meeting, issue_key);
+                            created += 1;
+                        } else {
+                            skipped += 1;
                         }
                     }
+                }
 
-                    if skipped > 0 {
-                        logger::log(format!(
-                            "✅ Created worklogs from {}/{} meetings ({} already logged, skipped)",
-                            created, count, skipped
-                        ));
-                    } else {
-                        logger::log(format!("✅ Created worklogs from {} meetings", created));
-                    }
+                if skipped > 0 {
+                    logger::log(format!(
+                        "✅ Created worklogs from {}/{} meetings ({} already logged, skipped)",
+                        created, count, skipped
+                    ));
+                } else {
+                    logger::log(format!("✅ Created worklogs from {} meetings", created));
                 }
             }
         }

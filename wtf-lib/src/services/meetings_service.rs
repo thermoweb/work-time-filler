@@ -1,7 +1,7 @@
 use crate::models::data::{Absence, Meeting, Sprint, SprintState};
 use crate::services::jira_service::{JiraService, SprintService};
 use crate::storage::database::{GenericDatabase, DATABASE};
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use log::{error, warn};
 
 // --- UntrackedMeeting (private) ---
@@ -74,13 +74,11 @@ impl MeetingsService {
             .iter()
             .find(|s| matches!(s.state, SprintState::Active))
         {
-            if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                let (start, end) = sprint_day_bounds(start, end);
+            if sprint.start.is_some() && sprint.end.is_some() {
                 return all_meetings
-                    .iter()
-                    .cloned()
-                    .filter(|m| m.is_between(start, end))
-                    .collect::<Vec<Meeting>>();
+                    .into_iter()
+                    .filter(|m| sprint.contains_meeting(m))
+                    .collect();
             } else {
                 warn!("Active sprint '{}' missing start or end date", sprint.name);
             }
@@ -99,12 +97,12 @@ impl MeetingsService {
     }
 
     pub fn get_meetings_for_sprint(&self, sprint: &Sprint) -> Vec<Meeting> {
-        if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-            let (start, end) = sprint_day_bounds(start, end);
-            self.get_meetings_between_dates(start, end)
-        } else {
-            vec![]
-        }
+        self.meetings_db
+            .get_all()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|m| sprint.contains_meeting(m))
+            .collect()
     }
 
     pub fn get_meetings_between_dates(
@@ -209,13 +207,6 @@ impl AbsenceService {
     }
 }
 
-/// Expands sprint start to midnight UTC (start-of-day) and sprint end to 23:59:59 UTC (end-of-day)
-/// so that meetings on the sprint start/end day are not missed due to exact sprint timestamps.
-fn sprint_day_bounds(start: DateTime<Utc>, end: DateTime<Utc>) -> (DateTime<Utc>, DateTime<Utc>) {
-    let start_day = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-    let end_day = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
-    (start_day, end_day)
-}
 
 #[cfg(test)]
 mod tests {

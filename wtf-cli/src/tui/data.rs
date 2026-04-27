@@ -183,26 +183,10 @@ impl TuiData {
     }
 
     fn get_meetings_for_sprints(sprints: &[Sprint]) -> Vec<Meeting> {
-        use chrono::{TimeZone, Utc};
         let all_meetings = MeetingsService::production().get_all_meetings();
-
-        // Filter meetings that fall within sprint date ranges, expanded to full UTC days
-        // so meetings at the start/end of the sprint day are not missed.
         all_meetings
             .into_iter()
-            .filter(|meeting| {
-                sprints.iter().any(|sprint| {
-                    if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                        let day_start = Utc
-                            .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-                        let day_end = Utc
-                            .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
-                        meeting.start >= day_start && meeting.start <= day_end
-                    } else {
-                        false
-                    }
-                })
-            })
+            .filter(|meeting| sprints.iter().any(|sprint| sprint.contains_meeting(meeting)))
             .collect()
     }
 
