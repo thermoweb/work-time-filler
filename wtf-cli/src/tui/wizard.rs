@@ -231,6 +231,7 @@ impl Tui {
                         m.jira_link.is_some()
                             && sprint.contains_meeting(m)
                             && !meetings_svc.is_absent(m.start.date_naive())
+                            && m.my_response_status.as_deref() != Some("declined")
                     })
                     .cloned()
                     .collect();
