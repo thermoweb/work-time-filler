@@ -207,7 +207,6 @@ impl AbsenceService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

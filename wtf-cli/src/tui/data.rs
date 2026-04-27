@@ -186,7 +186,11 @@ impl TuiData {
         let all_meetings = MeetingsService::production().get_all_meetings();
         all_meetings
             .into_iter()
-            .filter(|meeting| sprints.iter().any(|sprint| sprint.contains_meeting(meeting)))
+            .filter(|meeting| {
+                sprints
+                    .iter()
+                    .any(|sprint| sprint.contains_meeting(meeting))
+            })
             .collect()
     }
 

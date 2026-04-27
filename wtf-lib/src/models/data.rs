@@ -39,10 +39,9 @@ impl Sprint {
     /// are not missed due to the sprint's configured hour offsets.
     pub fn contains_meeting(&self, meeting: &Meeting) -> bool {
         if let (Some(start), Some(end)) = (self.start, self.end) {
-            let day_start = Utc
-                .from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-            let day_end = Utc
-                .from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+            let day_start =
+                Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+            let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
             meeting.is_between(day_start, day_end)
         } else {
             false
