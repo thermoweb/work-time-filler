@@ -497,8 +497,10 @@ impl Tui {
 
             if let Some(sprint) = sprint {
                 if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                    let day_start = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-                    let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+                    let day_start =
+                        Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+                    let day_end =
+                        Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
                     // Count worklogs in "Created" state for this sprint
                     let worklogs_to_push: Vec<_> = self
                         .data
@@ -564,8 +566,10 @@ impl Tui {
 
         if let Some(sprint) = sprint {
             if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                let day_start = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-                let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+                let day_start =
+                    Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+                let day_end =
+                    Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
                 // Get all Created worklogs in sprint date range
                 let worklogs_to_stage: Vec<_> = self
                     .data
