@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use chrono::TimeZone;
+use chrono::Utc;
 use wtf_lib::models::data::LocalWorklogState;
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;
@@ -495,6 +497,8 @@ impl Tui {
 
             if let Some(sprint) = sprint {
                 if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                    let day_start = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+                    let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
                     // Count worklogs in "Created" state for this sprint
                     let worklogs_to_push: Vec<_> = self
                         .data
@@ -502,8 +506,8 @@ impl Tui {
                         .iter()
                         .filter(|w| {
                             w.status == LocalWorklogState::Created
-                                && w.started >= start
-                                && w.started <= end
+                                && w.started >= day_start
+                                && w.started <= day_end
                         })
                         .collect();
 
@@ -560,6 +564,8 @@ impl Tui {
 
         if let Some(sprint) = sprint {
             if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                let day_start = Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
+                let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
                 // Get all Created worklogs in sprint date range
                 let worklogs_to_stage: Vec<_> = self
                     .data
@@ -567,8 +573,8 @@ impl Tui {
                     .iter()
                     .filter(|w| {
                         w.status == LocalWorklogState::Created
-                            && w.started >= start
-                            && w.started <= end
+                            && w.started >= day_start
+                            && w.started <= day_end
                     })
                     .cloned()
                     .collect();
