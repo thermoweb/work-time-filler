@@ -6,19 +6,19 @@ use ratatui::{
     Frame,
 };
 
-use crate::tui::data::TuiData;
+use crate::tui::data::{DayActivity, TuiData};
 use crate::tui::theme::theme;
 use crate::tui::{GapFillState, WizardPreLaunchPrompt, WizardState, WizardStep};
 
 pub(in crate::tui) fn render_wizard(
     frame: &mut Frame,
     wizard: &WizardState,
-    _data: &TuiData,
+    data: &TuiData,
     gap_fill_state: &Option<GapFillState>,
 ) {
     use WizardStep;
 
-    // Create centered popup area - larger to show all content
+    // Create centered popup area
     let area = frame.area();
     let popup_width = 90.min(area.width.saturating_sub(4));
     let popup_height = 35.min(area.height.saturating_sub(4));
@@ -31,6 +31,25 @@ pub(in crate::tui) fn render_wizard(
 
     // Clear area for opacity
     frame.render_widget(Clear, popup_area);
+
+    // Activity panel overlays the right half of the popup from the steps section down.
+    // Header height = title + subtitle + (blank + quote)? + blank + sprint + blank
+    let header_height: u16 = if wizard.startup_message.is_some() { 7 } else { 5 };
+    let activity_width = popup_width / 2;
+    let activity_count = data
+        .sprint_activities
+        .get(&wizard.sprint_id)
+        .map(|a| a.len())
+        .unwrap_or(0) as u16;
+    // Two-column layout: ceil(days / 2) rows, no border overhead
+    let max_panel_height = popup_height.saturating_sub(1 + header_height + 1);
+    let activity_panel_height = ((activity_count + 1) / 2).min(max_panel_height);
+    let activity_area = Rect {
+        x: popup_area.x + popup_width - activity_width,
+        y: popup_area.y + 1 + header_height,
+        width: activity_width,
+        height: activity_panel_height,
+    };
 
     // Build wizard content
     let mut lines = vec![];
@@ -525,6 +544,20 @@ pub(in crate::tui) fn render_wizard(
 
     frame.render_widget(paragraph, popup_area);
 
+    // Vertical separator between steps and activity panel
+    let sep_lines: Vec<Line> = (0..activity_area.height)
+        .map(|_| Line::from(Span::styled("│", Style::default().fg(theme().border))))
+        .collect();
+    let sep_area = Rect {
+        x: activity_area.x.saturating_sub(1),
+        y: activity_area.y,
+        width: 1,
+        height: activity_area.height,
+    };
+    frame.render_widget(Paragraph::new(sep_lines), sep_area);
+
+    render_activity_panel(frame, activity_area, wizard.sprint_id, data);
+
     // Render progress bar for Pushing step
     if matches!(wizard.current_step, WizardStep::Pushing) && wizard.push_total > 0 {
         let percentage =
@@ -550,6 +583,71 @@ pub(in crate::tui) fn render_wizard(
             .label(progress_label);
 
         frame.render_widget(gauge, gauge_area);
+    }
+}
+
+fn render_activity_panel(frame: &mut Frame, area: Rect, sprint_id: usize, data: &TuiData) {
+    // Paint background to overwrite underlying text
+    frame.render_widget(
+        Block::default().style(Style::default().bg(theme().bg_primary)),
+        area,
+    );
+
+    let activities = data
+        .sprint_activities
+        .get(&sprint_id)
+        .cloned()
+        .unwrap_or_default();
+
+    if activities.is_empty() {
+        return;
+    }
+
+    let midpoint = (activities.len() + 1) / 2;
+    let lines: Vec<Line> = (0..midpoint)
+        .map(|i| {
+            let mut spans = wizard_activity_spans(&activities[i], data.daily_hours_limit);
+            if let Some(right) = activities.get(midpoint + i) {
+                spans.push(Span::styled(" │ ", Style::default().fg(Color::DarkGray)));
+                spans.extend(wizard_activity_spans(right, data.daily_hours_limit));
+            }
+            Line::from(spans)
+        })
+        .collect();
+
+    frame.render_widget(Paragraph::new(lines), area);
+}
+
+fn wizard_activity_spans(activity: &DayActivity, daily_limit: f64) -> Vec<Span<'static>> {
+    let date_str = activity.date.format("%b %d").to_string();
+    if activity.is_absence {
+        vec![
+            Span::styled(date_str, Style::default().fg(Color::Gray)),
+            Span::raw(" "),
+            Span::styled("████████".to_string(), Style::default().fg(Color::DarkGray)),
+        ]
+    } else {
+        let blocks = ((activity.hours / daily_limit * 8.0).round() as usize).min(8);
+        let bar = format!("{}{}", "█".repeat(blocks), "░".repeat(8 - blocks));
+        let color = if activity.hours == 0.0 {
+            Color::DarkGray
+        } else if activity.hours < 3.0 {
+            Color::Gray
+        } else if activity.hours < 6.0 {
+            Color::Yellow
+        } else {
+            Color::Green
+        };
+        vec![
+            Span::styled(date_str, Style::default().fg(Color::Gray)),
+            Span::raw(" "),
+            Span::styled(bar, Style::default().fg(color)),
+            Span::raw(" "),
+            Span::styled(
+                format!("{:.1}h", activity.hours),
+                Style::default().fg(Color::White),
+            ),
+        ]
     }
 }
 
