@@ -282,6 +282,7 @@ pub struct Tui {
     /// Receives resolved (issue_id, title) pairs for Settings color label lookups.
     pub(super) settings_issue_title_receiver: Option<Receiver<(String, Option<String>)>>,
 
+    pub(super) last_fetch_completed_at: Option<std::time::Instant>,
     pub(super) status_clear_time: Option<std::time::Instant>,
     pub(super) needs_full_clear: bool,
     pub(super) should_quit: bool,

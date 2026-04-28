@@ -115,6 +115,7 @@ impl Tui {
             data_refresh_receiver: None,
             update_receiver: Some(update_receiver),
             settings_issue_title_receiver: None,
+            last_fetch_completed_at: None,
             status_clear_time: None,
             needs_full_clear: false,
             should_quit: false,
@@ -249,6 +250,7 @@ impl Tui {
                 }
                 self.refresh_data();
                 self.fetch_receiver = None;
+                self.last_fetch_completed_at = Some(std::time::Instant::now());
                 self.status_clear_time = Some(std::time::Instant::now());
                 self.event_bus
                     .publish(AppEvent::FetchComplete(self.data.clone()));

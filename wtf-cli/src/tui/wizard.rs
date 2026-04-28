@@ -80,6 +80,18 @@ impl Tui {
 
     // Wizard step implementations
     pub(super) fn wizard_step_sync(&mut self) {
+        const FRESHNESS_SECS: u64 = 300;
+        if let Some(last) = self.last_fetch_completed_at {
+            if last.elapsed().as_secs() < FRESHNESS_SECS {
+                let elapsed = last.elapsed().as_secs();
+                logger::log(format!(
+                    "⏭️  Step 1/7: Skipping sync — last update was {}s ago (< {}s)",
+                    elapsed, FRESHNESS_SECS
+                ));
+                self.wizard_step_autolink();
+                return;
+            }
+        }
         logger::log("📡 Step 1/7: Syncing data...".to_string());
         self.handle_update();
         // The update will complete asynchronously
