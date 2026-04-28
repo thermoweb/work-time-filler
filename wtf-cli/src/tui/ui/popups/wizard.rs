@@ -34,7 +34,11 @@ pub(in crate::tui) fn render_wizard(
 
     // Activity panel overlays the right half of the popup from the steps section down.
     // Header height = title + subtitle + (blank + quote)? + blank + sprint + blank
-    let header_height: u16 = if wizard.startup_message.is_some() { 7 } else { 5 };
+    let header_height: u16 = if wizard.startup_message.is_some() {
+        7
+    } else {
+        5
+    };
     let activity_width = popup_width / 2;
     let activity_count = data
         .sprint_activities
