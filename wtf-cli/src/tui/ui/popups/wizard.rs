@@ -630,7 +630,10 @@ fn wizard_activity_spans(activity: &DayActivity, daily_limit: f64) -> Vec<Span<'
             Span::raw(" "),
             Span::styled("████████".to_string(), Style::default().fg(Color::DarkGray)),
             Span::raw(" "),
-            Span::styled(format!("{:>5}", "off"), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{:>5}", "off"),
+                Style::default().fg(Color::DarkGray),
+            ),
         ]
     } else {
         let blocks = ((activity.hours / daily_limit * 8.0).round() as usize).min(8);
