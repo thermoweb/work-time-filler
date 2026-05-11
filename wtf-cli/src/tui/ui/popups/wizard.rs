@@ -20,7 +20,7 @@ pub(in crate::tui) fn render_wizard(
 
     // Create centered popup area
     let area = frame.area();
-    let popup_width = 90.min(area.width.saturating_sub(4));
+    let popup_width = 96.min(area.width.saturating_sub(4));
     let popup_height = 35.min(area.height.saturating_sub(4));
     let popup_area = Rect {
         x: (area.width.saturating_sub(popup_width)) / 2,
@@ -629,6 +629,8 @@ fn wizard_activity_spans(activity: &DayActivity, daily_limit: f64) -> Vec<Span<'
             Span::styled(date_str, Style::default().fg(Color::Gray)),
             Span::raw(" "),
             Span::styled("████████".to_string(), Style::default().fg(Color::DarkGray)),
+            Span::raw(" "),
+            Span::styled(format!("{:>5}", "off"), Style::default().fg(Color::DarkGray)),
         ]
     } else {
         let blocks = ((activity.hours / daily_limit * 8.0).round() as usize).min(8);
@@ -648,7 +650,7 @@ fn wizard_activity_spans(activity: &DayActivity, daily_limit: f64) -> Vec<Span<'
             Span::styled(bar, Style::default().fg(color)),
             Span::raw(" "),
             Span::styled(
-                format!("{:.1}h", activity.hours),
+                format!("{:>4.1}h", activity.hours),
                 Style::default().fg(Color::White),
             ),
         ]
