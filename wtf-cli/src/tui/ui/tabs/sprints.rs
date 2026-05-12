@@ -1,4 +1,4 @@
-use chrono::{Datelike, Local};
+use chrono::Local;
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -302,7 +302,7 @@ fn render_sprint_list_expanded(
             SprintState::Closed => Color::DarkGray,
         };
 
-        let capacity_hours = sprint.workdays as f64 * data.daily_hours_limit;
+        let capacity_hours = calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
         let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
         let percentage = if capacity_hours > 0.0 {
             ((logged_hours / capacity_hours * 100.0).min(100.0).round()) as u16
@@ -428,7 +428,7 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
     let inner = block.inner(*area);
     frame.render_widget(block, *area);
 
-    let capacity_hours = sprint.workdays as f64 * data.daily_hours_limit;
+    let capacity_hours = calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
     let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
     let remaining_hours = (capacity_hours - logged_hours).max(0.0);
     let percentage = if capacity_hours > 0.0 {
@@ -453,22 +453,6 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
             let end_date = end.date_naive();
             let remaining_days = (end_date - today).num_days().max(0);
 
-            // Count remaining weekdays (Mon–Fri) from tomorrow to end_date
-            let remaining_workdays = if today < end_date {
-                let mut count = 0i64;
-                let mut d = today.succ_opt().unwrap_or(today);
-                while d <= end_date {
-                    let wd = d.weekday();
-                    if wd != chrono::Weekday::Sat && wd != chrono::Weekday::Sun {
-                        count += 1;
-                    }
-                    d = d.succ_opt().unwrap_or(d);
-                }
-                count
-            } else {
-                0
-            };
-
             // Count distinct days where work was actually logged (excludes weekends/absences)
             let worked_days = data
                 .sprint_activities
@@ -489,8 +473,9 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
                 0.0
             };
 
-            let need = if remaining_workdays > 0 {
-                remaining_hours / remaining_workdays as f64
+            let total_workdays = calculate_sprint_capacity(sprint.id, data) as i64;
+            let need = if total_workdays > 0 {
+                remaining_hours / total_workdays as f64
             } else {
                 0.0
             };
@@ -540,7 +525,7 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
         Line::from(format!("Duration: {} - {}", start_str, end_str)),
         Line::from(format!(
             "Workdays: {} days ({:.1}h capacity)",
-            sprint.workdays, capacity_hours
+            calculate_sprint_capacity(sprint.id, data), capacity_hours
         )),
         Line::from(""),
         Line::from(vec![
@@ -713,6 +698,13 @@ fn get_activity_color(hours: f64) -> Style {
 // }
 
 // Helper functions
+
+fn calculate_sprint_capacity(sprint_id: usize, data: &TuiData) -> usize {
+    data.sprint_activities
+        .get(&sprint_id)
+        .map(|activities| activities.iter().filter(|a| !a.is_absence).count())
+        .unwrap_or(0)
+}
 
 fn calculate_sprint_logged_hours(sprint_id: usize, data: &TuiData) -> f64 {
     data.sprint_activities

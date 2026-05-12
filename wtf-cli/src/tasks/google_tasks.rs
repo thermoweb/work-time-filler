@@ -1,7 +1,7 @@
 use crate::debug;
 use crate::tasks::google_tasks::GoogleEvent::{Absence, Meeting, Unknown};
 use crate::tasks::Task;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use google_calendar3::api::Event;
 use std::collections::HashMap;
 use std::error::Error;
@@ -134,12 +134,29 @@ impl GoogleEvent {
             .clone()
             .unwrap_or_else(|| "No Title".to_string());
 
-        if title.contains("Absence") || title.contains("Absent") {
-            // Safely extract absence data
+        let title_lower = title.to_lowercase();
+        if title_lower.contains("absence") || title_lower.contains("absent") {
+            let to_start = |edt: &google_calendar3::api::EventDateTime| -> Option<DateTime<Utc>> {
+                edt.date_time.or_else(|| {
+                    edt.date.and_then(|d| {
+                        Utc.from_local_datetime(&d.and_time(NaiveTime::MIN)).single()
+                    })
+                })
+            };
+            let to_end = |edt: &google_calendar3::api::EventDateTime| -> Option<DateTime<Utc>> {
+                edt.date_time.or_else(|| {
+                    edt.date.and_then(|d| {
+                        // Google all-day end date is exclusive (next day), so subtract one day
+                        let day = d.pred_opt().unwrap_or(d);
+                        Utc.from_local_datetime(&day.and_hms_opt(23, 59, 59).unwrap())
+                            .single()
+                    })
+                })
+            };
             return if let (Some(id), Some(start_dt), Some(end_dt)) = (
                 event.id.clone(),
-                event.start.as_ref().and_then(|s| s.date_time),
-                event.end.as_ref().and_then(|s| s.date_time),
+                event.start.as_ref().and_then(to_start),
+                event.end.as_ref().and_then(to_end),
             ) {
                 let absence = AbsenceEntity {
                     id,
