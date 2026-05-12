@@ -709,14 +709,15 @@ fn calculate_sprint_capacity(sprint_id: usize, data: &TuiData) -> usize {
 }
 
 fn calculate_sprint_logged_hours(sprint_id: usize, data: &TuiData) -> f64 {
-    data.sprint_activities
+    let h = data.sprint_activities
         .get(&sprint_id)
         .map(|activities| {
             activities
                 .iter()
-                .filter(|a| !a.is_absence) // Exclude absences from logged hours
+                .filter(|a| !a.is_absence)
                 .map(|a| a.hours)
-                .sum()
+                .sum::<f64>()
         })
-        .unwrap_or(0.0)
+        .unwrap_or(0.0);
+    if h.is_sign_negative() { 0.0 } else { h }
 }

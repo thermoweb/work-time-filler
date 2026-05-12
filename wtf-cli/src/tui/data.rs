@@ -395,7 +395,7 @@ impl TuiData {
                 }
 
                 // Count this local worklog (either not pushed, or push failed)
-                let hours = local_wl.time_spent_seconds as f64 / 3600.0;
+                let hours = (local_wl.time_spent_seconds as f64 / 3600.0).max(0.0);
                 *daily_hours.entry(worklog_date).or_insert(0.0) += hours;
             }
         }
@@ -426,7 +426,7 @@ impl TuiData {
         while current_date <= end_date {
             let weekday = current_date.weekday().num_days_from_monday();
             if weekday < 5 {
-                let hours = daily_hours.get(&current_date).copied().unwrap_or(0.0);
+                let hours = daily_hours.get(&current_date).copied().unwrap_or(0.0).max(0.0);
                 let is_absence = absence_days.contains_key(&current_date);
                 activities.push(DayActivity {
                     date: current_date,
@@ -491,7 +491,7 @@ impl TuiData {
                 }
 
                 // Count this local worklog (either not pushed, or push failed)
-                let hours = local_wl.time_spent_seconds as f64 / 3600.0;
+                let hours = (local_wl.time_spent_seconds as f64 / 3600.0).max(0.0);
                 *daily_hours.entry(worklog_date).or_insert(0.0) += hours;
             }
         }
