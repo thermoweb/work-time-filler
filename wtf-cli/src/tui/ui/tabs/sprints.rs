@@ -302,7 +302,8 @@ fn render_sprint_list_expanded(
             SprintState::Closed => Color::DarkGray,
         };
 
-        let capacity_hours = calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
+        let capacity_hours =
+            calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
         let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
         let percentage = if capacity_hours > 0.0 {
             ((logged_hours / capacity_hours * 100.0).min(100.0).round()) as u16
@@ -525,7 +526,8 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
         Line::from(format!("Duration: {} - {}", start_str, end_str)),
         Line::from(format!(
             "Workdays: {} days ({:.1}h capacity)",
-            calculate_sprint_capacity(sprint.id, data), capacity_hours
+            calculate_sprint_capacity(sprint.id, data),
+            capacity_hours
         )),
         Line::from(""),
         Line::from(vec![

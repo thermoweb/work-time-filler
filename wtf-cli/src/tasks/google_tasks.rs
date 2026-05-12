@@ -139,7 +139,8 @@ impl GoogleEvent {
             let to_start = |edt: &google_calendar3::api::EventDateTime| -> Option<DateTime<Utc>> {
                 edt.date_time.or_else(|| {
                     edt.date.and_then(|d| {
-                        Utc.from_local_datetime(&d.and_time(NaiveTime::MIN)).single()
+                        Utc.from_local_datetime(&d.and_time(NaiveTime::MIN))
+                            .single()
                     })
                 })
             };
