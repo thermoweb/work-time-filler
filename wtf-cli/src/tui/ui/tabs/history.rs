@@ -179,10 +179,7 @@ impl TabController for HistoryTab {
                 Some(HistoryRow::Day(_, _)) => {}
                 Some(HistoryRow::JiraOnly(sprint_i)) => {
                     if let Some(vid) = jira_only_sprint_ids.get(*sprint_i) {
-                        tui.data
-                            .ui_state
-                            .expanded_history_ids
-                            .insert(vid.clone());
+                        tui.data.ui_state.expanded_history_ids.insert(vid.clone());
                     }
                 }
                 None => {}
@@ -190,12 +187,7 @@ impl TabController for HistoryTab {
             KeyCode::Enter => match &selected_row {
                 Some(HistoryRow::Batch(batch_idx)) => {
                     if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
-                        if tui
-                            .data
-                            .ui_state
-                            .expanded_history_ids
-                            .contains(&history.id)
-                        {
+                        if tui.data.ui_state.expanded_history_ids.contains(&history.id) {
                             tui.data.ui_state.expanded_history_ids.remove(&history.id);
                             let new_rows = build_flat_rows(
                                 &tui.data,
@@ -219,10 +211,7 @@ impl TabController for HistoryTab {
                         if tui.data.ui_state.expanded_history_ids.contains(vid) {
                             tui.data.ui_state.expanded_history_ids.remove(vid);
                         } else {
-                            tui.data
-                                .ui_state
-                                .expanded_history_ids
-                                .insert(vid.clone());
+                            tui.data.ui_state.expanded_history_ids.insert(vid.clone());
                         }
                     }
                 }

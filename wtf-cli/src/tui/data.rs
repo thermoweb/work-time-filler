@@ -424,7 +424,11 @@ impl TuiData {
         let mut current_date = start_date;
 
         while current_date <= end_date {
-            let hours = daily_hours.get(&current_date).copied().unwrap_or(0.0).max(0.0);
+            let hours = daily_hours
+                .get(&current_date)
+                .copied()
+                .unwrap_or(0.0)
+                .max(0.0);
             let is_absence = absence_days.contains_key(&current_date);
             activities.push(DayActivity {
                 date: current_date,
