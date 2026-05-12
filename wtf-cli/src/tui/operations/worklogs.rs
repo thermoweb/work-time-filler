@@ -13,6 +13,11 @@ use super::super::{
 
 impl Tui {
     pub(in crate::tui) fn handle_push_worklogs(&mut self) {
+        if self.push_receiver.is_some() {
+            logger::log("⏳ Push already in progress — please wait".to_string());
+            return;
+        }
+
         // Get all staged worklogs directly from DB (not from self.data which might be stale)
         let staged_worklogs = LocalWorklogService::production()
             .get_all_local_worklogs()

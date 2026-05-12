@@ -419,25 +419,18 @@ impl TuiData {
             }
         }
 
-        // Generate weekday-only range from start to end, filling gaps with 0 hours
+        // Generate full range from start to end (weekends included, rendered distinctly)
         let mut activities = Vec::new();
         let mut current_date = start_date;
 
         while current_date <= end_date {
-            let weekday = current_date.weekday().num_days_from_monday();
-            if weekday < 5 {
-                let hours = daily_hours
-                    .get(&current_date)
-                    .copied()
-                    .unwrap_or(0.0)
-                    .max(0.0);
-                let is_absence = absence_days.contains_key(&current_date);
-                activities.push(DayActivity {
-                    date: current_date,
-                    hours,
-                    is_absence,
-                });
-            }
+            let hours = daily_hours.get(&current_date).copied().unwrap_or(0.0).max(0.0);
+            let is_absence = absence_days.contains_key(&current_date);
+            activities.push(DayActivity {
+                date: current_date,
+                hours,
+                is_absence,
+            });
             current_date = current_date.succ_opt().unwrap_or(current_date);
         }
 

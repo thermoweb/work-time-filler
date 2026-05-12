@@ -461,7 +461,13 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
                 .map(|activities| {
                     activities
                         .iter()
-                        .filter(|a| !a.is_absence && a.hours > 0.0 && a.date <= today)
+                        .filter(|a| {
+                            use chrono::Datelike;
+                            !a.is_absence
+                                && a.date.weekday().num_days_from_monday() < 5
+                                && a.hours > 0.0
+                                && a.date <= today
+                        })
                         .map(|a| a.date)
                         .collect::<std::collections::HashSet<_>>()
                         .len()
@@ -658,14 +664,24 @@ fn render_sprint_activity_compact(frame: &mut Frame, area: &Rect, sprint: &Sprin
 }
 
 fn build_activity_line<'a>(activity: &DayActivity, daily_limit: f64) -> Line<'a> {
-    let date_str = activity.date.format("%b %d").to_string();
+    use chrono::Datelike;
+    let date_str = activity.date.format("%a %d").to_string();
+    let is_weekend = activity.date.weekday().num_days_from_monday() >= 5;
 
-    if activity.is_absence {
-        let bar = create_activity_bar(daily_limit, daily_limit); // 100% fill
+    if is_weekend {
+        Line::from(vec![
+            Span::styled(date_str, Style::default().fg(Color::DarkGray)),
+            Span::raw(" "),
+            Span::styled("░░░░░░░░".to_string(), Style::default().fg(Color::DarkGray)),
+        ])
+    } else if activity.is_absence {
+        let bar = create_activity_bar(daily_limit, daily_limit);
         Line::from(vec![
             Span::styled(date_str, Style::default().fg(Color::Gray)),
             Span::raw(" "),
             Span::styled(bar, Style::default().fg(Color::DarkGray)),
+            Span::raw(" "),
+            Span::styled(format!("{:>4}", "off"), Style::default().fg(Color::DarkGray)),
         ])
     } else {
         let bar = create_activity_bar(activity.hours, daily_limit);
@@ -675,7 +691,7 @@ fn build_activity_line<'a>(activity: &DayActivity, daily_limit: f64) -> Line<'a>
             Span::styled(bar, get_activity_color(activity.hours)),
             Span::raw(" "),
             Span::styled(
-                format!("{:.1}h", activity.hours),
+                format!("{:>4.1}h", activity.hours),
                 Style::default().fg(Color::White),
             ),
         ])
@@ -702,20 +718,30 @@ fn get_activity_color(hours: f64) -> Style {
 // Helper functions
 
 fn calculate_sprint_capacity(sprint_id: usize, data: &TuiData) -> usize {
+    use chrono::Datelike;
     data.sprint_activities
-        .get(&sprint_id)
-        .map(|activities| activities.iter().filter(|a| !a.is_absence).count())
-        .unwrap_or(0)
-}
-
-fn calculate_sprint_logged_hours(sprint_id: usize, data: &TuiData) -> f64 {
-    let h = data
-        .sprint_activities
         .get(&sprint_id)
         .map(|activities| {
             activities
                 .iter()
-                .filter(|a| !a.is_absence)
+                .filter(|a| {
+                    !a.is_absence && a.date.weekday().num_days_from_monday() < 5
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+fn calculate_sprint_logged_hours(sprint_id: usize, data: &TuiData) -> f64 {
+    use chrono::Datelike;
+    let h = data.sprint_activities
+        .get(&sprint_id)
+        .map(|activities| {
+            activities
+                .iter()
+                .filter(|a| {
+                    !a.is_absence && a.date.weekday().num_days_from_monday() < 5
+                })
                 .map(|a| a.hours)
                 .sum::<f64>()
         })

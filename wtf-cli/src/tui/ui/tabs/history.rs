@@ -23,6 +23,13 @@ pub(in crate::tui) struct HistoryTab;
 /// Prefix for virtual entry IDs per sprint: "__jira_only__{sprint_id}"
 pub(in crate::tui) const JIRA_ONLY_VIRTUAL_PREFIX: &str = "__jira_only__";
 
+#[derive(Debug, Clone, PartialEq)]
+enum HistoryRow {
+    Batch(usize),
+    Day(usize, chrono::NaiveDate),
+    JiraOnly(usize),
+}
+
 impl TabController for HistoryTab {
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_history_tab(frame, area, data);
@@ -67,7 +74,7 @@ impl TabController for HistoryTab {
                                     / 3600.0;
 
                             if let Ok(user_hours) = state.user_input.parse::<f64>() {
-                                if (user_hours - total_hours).abs() < 0.05 {
+                                if format!("{:.1}", user_hours) == format!("{:.1}", total_hours) {
                                     revert_history_id = Some(state.history_id.clone());
                                 } else {
                                     logger::log(format!(
@@ -91,11 +98,7 @@ impl TabController for HistoryTab {
             return;
         }
 
-        let (jira_only_count, virtual_ids, sprint_worklogs_for_import): (
-            usize,
-            Vec<String>,
-            Vec<Vec<wtf_lib::models::data::Worklog>>,
-        ) = {
+        let (jira_only_count, jira_only_sprint_ids, jira_only_sprint_worklogs) = {
             let entries = jira_only_by_sprint(&tui.data);
             let count = entries.len();
             let ids: Vec<String> = entries
@@ -104,22 +107,21 @@ impl TabController for HistoryTab {
                 .collect();
             let worklogs: Vec<Vec<wtf_lib::models::data::Worklog>> = entries
                 .iter()
-                .map(|(_, sprint_worklogs)| {
-                    sprint_worklogs
-                        .iter()
-                        .map(|worklog| (*worklog).clone())
-                        .collect()
-                })
+                .map(|(_, wls)| wls.iter().map(|wl| (*wl).clone()).collect())
                 .collect();
             (count, ids, worklogs)
         };
-        let has_jira_only = jira_only_count > 0;
 
-        let max_index = if tui.data.worklog_history.is_empty() && !has_jira_only {
-            0
-        } else {
-            tui.data.worklog_history.len() + jira_only_count - 1
-        };
+        if tui.data.worklog_history.is_empty() && jira_only_count == 0 {
+            return;
+        }
+
+        let flat_rows = build_flat_rows(
+            &tui.data,
+            &tui.data.ui_state.expanded_history_ids,
+            jira_only_count,
+        );
+        let max_index = flat_rows.len().saturating_sub(1);
 
         if helpers::handle_list_navigation(
             key,
@@ -129,77 +131,106 @@ impl TabController for HistoryTab {
             return;
         }
 
-        let virtual_entry_idx = tui.data.worklog_history.len();
-        let on_virtual_entry =
-            has_jira_only && tui.data.ui_state.selected_history_index >= virtual_entry_idx;
-        let virtual_sprint_i = tui
-            .data
-            .ui_state
-            .selected_history_index
-            .saturating_sub(virtual_entry_idx);
-        let virtual_id = virtual_ids.get(virtual_sprint_i).cloned();
+        let selected_row = flat_rows
+            .get(tui.data.ui_state.selected_history_index)
+            .cloned();
 
         match key.code {
-            KeyCode::Left | KeyCode::Char('h') => {
-                if on_virtual_entry {
-                    if let Some(virtual_id) = &virtual_id {
-                        tui.data.ui_state.expanded_history_ids.remove(virtual_id);
-                    }
-                } else if let Some(history) = tui
-                    .data
-                    .worklog_history
-                    .get(tui.data.ui_state.selected_history_index)
-                {
-                    tui.data.ui_state.expanded_history_ids.remove(&history.id);
-                }
-            }
-            KeyCode::Right | KeyCode::Char('l') => {
-                if on_virtual_entry {
-                    if let Some(virtual_id) = virtual_id {
-                        tui.data.ui_state.expanded_history_ids.insert(virtual_id);
-                    }
-                } else if let Some(history) = tui
-                    .data
-                    .worklog_history
-                    .get(tui.data.ui_state.selected_history_index)
-                {
-                    tui.data
-                        .ui_state
-                        .expanded_history_ids
-                        .insert(history.id.clone());
-                }
-            }
-            KeyCode::Enter => {
-                if on_virtual_entry {
-                    if let Some(virtual_id) = virtual_id {
-                        if tui.data.ui_state.expanded_history_ids.contains(&virtual_id) {
-                            tui.data.ui_state.expanded_history_ids.remove(&virtual_id);
-                        } else {
-                            tui.data.ui_state.expanded_history_ids.insert(virtual_id);
-                        }
-                    }
-                } else if let Some(history) = tui
-                    .data
-                    .worklog_history
-                    .get(tui.data.ui_state.selected_history_index)
-                {
-                    if tui.data.ui_state.expanded_history_ids.contains(&history.id) {
+            KeyCode::Left | KeyCode::Char('h') => match &selected_row {
+                Some(HistoryRow::Batch(batch_idx)) => {
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
                         tui.data.ui_state.expanded_history_ids.remove(&history.id);
-                    } else {
+                    }
+                }
+                Some(HistoryRow::Day(batch_idx, _)) => {
+                    // Collapse parent and jump to its header
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
+                        tui.data.ui_state.expanded_history_ids.remove(&history.id);
+                    }
+                    let batch_idx = *batch_idx;
+                    let new_rows = build_flat_rows(
+                        &tui.data,
+                        &tui.data.ui_state.expanded_history_ids,
+                        jira_only_count,
+                    );
+                    if let Some(pos) = new_rows
+                        .iter()
+                        .position(|r| matches!(r, HistoryRow::Batch(i) if *i == batch_idx))
+                    {
+                        tui.data.ui_state.selected_history_index = pos;
+                    }
+                }
+                Some(HistoryRow::JiraOnly(sprint_i)) => {
+                    if let Some(vid) = jira_only_sprint_ids.get(*sprint_i) {
+                        tui.data.ui_state.expanded_history_ids.remove(vid);
+                    }
+                }
+                None => {}
+            },
+            KeyCode::Right | KeyCode::Char('l') => match &selected_row {
+                Some(HistoryRow::Batch(batch_idx)) => {
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
                         tui.data
                             .ui_state
                             .expanded_history_ids
                             .insert(history.id.clone());
                     }
                 }
-            }
+                Some(HistoryRow::Day(_, _)) => {}
+                Some(HistoryRow::JiraOnly(sprint_i)) => {
+                    if let Some(vid) = jira_only_sprint_ids.get(*sprint_i) {
+                        tui.data
+                            .ui_state
+                            .expanded_history_ids
+                            .insert(vid.clone());
+                    }
+                }
+                None => {}
+            },
+            KeyCode::Enter => match &selected_row {
+                Some(HistoryRow::Batch(batch_idx)) => {
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
+                        if tui
+                            .data
+                            .ui_state
+                            .expanded_history_ids
+                            .contains(&history.id)
+                        {
+                            tui.data.ui_state.expanded_history_ids.remove(&history.id);
+                            let new_rows = build_flat_rows(
+                                &tui.data,
+                                &tui.data.ui_state.expanded_history_ids,
+                                jira_only_count,
+                            );
+                            let new_max = new_rows.len().saturating_sub(1);
+                            tui.data.ui_state.selected_history_index =
+                                tui.data.ui_state.selected_history_index.min(new_max);
+                        } else {
+                            tui.data
+                                .ui_state
+                                .expanded_history_ids
+                                .insert(history.id.clone());
+                        }
+                    }
+                }
+                Some(HistoryRow::Day(_, _)) => {}
+                Some(HistoryRow::JiraOnly(sprint_i)) => {
+                    if let Some(vid) = jira_only_sprint_ids.get(*sprint_i) {
+                        if tui.data.ui_state.expanded_history_ids.contains(vid) {
+                            tui.data.ui_state.expanded_history_ids.remove(vid);
+                        } else {
+                            tui.data
+                                .ui_state
+                                .expanded_history_ids
+                                .insert(vid.clone());
+                        }
+                    }
+                }
+                None => {}
+            },
             KeyCode::Delete => {
-                if !on_virtual_entry {
-                    if let Some(history) = tui
-                        .data
-                        .worklog_history
-                        .get(tui.data.ui_state.selected_history_index)
-                    {
+                if let Some(HistoryRow::Batch(batch_idx)) = &selected_row {
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
                         tui.revert_confirmation_state = Some(RevertConfirmationState {
                             history_id: history.id.clone(),
                             user_input: String::new(),
@@ -209,12 +240,8 @@ impl TabController for HistoryTab {
                 }
             }
             KeyCode::Char('D') => {
-                if !on_virtual_entry {
-                    if let Some(history) = tui
-                        .data
-                        .worklog_history
-                        .get(tui.data.ui_state.selected_history_index)
-                    {
+                if let Some(HistoryRow::Batch(batch_idx)) = &selected_row {
+                    if let Some(history) = tui.data.worklog_history.get(*batch_idx) {
                         match LocalWorklogService::production().delete_history_from_db(&history.id)
                         {
                             Ok(()) => {
@@ -232,12 +259,14 @@ impl TabController for HistoryTab {
                 }
             }
             KeyCode::Char('c') | KeyCode::Char('C') => {
-                if on_virtual_entry {
-                    if let Some(sprint_worklogs) =
-                        sprint_worklogs_for_import.into_iter().nth(virtual_sprint_i)
-                    {
+                let jira_only_sprint_i = match &selected_row {
+                    Some(HistoryRow::JiraOnly(i)) => Some(*i),
+                    _ => None,
+                };
+                if let Some(sprint_i) = jira_only_sprint_i {
+                    if let Some(owned_wls) = jira_only_sprint_worklogs.into_iter().nth(sprint_i) {
                         let count = LocalWorklogService::production()
-                            .create_history_for_jira_only_worklogs(&sprint_worklogs);
+                            .create_history_for_jira_only_worklogs(&owned_wls);
                         if count > 0 {
                             logger::log(format!(
                                 "☁ Imported {} Jira worklog(s) into a new history entry",
@@ -314,6 +343,37 @@ pub(in crate::tui) fn jira_only_by_sprint<'a>(
     result
 }
 
+/// Builds the flat navigable row list from the current history + expansion state.
+/// Batch headers always precede their day rows; JiraOnly entries come last.
+fn build_flat_rows(
+    data: &TuiData,
+    expanded_ids: &std::collections::HashSet<String>,
+    jira_only_count: usize,
+) -> Vec<HistoryRow> {
+    let mut rows: Vec<HistoryRow> = Vec::new();
+
+    for (batch_idx, history_entry) in data.worklog_history.iter().enumerate() {
+        rows.push(HistoryRow::Batch(batch_idx));
+        if expanded_ids.contains(&history_entry.id) {
+            let days: std::collections::BTreeSet<chrono::NaiveDate> = history_entry
+                .local_worklogs_id
+                .iter()
+                .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
+                .map(|w| w.started.date_naive())
+                .collect();
+            for date in days {
+                rows.push(HistoryRow::Day(batch_idx, date));
+            }
+        }
+    }
+
+    for i in 0..jira_only_count {
+        rows.push(HistoryRow::JiraOnly(i));
+    }
+
+    rows
+}
+
 pub(in crate::tui) fn render_history_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let selected_index = data.ui_state.selected_history_index;
     let expanded_history_ids = &data.ui_state.expanded_history_ids;
@@ -334,6 +394,7 @@ fn render_history_list(
     expanded_history_ids: &std::collections::HashSet<String>,
 ) {
     use chrono::{Datelike, Timelike};
+    use std::collections::HashMap;
 
     let history = &data.worklog_history;
     let sprint_entries = jira_only_by_sprint(data);
@@ -374,188 +435,255 @@ fn render_history_list(
         return;
     }
 
-    // Build tree lines
-    let mut lines = Vec::new();
+    let flat_rows = build_flat_rows(data, expanded_history_ids, sprint_entries.len());
 
-    for (idx, history_entry) in history.iter().enumerate() {
-        let is_selected = idx == selected_index;
-        let is_expanded = expanded_history_ids.contains(&history_entry.id);
+    // Cache: batch_idx -> (worklogs, day_secs_totals, day_counts, max_day_secs)
+    type BatchCache = HashMap<
+        usize,
+        (
+            Vec<wtf_lib::models::data::LocalWorklog>,
+            HashMap<chrono::NaiveDate, i64>,
+            HashMap<chrono::NaiveDate, usize>,
+            i64,
+        ),
+    >;
+    let mut batch_cache: BatchCache = HashMap::new();
 
-        // Get worklogs for this history entry
-        let worklogs: Vec<_> = history_entry
-            .local_worklogs_id
-            .iter()
-            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
-            .collect();
+    let mut lines: Vec<Line> = Vec::new();
+    let mut selected_line_idx: usize = 0;
 
-        let total_time = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();
-        let total_hours = total_time as f64 / 3600.0;
-
-        // Color based on size
-        let count_color = if worklogs.len() > 100 {
-            Color::Red
-        } else if worklogs.len() > 50 {
-            Color::Yellow
-        } else if worklogs.len() > 10 {
-            Color::White
-        } else {
-            Color::Gray
-        };
-
-        let expand_icon = if is_expanded { "🔽" } else { "🔸" };
+    for (flat_idx, row) in flat_rows.iter().enumerate() {
+        let is_selected = flat_idx == selected_index;
+        if is_selected {
+            selected_line_idx = lines.len();
+        }
         let selection_icon = if is_selected {
             theme().selector
         } else {
             theme().unselected_selector
         };
 
-        let date_str = format!(
-            "{:04}-{:02}-{:02} {:02}:{:02}",
-            history_entry.date.year(),
-            history_entry.date.month(),
-            history_entry.date.day(),
-            history_entry.date.hour(),
-            history_entry.date.minute()
-        );
+        match row {
+            HistoryRow::Batch(batch_idx) => {
+                let history_entry = &history[*batch_idx];
+                let is_expanded = expanded_history_ids.contains(&history_entry.id);
 
-        // Parent line
-        lines.push(Line::from(vec![
-            Span::raw(selection_icon),
-            Span::raw(expand_icon),
-            Span::raw(" "),
-            Span::styled(
-                format!("[{}]", &history_entry.id[..8]),
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::raw(" "),
-            Span::styled(date_str, Style::default().fg(Color::White)),
-            Span::raw(" • "),
-            Span::styled(
-                format!("{} WL", worklogs.len()),
-                Style::default().fg(count_color),
-            ),
-            Span::raw(" • "),
-            Span::styled(
-                format!("{:.1}h", total_hours),
-                Style::default().fg(Color::Cyan),
-            ),
-        ]));
+                let (worklogs, _, _, _) = batch_cache.entry(*batch_idx).or_insert_with(|| {
+                    let wls: Vec<_> = history_entry
+                        .local_worklogs_id
+                        .iter()
+                        .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
+                        .collect();
+                    let mut day_secs: HashMap<chrono::NaiveDate, i64> = HashMap::new();
+                    let mut day_counts: HashMap<chrono::NaiveDate, usize> = HashMap::new();
+                    for w in &wls {
+                        let d = w.started.date_naive();
+                        *day_secs.entry(d).or_insert(0) += w.time_spent_seconds;
+                        *day_counts.entry(d).or_insert(0) += 1;
+                    }
+                    let max = day_secs.values().copied().max().unwrap_or(1).max(1);
+                    (wls, day_secs, day_counts, max)
+                });
 
-        // If expanded, show child worklogs (top 5)
-        if is_expanded {
-            let mut sorted_worklogs = worklogs.clone();
-            sorted_worklogs.sort_by(|a, b| b.time_spent_seconds.cmp(&a.time_spent_seconds));
+                let total_secs = worklogs.iter().map(|w| w.time_spent_seconds).sum::<i64>();
+                let total_hours = total_secs as f64 / 3600.0;
+                let count_color = if worklogs.len() > 100 {
+                    Color::Red
+                } else if worklogs.len() > 50 {
+                    Color::Yellow
+                } else if worklogs.len() > 10 {
+                    Color::White
+                } else {
+                    Color::Gray
+                };
 
-            let visible_count = 5.min(sorted_worklogs.len());
-            let total_count = sorted_worklogs.len();
-
-            for (i, worklog) in sorted_worklogs.into_iter().take(visible_count).enumerate() {
-                let is_last = i == visible_count - 1 && total_count <= 5;
-                let tree_char = if is_last { "└─" } else { "├─" };
-                let hours = worklog.time_spent_seconds as f64 / 3600.0;
+                let expand_icon = if is_expanded { "🔽" } else { "🔸" };
+                let date_str = format!(
+                    "{:04}-{:02}-{:02} {:02}:{:02}",
+                    history_entry.date.year(),
+                    history_entry.date.month(),
+                    history_entry.date.day(),
+                    history_entry.date.hour(),
+                    history_entry.date.minute()
+                );
 
                 lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled(tree_char, Style::default().fg(Color::DarkGray)),
+                    Span::raw(selection_icon),
+                    Span::raw(expand_icon),
                     Span::raw(" "),
-                    Span::styled(worklog.issue_id, Style::default().fg(Color::Cyan)),
+                    Span::styled(
+                        format!("[{}]", &history_entry.id[..8]),
+                        Style::default().fg(Color::Yellow),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(date_str, Style::default().fg(Color::White)),
                     Span::raw(" • "),
-                    Span::styled(format!("{:.1}h", hours), Style::default().fg(Color::Gray)),
+                    Span::styled(
+                        format!("{} WL", worklogs.len()),
+                        Style::default().fg(count_color),
+                    ),
+                    Span::raw(" • "),
+                    Span::styled(
+                        format!("{:.1}h", total_hours),
+                        Style::default().fg(Color::Cyan),
+                    ),
                 ]));
             }
 
-            if total_count > visible_count {
+            HistoryRow::Day(batch_idx, date) => {
+                let history_entry = &history[*batch_idx];
+                let (_, day_secs_map, day_counts_map, max_day_secs) =
+                    batch_cache.entry(*batch_idx).or_insert_with(|| {
+                        let wls: Vec<_> = history_entry
+                            .local_worklogs_id
+                            .iter()
+                            .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
+                            .collect();
+                        let mut day_secs: HashMap<chrono::NaiveDate, i64> = HashMap::new();
+                        let mut day_counts: HashMap<chrono::NaiveDate, usize> = HashMap::new();
+                        for w in &wls {
+                            let d = w.started.date_naive();
+                            *day_secs.entry(d).or_insert(0) += w.time_spent_seconds;
+                            *day_counts.entry(d).or_insert(0) += 1;
+                        }
+                        let max = day_secs.values().copied().max().unwrap_or(1).max(1);
+                        (wls, day_secs, day_counts, max)
+                    });
+
+                let day_secs = day_secs_map.get(date).copied().unwrap_or(0);
+                let day_count = day_counts_map.get(date).copied().unwrap_or(0);
+                let day_hours = day_secs as f64 / 3600.0;
+
+                const BAR_WIDTH: usize = 8;
+                let filled =
+                    ((day_secs as f64 / *max_day_secs as f64) * BAR_WIDTH as f64).round() as usize;
+                let filled = filled.min(BAR_WIDTH);
+                let bar = format!("{}{}", "█".repeat(filled), "░".repeat(BAR_WIDTH - filled));
+
+                let is_last_day = !matches!(
+                    flat_rows.get(flat_idx + 1),
+                    Some(HistoryRow::Day(bi, _)) if *bi == *batch_idx
+                );
+                let tree_char = if is_last_day { "└─" } else { "├─" };
+
                 lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled("└─", Style::default().fg(Color::DarkGray)),
+                    Span::raw(selection_icon),
+                    Span::raw("   "),
+                    Span::styled(tree_char, Style::default().fg(Color::DarkGray)),
                     Span::raw(" "),
                     Span::styled(
-                        format!("... ({} more)", total_count - visible_count),
+                        date.format("%a %d-%b").to_string(),
+                        Style::default().fg(if is_selected {
+                            Color::LightCyan
+                        } else {
+                            Color::White
+                        }),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(bar, Style::default().fg(Color::Green)),
+                    Span::raw("  "),
+                    Span::styled(
+                        format!("{:.1}h", day_hours),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                    Span::raw("  "),
+                    Span::styled(
+                        format!("({} WL)", day_count),
                         Style::default().fg(Color::DarkGray),
                     ),
                 ]));
+            }
+
+            HistoryRow::JiraOnly(sprint_i) => {
+                let Some((sprint, sprint_wls)) = sprint_entries.get(*sprint_i) else {
+                    continue;
+                };
+                let virtual_id = format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, sprint.id);
+                let is_expanded = expanded_history_ids.contains(&virtual_id);
+                let total_seconds: u64 = sprint_wls.iter().map(|w| w.time_spent_seconds).sum();
+                let total_hours = total_seconds as f64 / 3600.0;
+                let expand_icon = if is_expanded { "🔽" } else { "🔸" };
+
+                lines.push(Line::from(vec![
+                    Span::raw(selection_icon),
+                    Span::raw(expand_icon),
+                    Span::raw(" "),
+                    Span::styled(
+                        "☁",
+                        Style::default()
+                            .fg(Color::Blue)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        truncate_string(&sprint.name, 30),
+                        Style::default().fg(Color::Blue),
+                    ),
+                    Span::raw(" • "),
+                    Span::styled(
+                        format!("{} WL", sprint_wls.len()),
+                        Style::default().fg(Color::White),
+                    ),
+                    Span::raw(" • "),
+                    Span::styled(
+                        format!("{:.1}h", total_hours),
+                        Style::default().fg(Color::Cyan),
+                    ),
+                    Span::raw("  "),
+                    Span::styled("[C] import", Style::default().fg(Color::DarkGray)),
+                ]));
+
+                if is_expanded {
+                    let visible_count = 5.min(sprint_wls.len());
+                    let total_count = sprint_wls.len();
+                    for (j, wl) in sprint_wls.iter().take(visible_count).enumerate() {
+                        let is_last = j == visible_count - 1 && total_count <= 5;
+                        let tree_char = if is_last { "└─" } else { "├─" };
+                        let hours = wl.time_spent_seconds as f64 / 3600.0;
+                        lines.push(Line::from(vec![
+                            Span::raw("     "),
+                            Span::styled(tree_char, Style::default().fg(Color::DarkGray)),
+                            Span::raw(" "),
+                            Span::styled(wl.issue_id.clone(), Style::default().fg(Color::Cyan)),
+                            Span::raw(" • "),
+                            Span::styled(
+                                format!("{:.1}h", hours),
+                                Style::default().fg(Color::DarkGray),
+                            ),
+                        ]));
+                    }
+                    if total_count > visible_count {
+                        lines.push(Line::from(vec![
+                            Span::raw("     "),
+                            Span::styled("└─", Style::default().fg(Color::DarkGray)),
+                            Span::raw(" "),
+                            Span::styled(
+                                format!("... ({} more)", total_count - visible_count),
+                                Style::default().fg(Color::DarkGray),
+                            ),
+                        ]));
+                    }
+                }
             }
         }
     }
 
-    // Virtual "Untracked Jira Worklogs" entries — one per sprint
-    for (i, (sprint, sprint_wls)) in sprint_entries.iter().enumerate() {
-        let virtual_idx = history.len() + i;
-        let is_selected = virtual_idx == selected_index;
-        let virtual_id = format!("{}{}", JIRA_ONLY_VIRTUAL_PREFIX, sprint.id);
-        let is_expanded = expanded_history_ids.contains(&virtual_id);
-        let total_seconds: u64 = sprint_wls.iter().map(|w| w.time_spent_seconds).sum();
-        let total_hours = total_seconds as f64 / 3600.0;
-        let expand_icon = if is_expanded { "🔽" } else { "🔸" };
-        let selection_icon = if is_selected {
-            theme().selector
-        } else {
-            theme().unselected_selector
-        };
+    let visible_height = inner.height as usize;
+    let total_lines = lines.len();
+    let scroll_offset = if total_lines <= visible_height {
+        0
+    } else if selected_line_idx >= total_lines.saturating_sub(visible_height / 2) {
+        total_lines.saturating_sub(visible_height)
+    } else {
+        selected_line_idx.saturating_sub(visible_height / 2)
+    };
 
-        lines.push(Line::from(vec![
-            Span::raw(selection_icon),
-            Span::raw(expand_icon),
-            Span::raw(" "),
-            Span::styled(
-                "☁",
-                Style::default()
-                    .fg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                truncate_string(&sprint.name, 30),
-                Style::default().fg(Color::Blue),
-            ),
-            Span::raw(" • "),
-            Span::styled(
-                format!("{} WL", sprint_wls.len()),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw(" • "),
-            Span::styled(
-                format!("{:.1}h", total_hours),
-                Style::default().fg(Color::Cyan),
-            ),
-            Span::raw("  "),
-            Span::styled("[C] import", Style::default().fg(Color::DarkGray)),
-        ]));
-
-        if is_expanded {
-            let visible_count = 5.min(sprint_wls.len());
-            let total_count = sprint_wls.len();
-            for (j, wl) in sprint_wls.iter().take(visible_count).enumerate() {
-                let is_last = j == visible_count - 1 && total_count <= 5;
-                let tree_char = if is_last { "└─" } else { "├─" };
-                let hours = wl.time_spent_seconds as f64 / 3600.0;
-                lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled(tree_char, Style::default().fg(Color::DarkGray)),
-                    Span::raw(" "),
-                    Span::styled(wl.issue_id.clone(), Style::default().fg(Color::Cyan)),
-                    Span::raw(" • "),
-                    Span::styled(
-                        format!("{:.1}h", hours),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
-            }
-            if total_count > visible_count {
-                lines.push(Line::from(vec![
-                    Span::raw("     "),
-                    Span::styled("└─", Style::default().fg(Color::DarkGray)),
-                    Span::raw(" "),
-                    Span::styled(
-                        format!("... ({} more)", total_count - visible_count),
-                        Style::default().fg(Color::DarkGray),
-                    ),
-                ]));
-            }
-        }
-    }
-
-    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
+    let visible: Vec<Line> = lines
+        .into_iter()
+        .skip(scroll_offset)
+        .take(visible_height)
+        .collect();
+    let paragraph = Paragraph::new(visible).alignment(Alignment::Left);
     frame.render_widget(paragraph, inner);
 }
 
@@ -564,57 +692,69 @@ fn render_history_details(
     area: &Rect,
     data: &TuiData,
     selected_index: usize,
-    _expanded_history_ids: &std::collections::HashSet<String>,
+    expanded_history_ids: &std::collections::HashSet<String>,
 ) {
-    let history = &data.worklog_history;
+    let sprint_entries = jira_only_by_sprint(data);
+    let flat_rows = build_flat_rows(data, expanded_history_ids, sprint_entries.len());
 
-    // Virtual sprint entries start at index history.len()
-    if selected_index >= history.len() {
-        let sprint_entries = jira_only_by_sprint(data);
-        let virtual_i = selected_index - history.len();
-        if let Some((sprint, sprint_wls)) = sprint_entries.into_iter().nth(virtual_i) {
-            render_jira_only_details(frame, area, sprint, &sprint_wls, data);
+    match flat_rows.get(selected_index) {
+        Some(HistoryRow::JiraOnly(sprint_i)) => {
+            if let Some((sprint, sprint_wls)) = sprint_entries.into_iter().nth(*sprint_i) {
+                render_jira_only_details(frame, area, sprint, &sprint_wls, data);
+            }
+            return;
         }
-        return;
+        Some(HistoryRow::Day(batch_idx, date)) => {
+            if let Some(history_entry) = data.worklog_history.get(*batch_idx) {
+                let worklogs: Vec<_> = history_entry
+                    .local_worklogs_id
+                    .iter()
+                    .filter_map(|wid| LocalWorklogService::production().get_worklog(wid))
+                    .collect();
+                let day_wls: Vec<_> = worklogs
+                    .into_iter()
+                    .filter(|w| w.started.date_naive() == *date)
+                    .collect();
+                render_day_details(frame, area, *date, &day_wls);
+            }
+            return;
+        }
+        _ => {}
     }
 
-    if history.is_empty() {
+    // Batch header selected (or empty)
+    if data.worklog_history.is_empty() {
         let block = Block::default()
-            .title("!! Revert Preview")
+            .title("⚠  Revert Preview")
             .borders(Borders::ALL)
             .style(Style::default().fg(Color::Red).bg(theme().bg_primary));
-
         let inner = block.inner(*area);
         frame.render_widget(block, *area);
-
-        let content = vec![
+        let paragraph = Paragraph::new(vec![
             Line::from(""),
             Line::from(Span::styled(
                 "No history selected",
                 Style::default().fg(Color::Gray),
             )),
-        ];
-        let paragraph = Paragraph::new(content).alignment(Alignment::Center);
+        ])
+        .alignment(Alignment::Center);
         frame.render_widget(paragraph, inner);
         return;
     }
 
-    let history_entry = &history[selected_index];
+    let batch_idx = match flat_rows.get(selected_index) {
+        Some(HistoryRow::Batch(i)) => *i,
+        _ => 0,
+    };
 
-    // Split the area: 70% revert preview, 30% selected item
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Percentage(70), // Revert preview
-            Constraint::Percentage(30), // Selected item
-        ])
-        .split(*area);
-
-    // Render revert preview
-    render_revert_preview(frame, &chunks[0], data, history_entry);
-
-    // Render selected item details
-    render_selected_history_item(frame, &chunks[1], data, history_entry);
+    if let Some(history_entry) = data.worklog_history.get(batch_idx) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+            .split(*area);
+        render_revert_preview(frame, &chunks[0], data, history_entry);
+        render_selected_history_item(frame, &chunks[1], data, history_entry);
+    }
 }
 
 fn render_revert_preview(
@@ -855,6 +995,121 @@ fn render_selected_history_item(
             ),
         ]),
     ];
+
+    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
+    frame.render_widget(paragraph, inner);
+}
+
+fn render_day_details(
+    frame: &mut Frame,
+    area: &Rect,
+    date: chrono::NaiveDate,
+    worklogs: &[wtf_lib::models::data::LocalWorklog],
+) {
+    use chrono::Timelike;
+
+    let total_secs: i64 = worklogs.iter().map(|w| w.time_spent_seconds).sum();
+    let total_hours = total_secs as f64 / 3600.0;
+
+    let block = Block::default()
+        .title(format!(
+            "📅 {} — {:.1}h total",
+            date.format("%A %d %B %Y"),
+            total_hours
+        ))
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Cyan).bg(theme().bg_primary));
+
+    let inner = block.inner(*area);
+    frame.render_widget(block, *area);
+
+    if worklogs.is_empty() {
+        let paragraph = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(Span::styled(
+                "No worklogs for this day",
+                Style::default().fg(Color::Gray),
+            )),
+        ])
+        .alignment(Alignment::Center);
+        frame.render_widget(paragraph, inner);
+        return;
+    }
+
+    let mut sorted = worklogs.to_vec();
+    sorted.sort_by_key(|w| w.started);
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(
+                format!("{:<5}", "Time"),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("{:<16}", "Issue"),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("{:<8}", "Duration"),
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                "Comment",
+                Style::default()
+                    .fg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(Span::styled(
+            "─".repeat(70),
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    for worklog in &sorted {
+        let hours = worklog.time_spent_seconds as f64 / 3600.0;
+        let time_str = format!(
+            "{:02}:{:02}",
+            worklog.started.hour(),
+            worklog.started.minute()
+        );
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("{:<5}", time_str),
+                Style::default().fg(Color::White),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("{:<16}", truncate_string(&worklog.issue_id, 16)),
+                Style::default().fg(Color::Cyan),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                format!("{:<8}", format!("{:.1}h", hours)),
+                Style::default().fg(Color::Yellow),
+            ),
+            Span::raw("  "),
+            Span::styled(
+                {
+                    let msg = worklog
+                        .comment
+                        .find("]-")
+                        .map_or(worklog.comment.as_str(), |i| &worklog.comment[i + 2..]);
+                    truncate_string(msg, 50)
+                },
+                Style::default().fg(Color::Gray),
+            ),
+        ]));
+    }
 
     let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
     frame.render_widget(paragraph, inner);
