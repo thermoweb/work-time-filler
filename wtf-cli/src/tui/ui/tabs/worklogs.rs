@@ -3,7 +3,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -120,7 +120,6 @@ fn render_worklogs_list(
         ""
     };
 
-    // Build contextual help text
     let shortcuts_data = vec![
         ("A", " Stage/Unstage"),
         ("Ctrl+A", " Stage All"),
@@ -147,10 +146,9 @@ fn render_worklogs_list(
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
-    let inner = block.inner(*area);
-    frame.render_widget(block, *area);
-
     if worklogs.is_empty() {
+        let inner = block.inner(*area);
+        frame.render_widget(block, *area);
         let content = vec![
             Line::from(""),
             Line::from(Span::styled(
@@ -163,102 +161,79 @@ fn render_worklogs_list(
         return;
     }
 
-    // Calculate scroll offset to keep selected item visible
-    let visible_height = inner.height as usize;
-    let total_worklogs = worklogs.len();
-
-    let scroll_offset = if total_worklogs <= visible_height {
-        0
-    } else if selected_index >= total_worklogs.saturating_sub(visible_height / 2) {
-        total_worklogs.saturating_sub(visible_height)
-    } else {
-        selected_index.saturating_sub(visible_height / 2)
-    };
-
-    // Render visible worklogs
-    let visible_worklogs = worklogs
+    let items: Vec<ListItem> = worklogs
         .iter()
-        .enumerate()
-        .skip(scroll_offset)
-        .take(visible_height);
+        .map(|worklog| {
+            let (status_icon, status_color) = match worklog.status {
+                LocalWorklogState::Staged => ("●", Color::Yellow),
+                LocalWorklogState::Pushed => ("✓", Color::Green),
+                LocalWorklogState::Created => ("○", Color::Gray),
+            };
 
-    let mut lines = Vec::new();
+            let date_str = format!(
+                "{}-{:02}-{:02}",
+                worklog.started.year(),
+                worklog.started.month(),
+                worklog.started.day()
+            );
+            let time_str = format!(
+                "{:02}:{:02}",
+                worklog.started.hour(),
+                worklog.started.minute()
+            );
+            let hours = worklog.time_spent_seconds as f64 / 3600.0;
 
-    for (idx, worklog) in visible_worklogs {
-        let is_selected = idx == selected_index;
+            let issue_title = data
+                .issues_by_key
+                .get(&worklog.issue_id)
+                .map(|issue| truncate_string(&issue.summary, 40))
+                .unwrap_or_else(|| String::from(""));
 
-        // Status indicator
-        let (status_icon, status_color) = match worklog.status {
-            LocalWorklogState::Staged => ("●", Color::Yellow),
-            LocalWorklogState::Pushed => ("✓", Color::Green),
-            LocalWorklogState::Created => ("○", Color::Gray),
-        };
+            let line = Line::from(vec![
+                Span::styled(
+                    theme().unselected_selector,
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    status_icon,
+                    Style::default().fg(status_color).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:<10}", date_str),
+                    Style::default().fg(Color::White),
+                ),
+                Span::raw(" "),
+                Span::styled(format!("{:<5}", time_str), Style::default().fg(Color::Gray)),
+                Span::raw("  "),
+                Span::styled(
+                    format!("{:<15}", truncate_string(&worklog.issue_id, 15)),
+                    Style::default().fg(Color::Cyan),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:<40}", issue_title),
+                    Style::default().fg(Color::Gray),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:>5.1}h", hours),
+                    Style::default().fg(Color::Yellow),
+                ),
+            ]);
 
-        let date_str = format!(
-            "{}-{:02}-{:02}",
-            worklog.started.year(),
-            worklog.started.month(),
-            worklog.started.day()
-        );
-        let time_str = format!(
-            "{:02}:{:02}",
-            worklog.started.hour(),
-            worklog.started.minute()
-        );
-        let hours = worklog.time_spent_seconds as f64 / 3600.0;
+            ListItem::new(line)
+        })
+        .collect();
 
-        let issue_title = data
-            .issues_by_key
-            .get(&worklog.issue_id)
-            .map(|issue| truncate_string(&issue.summary, 40))
-            .unwrap_or_else(|| String::from(""));
+    let list = List::new(items)
+        .block(block)
+        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
 
-        let line = Line::from(vec![
-            Span::styled(
-                if is_selected {
-                    theme().selector
-                } else {
-                    theme().unselected_selector
-                },
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                status_icon,
-                Style::default()
-                    .fg(status_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:<10}", date_str),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw(" "),
-            Span::styled(format!("{:<5}", time_str), Style::default().fg(Color::Gray)),
-            Span::raw("  "),
-            Span::styled(
-                format!("{:<15}", truncate_string(&worklog.issue_id, 15)),
-                Style::default().fg(Color::Cyan),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:<40}", issue_title),
-                Style::default().fg(Color::Gray),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:>5.1}h", hours),
-                Style::default().fg(Color::Yellow),
-            ),
-        ]);
+    let mut state = ListState::default();
+    state.select(Some(selected_index));
 
-        lines.push(line);
-    }
-
-    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
-    frame.render_widget(paragraph, inner);
+    frame.render_stateful_widget(list, *area, &mut state);
 }
 
 fn render_daily_summary(frame: &mut Frame, area: &Rect, data: &TuiData) {
