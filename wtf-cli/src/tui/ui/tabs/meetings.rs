@@ -5,7 +5,7 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -141,162 +141,128 @@ fn render_meetings_list(
     meetings: &[Meeting],
     selected_index: usize,
 ) {
-    let mut lines = vec![];
-
-    if meetings.is_empty() {
+    let items: Vec<ListItem> = if meetings.is_empty() {
         let message = if data.ui_state.filter_unlinked_only {
             "No unlinked meetings found"
         } else {
             "No meetings found"
         };
-        lines.push(Line::from(vec![
+        vec![ListItem::new(Line::from(vec![
             Span::raw(" "),
             Span::styled(message, Style::default().fg(Color::DarkGray)),
-        ]));
+        ]))]
     } else {
-        // Calculate visible window (consider block borders: area.height - 2)
-        let visible_height = area.height.saturating_sub(2) as usize;
-        let total_meetings = meetings.len();
-
-        // Calculate scroll position to keep selected item visible
-        let scroll_offset = if selected_index < visible_height / 2 {
-            0
-        } else if selected_index >= total_meetings.saturating_sub(visible_height / 2) {
-            total_meetings.saturating_sub(visible_height)
-        } else {
-            selected_index.saturating_sub(visible_height / 2)
-        };
-
-        // Render visible meetings
-        let visible_meetings = meetings
+        meetings
             .iter()
-            .enumerate()
-            .skip(scroll_offset)
-            .take(visible_height);
+            .map(|meeting| {
+                let local_start = meeting.start.with_timezone(&Local);
+                let local_end = meeting.end.with_timezone(&Local);
 
-        for (idx, meeting) in visible_meetings {
-            let local_start = meeting.start.with_timezone(&Local);
-            let local_end = meeting.end.with_timezone(&Local);
-            let is_selected = idx == selected_index;
+                let date_str = local_start.format("%d %b").to_string();
+                let time_str = format!(
+                    "{}-{}",
+                    local_start.format("%H:%M"),
+                    local_end.format("%H:%M")
+                );
 
-            // Date and time
-            let date_str = local_start.format("%d %b").to_string();
-            let time_str = format!(
-                "{}-{}",
-                local_start.format("%H:%M"),
-                local_end.format("%H:%M")
-            );
+                let title = meeting
+                    .title
+                    .as_ref()
+                    .map(|t| truncate_string(t, 70))
+                    .unwrap_or_else(|| "No title".to_string());
 
-            // Title - truncate based on available width
-            let title = meeting
-                .title
-                .as_ref()
-                .map(|t| truncate_string(t, 70))
-                .unwrap_or_else(|| "No title".to_string());
+                let is_declined = meeting
+                    .my_response_status
+                    .as_ref()
+                    .map(|s| s == "declined")
+                    .unwrap_or(false);
 
-            // Check if meeting is declined
-            let is_declined = meeting
-                .my_response_status
-                .as_ref()
-                .map(|s| s == "declined")
-                .unwrap_or(false);
+                let is_untracked = wtf_lib::utils::meetings::is_untracked(
+                    meeting,
+                    &data.config,
+                    &data.untracked_meeting_ids,
+                );
 
-            // Check if meeting is untracked
-            let is_untracked = wtf_lib::utils::meetings::is_untracked(
-                meeting,
-                &data.config,
-                &data.untracked_meeting_ids,
-            );
+                let link_text = if let Some(ref jira_link) = meeting.jira_link {
+                    truncate_string(jira_link, 15)
+                } else {
+                    "—".to_string()
+                };
 
-            // Jira link or status
-            let link_text = if let Some(ref jira_link) = meeting.jira_link {
-                truncate_string(jira_link, 15)
-            } else {
-                "—".to_string()
-            };
+                let link_color = if meeting.jira_link.is_some() {
+                    Color::Blue
+                } else {
+                    Color::DarkGray
+                };
 
-            let link_color = if meeting.jira_link.is_some() {
-                Color::Blue
-            } else {
-                Color::DarkGray
-            };
+                let mut base_style = Style::default();
+                if is_declined {
+                    base_style = base_style
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::CROSSED_OUT);
+                } else if is_untracked {
+                    base_style = base_style.fg(Color::DarkGray);
+                }
 
-            // Selection indicator and style
-            let (indicator, mut base_style) = if is_selected {
-                (
-                    theme().selector,
-                    Style::default().add_modifier(Modifier::BOLD),
-                )
-            } else {
-                (theme().unselected_selector, Style::default())
-            };
-
-            // Apply grey and strikethrough for declined meetings
-            if is_declined {
-                base_style = base_style
-                    .fg(Color::DarkGray)
-                    .add_modifier(Modifier::CROSSED_OUT);
-            } else if is_untracked {
-                base_style = base_style.fg(Color::DarkGray);
-            }
-
-            // Build the compact line: indicator + date + time + title + link
-            lines.push(Line::from(vec![
-                Span::styled(
-                    indicator,
-                    if is_declined || is_untracked {
-                        base_style
-                    } else {
-                        base_style.fg(Color::Yellow)
-                    },
-                ),
-                Span::raw(" "),
-                Span::raw(" "),
-                Span::styled(
-                    date_str,
-                    if is_declined || is_untracked {
-                        base_style
-                    } else {
-                        base_style.fg(Color::Cyan)
-                    },
-                ),
-                Span::raw(" "),
-                Span::styled(time_str, base_style.fg(Color::DarkGray)),
-                Span::raw("  "),
-                {
-                    let circle_color = meeting.color_id.as_deref().map(|cid| {
+                let line = Line::from(vec![
+                    Span::styled(
+                        theme().unselected_selector,
                         if is_declined || is_untracked {
-                            Color::DarkGray
+                            base_style
                         } else {
-                            gc_color(cid)
+                            base_style.fg(Color::Yellow)
+                        },
+                    ),
+                    Span::raw(" "),
+                    Span::raw(" "),
+                    Span::styled(
+                        date_str,
+                        if is_declined || is_untracked {
+                            base_style
+                        } else {
+                            base_style.fg(Color::Cyan)
+                        },
+                    ),
+                    Span::raw(" "),
+                    Span::styled(time_str, base_style.fg(Color::DarkGray)),
+                    Span::raw("  "),
+                    {
+                        let circle_color = meeting.color_id.as_deref().map(|cid| {
+                            if is_declined || is_untracked {
+                                Color::DarkGray
+                            } else {
+                                gc_color(cid)
+                            }
+                        });
+                        if let Some(c) = circle_color {
+                            Span::styled("● ", Style::default().fg(c))
+                        } else {
+                            Span::raw("  ")
                         }
-                    });
-                    if let Some(c) = circle_color {
-                        Span::styled("● ", Style::default().fg(c))
-                    } else {
-                        Span::raw("  ")
-                    }
-                },
-                Span::styled(
-                    title,
-                    if is_declined || is_untracked {
-                        base_style
-                    } else {
-                        base_style.fg(Color::White)
                     },
-                ),
-                Span::raw(" "),
-                Span::styled(
-                    format!("[{}]", link_text),
-                    if is_declined || is_untracked {
-                        base_style
-                    } else {
-                        base_style.fg(link_color)
-                    },
-                ),
-            ]));
-        }
-    }
+                    Span::styled(
+                        title,
+                        if is_declined || is_untracked {
+                            base_style
+                        } else {
+                            base_style.fg(Color::White)
+                        },
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        format!("[{}]", link_text),
+                        if is_declined || is_untracked {
+                            base_style
+                        } else {
+                            base_style.fg(link_color)
+                        },
+                    ),
+                ]);
+
+                ListItem::new(line)
+            })
+            .collect()
+    };
 
     // Check if selected meeting has a link (to show contextual help)
     let selected_has_link = meetings
@@ -311,7 +277,6 @@ fn render_meetings_list(
         ""
     };
 
-    // Build contextual help text
     let mut shortcuts_data = vec![("F", "ilter"), ("A", "uto-link"), ("X", " Untrack")];
     if selected_has_link {
         shortcuts_data.push(("Del", " Unlink"));
@@ -341,11 +306,16 @@ fn render_meetings_list(
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
-    let paragraph = Paragraph::new(lines)
+    let list = List::new(items)
         .block(block)
-        .alignment(Alignment::Left);
+        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
 
-    frame.render_widget(paragraph, *area);
+    let mut state = ListState::default();
+    if !meetings.is_empty() {
+        state.select(Some(selected_index));
+    }
+
+    frame.render_stateful_widget(list, *area, &mut state);
 }
 
 fn render_meeting_details(
