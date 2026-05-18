@@ -27,12 +27,49 @@ impl TieredAchievementDef {
             id: "wizard_runs",
             unit: "wizard runs",
             tiers: vec![
-                AchievementTier { threshold: 1,   name: "Apprentice",   icon: "🧙",  points: 10,  chronie_message: "Your first run — the journey begins! 🧙" },
-                AchievementTier { threshold: 5,   name: "Adept",        icon: "✨",  points: 25,  chronie_message: "Five runs in! You're starting to feel the rhythm! ✨" },
-                AchievementTier { threshold: 15,  name: "Mage",         icon: "🔮",  points: 50,  chronie_message: "Fifteen runs! The arcane arts of time logging bend to your will! 🔮" },
-                AchievementTier { threshold: 30,  name: "Sorcerer",     icon: "⚗️", points: 75,  chronie_message: "Thirty runs! Few reach this level of dedication! ⚗️" },
-                AchievementTier { threshold: 50,  name: "Archmage",     icon: "🌟",  points: 100, chronie_message: "Fifty runs! You've surpassed all but the greatest! 🌟" },
-                AchievementTier { threshold: 100, name: "Chronomancer", icon: "⚡",  points: 200, chronie_message: "One hundred runs! You've mastered time itself! ⚡" },
+                AchievementTier {
+                    threshold: 1,
+                    name: "Apprentice",
+                    icon: "🧙",
+                    points: 10,
+                    chronie_message: "Your first run — the journey begins! 🧙",
+                },
+                AchievementTier {
+                    threshold: 5,
+                    name: "Adept",
+                    icon: "✨",
+                    points: 25,
+                    chronie_message: "Five runs in! You're starting to feel the rhythm! ✨",
+                },
+                AchievementTier {
+                    threshold: 15,
+                    name: "Mage",
+                    icon: "🔮",
+                    points: 50,
+                    chronie_message:
+                        "Fifteen runs! The arcane arts of time logging bend to your will! 🔮",
+                },
+                AchievementTier {
+                    threshold: 30,
+                    name: "Sorcerer",
+                    icon: "⚗️",
+                    points: 75,
+                    chronie_message: "Thirty runs! Few reach this level of dedication! ⚗️",
+                },
+                AchievementTier {
+                    threshold: 50,
+                    name: "Archmage",
+                    icon: "🌟",
+                    points: 100,
+                    chronie_message: "Fifty runs! You've surpassed all but the greatest! 🌟",
+                },
+                AchievementTier {
+                    threshold: 100,
+                    name: "Chronomancer",
+                    icon: "⚡",
+                    points: 200,
+                    chronie_message: "One hundred runs! You've mastered time itself! ⚡",
+                },
             ],
         }
     }
@@ -42,12 +79,50 @@ impl TieredAchievementDef {
             id: "hours_logged",
             unit: "hours logged",
             tiers: vec![
-                AchievementTier { threshold: 100,  name: "Timekeeper",   icon: "⏱️",  points: 25,  chronie_message: "One hundred hours tracked — you're building a real habit! ⏱️" },
-                AchievementTier { threshold: 300,  name: "Chronicler",   icon: "📜",  points: 50,  chronie_message: "Three hundred hours! Your work history tells quite a story! 📜" },
-                AchievementTier { threshold: 600,  name: "Lorekeeper",   icon: "📚",  points: 75,  chronie_message: "Six hundred hours! The records of your labor grow vast! 📚" },
-                AchievementTier { threshold: 1000, name: "Sage",         icon: "🔭",  points: 100, chronie_message: "A thousand hours! Wisdom comes from logging every moment! 🔭" },
-                AchievementTier { threshold: 2500, name: "Oracle",       icon: "🌙",  points: 150, chronie_message: "Twenty-five hundred hours! You see the pattern in all time! 🌙" },
-                AchievementTier { threshold: 5000, name: "Omniscient",   icon: "⭐",  points: 250, chronie_message: "Five thousand hours! You transcend time logging itself! ⭐" },
+                AchievementTier {
+                    threshold: 100,
+                    name: "Timekeeper",
+                    icon: "⏱️",
+                    points: 25,
+                    chronie_message: "One hundred hours tracked — you're building a real habit! ⏱️",
+                },
+                AchievementTier {
+                    threshold: 300,
+                    name: "Chronicler",
+                    icon: "📜",
+                    points: 50,
+                    chronie_message:
+                        "Three hundred hours! Your work history tells quite a story! 📜",
+                },
+                AchievementTier {
+                    threshold: 600,
+                    name: "Lorekeeper",
+                    icon: "📚",
+                    points: 75,
+                    chronie_message: "Six hundred hours! The records of your labor grow vast! 📚",
+                },
+                AchievementTier {
+                    threshold: 1000,
+                    name: "Sage",
+                    icon: "🔭",
+                    points: 100,
+                    chronie_message: "A thousand hours! Wisdom comes from logging every moment! 🔭",
+                },
+                AchievementTier {
+                    threshold: 2500,
+                    name: "Oracle",
+                    icon: "🌙",
+                    points: 150,
+                    chronie_message:
+                        "Twenty-five hundred hours! You see the pattern in all time! 🌙",
+                },
+                AchievementTier {
+                    threshold: 5000,
+                    name: "Omniscient",
+                    icon: "⭐",
+                    points: 250,
+                    chronie_message: "Five thousand hours! You transcend time logging itself! ⭐",
+                },
             ],
         }
     }

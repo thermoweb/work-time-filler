@@ -312,7 +312,9 @@ impl AchievementTracker {
 
         let hours = Self::hours_in_push(history_id);
         if hours > 0 {
-            let (old, new) = tui.tiered_achievement_service.increment("hours_logged", hours);
+            let (old, new) = tui
+                .tiered_achievement_service
+                .increment("hours_logged", hours);
             Self::check_tier_crossings("hours_logged", old, new, tui);
         }
 

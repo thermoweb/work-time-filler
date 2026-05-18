@@ -374,9 +374,18 @@ pub(in crate::tui) fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
                 let bar_width = 20usize;
                 let (bar_current, bar_max) = if let Some(nt) = next_tier {
                     let prev_threshold = tier_idx
-                        .and_then(|i| if i > 0 { Some(def.tiers[i].threshold) } else { None })
+                        .and_then(|i| {
+                            if i > 0 {
+                                Some(def.tiers[i].threshold)
+                            } else {
+                                None
+                            }
+                        })
                         .unwrap_or(0);
-                    (count.saturating_sub(prev_threshold), nt.threshold - prev_threshold)
+                    (
+                        count.saturating_sub(prev_threshold),
+                        nt.threshold - prev_threshold,
+                    )
                 } else {
                     // Maxed out
                     let last = def.tiers.last().unwrap();
@@ -489,17 +498,11 @@ pub(in crate::tui) fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
                     let (desc_line1, desc_line2) =
                         wrap_text_two_lines(&meta.description, text_width);
                     frame.render_widget(
-                        Paragraph::new(Span::styled(
-                            desc_line1,
-                            Style::default().fg(Color::Gray),
-                        )),
+                        Paragraph::new(Span::styled(desc_line1, Style::default().fg(Color::Gray))),
                         rows[1],
                     );
                     frame.render_widget(
-                        Paragraph::new(Span::styled(
-                            desc_line2,
-                            Style::default().fg(Color::Gray),
-                        )),
+                        Paragraph::new(Span::styled(desc_line2, Style::default().fg(Color::Gray))),
                         rows[2],
                     );
 

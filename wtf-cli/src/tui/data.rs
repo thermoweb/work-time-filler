@@ -184,7 +184,10 @@ impl TuiData {
             config,
             ui_state,
             unlocked_achievements,
-            tiered_progress: wtf_lib::services::tiered_achievement_service::TieredAchievementService::production().get_all_progress(),
+            tiered_progress:
+                wtf_lib::services::tiered_achievement_service::TieredAchievementService::production(
+                )
+                .get_all_progress(),
         }
     }
 
