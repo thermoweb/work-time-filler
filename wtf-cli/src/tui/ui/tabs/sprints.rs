@@ -358,7 +358,7 @@ fn render_sprint_list_expanded(
             ),
             Span::raw(" "),
             Span::styled(
-                format!("{:>5.1}h/{:.1}h", logged_hours, capacity_hours),
+                format!("{:>5.1}h/{:>5.1}h", logged_hours, capacity_hours),
                 Style::default().fg(Color::DarkGray),
             ),
             Span::raw(" "),
