@@ -60,7 +60,12 @@ pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
                     .as_ref()
                     .map(|j| j.to_lowercase().contains(&query))
                     .unwrap_or(false);
-                return title_match || jira_match;
+                let desc_match = meeting
+                    .description
+                    .as_ref()
+                    .map(|d| d.to_lowercase().contains(&query))
+                    .unwrap_or(false);
+                return title_match || jira_match || desc_match;
             }
 
             true
