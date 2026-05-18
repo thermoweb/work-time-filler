@@ -4,7 +4,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Gauge, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
@@ -272,10 +272,9 @@ fn render_sprint_list_expanded(
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
-    let inner = block.inner(*area);
-    frame.render_widget(block, *area);
-
     if data.all_sprints.is_empty() {
+        let inner = block.inner(*area);
+        frame.render_widget(block, *area);
         let content = vec![
             Line::from(""),
             Line::from(Span::styled(
@@ -290,12 +289,7 @@ fn render_sprint_list_expanded(
         return;
     }
 
-    let mut lines = Vec::new();
-    lines.push(Line::from(""));
-
-    for (i, sprint) in data.all_sprints.iter().enumerate() {
-        let is_selected = i == selected_index;
-
+    let items: Vec<ListItem> = data.all_sprints.iter().map(|sprint| {
         let icon_color = match sprint.state {
             SprintState::Active => Color::Green,
             SprintState::Future => Color::LightBlue,
@@ -332,18 +326,6 @@ fn render_sprint_list_expanded(
             "Closed".to_string()
         };
 
-        let indicator = if is_selected {
-            theme().selector
-        } else {
-            theme().unselected_selector
-        };
-        let base_style = if is_selected {
-            Style::default().add_modifier(Modifier::BOLD)
-        } else {
-            Style::default()
-        };
-
-        // Create progress bar (10 blocks)
         let filled_blocks = ((percentage as f64 / 10.0).round() as usize).min(10);
         let progress_bar = format!(
             "{}{}",
@@ -351,7 +333,6 @@ fn render_sprint_list_expanded(
             "░".repeat(10 - filled_blocks)
         );
 
-        // Color based on percentage
         let percentage_color = if percentage >= 80 {
             Color::Green
         } else if percentage >= 50 {
@@ -361,29 +342,29 @@ fn render_sprint_list_expanded(
         };
 
         let line = Line::from(vec![
-            Span::styled(indicator, base_style.fg(Color::Yellow)),
+            Span::styled(theme().unselected_selector, Style::default().fg(Color::Yellow)),
             Span::raw(" "),
-            Span::styled("● ", base_style.fg(icon_color)),
+            Span::styled("● ", Style::default().fg(icon_color)),
             Span::styled(
                 format!("{:<24}", truncate_string(&sprint.name, 24)),
-                base_style.fg(Color::White),
+                Style::default().fg(Color::White),
             ),
             Span::raw(" "),
-            Span::styled(progress_bar, base_style.fg(percentage_color)),
+            Span::styled(progress_bar, Style::default().fg(percentage_color)),
             Span::raw(" "),
             Span::styled(
                 format!("{:>3}%", percentage),
-                base_style.fg(percentage_color).add_modifier(Modifier::BOLD),
+                Style::default().fg(percentage_color).add_modifier(Modifier::BOLD),
             ),
             Span::raw(" "),
             Span::styled(
                 format!("{:>5.1}h/{:.1}h", logged_hours, capacity_hours),
-                base_style.fg(Color::DarkGray),
+                Style::default().fg(Color::DarkGray),
             ),
             Span::raw(" "),
             Span::styled(
                 status_text,
-                base_style.fg(match sprint.state {
+                Style::default().fg(match sprint.state {
                     SprintState::Active => Color::Green,
                     SprintState::Future => Color::LightBlue,
                     SprintState::Closed => Color::Gray,
@@ -391,13 +372,17 @@ fn render_sprint_list_expanded(
             ),
         ]);
 
-        lines.push(line);
-    }
+        ListItem::new(line)
+    }).collect();
 
-    lines.push(Line::from(""));
+    let list = List::new(items)
+        .block(block)
+        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
 
-    let paragraph = Paragraph::new(lines).alignment(Alignment::Left);
-    frame.render_widget(paragraph, inner);
+    let mut state = ListState::default();
+    state.select(Some(selected_index));
+
+    frame.render_stateful_widget(list, *area, &mut state);
 }
 
 fn render_sprint_details_with_activity(
