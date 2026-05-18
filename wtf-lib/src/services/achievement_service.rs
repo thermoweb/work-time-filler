@@ -141,39 +141,39 @@ mod tests {
     #[test]
     fn test_unlock_new_achievement() {
         let svc = temp_service();
-        assert!(svc.unlock(Achievement::ChroniesApprentice));
-        assert!(svc.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(svc.unlock(Achievement::AboutClicker));
+        assert!(svc.is_unlocked(Achievement::AboutClicker));
     }
 
     #[test]
     fn test_unlock_idempotent() {
         let svc = temp_service();
-        assert!(svc.unlock(Achievement::ChroniesApprentice));
-        assert!(!svc.unlock(Achievement::ChroniesApprentice)); // second call returns false
+        assert!(svc.unlock(Achievement::AboutClicker));
+        assert!(!svc.unlock(Achievement::AboutClicker)); // second call returns false
         assert_eq!(svc.unlock_count(), 1);
     }
 
     #[test]
     fn test_is_unlocked_false_initially() {
         let svc = temp_service();
-        assert!(!svc.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(!svc.is_unlocked(Achievement::AboutClicker));
         assert!(!svc.has_any_unlocked());
     }
 
     #[test]
     fn test_unlock_multiple_achievements() {
         let svc = temp_service();
-        svc.unlock(Achievement::ChroniesApprentice);
+        svc.unlock(Achievement::AboutClicker);
         svc.unlock(Achievement::NightOwl);
         assert_eq!(svc.unlock_count(), 2);
-        assert!(svc.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(svc.is_unlocked(Achievement::AboutClicker));
         assert!(svc.is_unlocked(Achievement::NightOwl));
     }
 
     #[test]
     fn test_reset_all() {
         let svc = temp_service();
-        svc.unlock(Achievement::ChroniesApprentice);
+        svc.unlock(Achievement::AboutClicker);
         svc.unlock(Achievement::NightOwl);
         assert_eq!(svc.unlock_count(), 2);
         svc.reset_all().unwrap();
@@ -222,13 +222,13 @@ mod tests {
         {
             let db = GenericDatabase::new(&tmp_db, "achievements").unwrap();
             let svc = AchievementService::new(db);
-            svc.unlock(Achievement::ChroniesApprentice);
+            svc.unlock(Achievement::AboutClicker);
         }
 
         // New instance from same DB should load persisted data
         let db2 = GenericDatabase::new(&tmp_db, "achievements").unwrap();
         let svc2 = AchievementService::new(db2);
-        assert!(svc2.is_unlocked(Achievement::ChroniesApprentice));
+        assert!(svc2.is_unlocked(Achievement::AboutClicker));
         assert_eq!(svc2.unlock_count(), 1);
     }
 }

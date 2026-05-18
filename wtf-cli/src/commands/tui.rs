@@ -19,10 +19,15 @@ impl Command for TuiCommand {
             && matches.get_flag("reset_achievements")
         {
             use wtf_lib::services::AchievementService;
+            use wtf_lib::services::TieredAchievementService;
 
             println!("🗑️  Resetting all achievements...");
             if let Err(e) = AchievementService::production().reset_all() {
                 eprintln!("❌ Failed to reset achievements: {}", e);
+                return;
+            }
+            if let Err(e) = TieredAchievementService::production().reset_all() {
+                eprintln!("❌ Failed to reset tiered achievements: {}", e);
                 return;
             }
             println!("✅ All achievements have been reset!");

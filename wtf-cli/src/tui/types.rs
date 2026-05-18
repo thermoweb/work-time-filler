@@ -245,6 +245,7 @@ impl Tab {
 pub struct Tui {
     pub(crate) data: super::data::TuiData,
     pub(crate) achievement_service: AchievementService,
+    pub(crate) tiered_achievement_service: wtf_lib::services::tiered_achievement_service::TieredAchievementService,
     pub(crate) current_tab: Tab,
     pub(in crate::tui) sprints_tab: super::ui::tabs::sprints::SprintsTab,
     pub(in crate::tui) achievements_tab: super::ui::tabs::achievements::AchievementsTab,

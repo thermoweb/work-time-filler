@@ -9,3 +9,5 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use models::achievement::{Achievement, AchievementData, AchievementMeta};
+pub use models::tiered_achievement::{TieredAchievementDef, TieredProgress};
+pub use services::tiered_achievement_service::TieredAchievementService;

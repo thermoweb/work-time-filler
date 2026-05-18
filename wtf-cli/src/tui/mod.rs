@@ -56,13 +56,32 @@ impl Tui {
             log_collector.clone() as std::sync::Arc<dyn crate::logger::Logger>
         );
 
-        // Chronie's startup greeting (only if ChroniesApprentice is unlocked)
+        // Chronie's startup greeting (only if user has completed at least one wizard run)
         log_chronie_message("startup", "🧙 Chronie:");
 
         // Initialize achievement service and run revoke schedule
         let achievement_service =
             wtf_lib::services::achievement_service::AchievementService::production();
         achievement_service.run_revoke_schedule();
+
+        let tiered_achievement_service =
+            wtf_lib::services::tiered_achievement_service::TieredAchievementService::production();
+
+        // One-time migration: seed hours_logged from existing pushed worklogs.
+        // wizard_runs is not seeded — history includes non-wizard pushes so it's unreliable.
+        {
+            use wtf_lib::models::data::LocalWorklogState;
+            use wtf_lib::services::worklogs_service::LocalWorklogService;
+
+            let total_hours: u64 = LocalWorklogService::production()
+                .get_all_local_worklogs()
+                .into_iter()
+                .filter(|w| w.status == LocalWorklogState::Pushed)
+                .map(|w| w.time_spent_seconds.max(0) as u64)
+                .sum::<u64>()
+                / 3600;
+            tiered_achievement_service.set_if_greater("hours_logged", total_hours);
+        }
 
         // Load logo image for About popup
         let about_image = Self::load_logo_image();
@@ -83,6 +102,7 @@ impl Tui {
         Self {
             data: TuiData::collect(),
             achievement_service,
+            tiered_achievement_service,
             current_tab: Tab::Sprints,
             sprints_tab: ui::tabs::sprints::SprintsTab,
             achievements_tab: ui::tabs::achievements::AchievementsTab,
@@ -2044,19 +2064,29 @@ pub fn get_branding_text(category: &str) -> Option<String> {
     }
 }
 
+/// Check whether Chronie should speak for the given message category.
+/// For secret/friend messages: requires ChroniesFriend achievement.
+/// For wizard/startup messages: requires at least 1 wizard run (tiered progress).
+fn has_chronie_access(category: &str) -> bool {
+    use wtf_lib::models::achievement::Achievement;
+    use wtf_lib::services::achievement_service::AchievementService;
+    use wtf_lib::services::tiered_achievement_service::TieredAchievementService;
+
+    match category {
+        "secret" | "friend" => {
+            AchievementService::production().is_unlocked(Achievement::ChroniesFriend)
+        }
+        _ => {
+            // Startup/wizard/random messages: unlocked once the user has run the wizard at least once
+            TieredAchievementService::production().get_count("wizard_runs") > 0
+        }
+    }
+}
+
 /// Get Chronie message if user has unlocked the ability to hear from Chronie
 /// Returns None if required achievement is not unlocked
 pub fn get_chronie_message(category: &str) -> Option<String> {
-    use wtf_lib::models::achievement::Achievement;
-    use wtf_lib::services::achievement_service::AchievementService;
-
-    let required_achievement = match category {
-        "secret" | "friend" => Achievement::ChroniesFriend,
-        "startup" | "random" | "overwork" | "wizard_complete" => Achievement::ChroniesApprentice,
-        _ => Achievement::ChroniesApprentice,
-    };
-
-    if !AchievementService::production().is_unlocked(required_achievement) {
+    if !has_chronie_access(category) {
         return None;
     }
 
@@ -2066,18 +2096,10 @@ pub fn get_chronie_message(category: &str) -> Option<String> {
 /// Log a Chronie message if user has unlocked the ability to hear from Chronie
 /// Handles achievement check and formatting automatically
 pub fn log_chronie_message(category: &str, prefix: &str) {
-    use wtf_lib::models::achievement::Achievement;
-    use wtf_lib::services::achievement_service::AchievementService;
-
-    let required = match category {
-        "secret" | "friend" => Achievement::ChroniesFriend,
-        _ => Achievement::ChroniesApprentice,
-    };
-
-    let is_unlocked = AchievementService::production().is_unlocked(required);
+    let is_unlocked = has_chronie_access(category);
     crate::logger::debug(format!(
-        "Chronie check - category: {}, required: {:?}, unlocked: {}",
-        category, required, is_unlocked
+        "Chronie check - category: {}, unlocked: {}",
+        category, is_unlocked
     ));
 
     if let Some(msg) = get_chronie_message(category) {

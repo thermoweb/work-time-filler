@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 /// Achievement identifier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Achievement {
-    ChroniesApprentice,
     AboutClicker,
     ChroniesFriend,
     TheUndoer,
@@ -16,13 +15,14 @@ pub enum Achievement {
     NightOwl,
     QuarterCrunch,
     ColorCoder,
+    ForgotFriday,
+    PerfectSprint,
 }
 
 impl Achievement {
     /// Get all possible achievements
     pub fn all() -> Vec<Achievement> {
         vec![
-            Achievement::ChroniesApprentice,
             Achievement::AboutClicker,
             Achievement::ChroniesFriend,
             Achievement::TheUndoer,
@@ -33,21 +33,14 @@ impl Achievement {
             Achievement::NightOwl,
             Achievement::QuarterCrunch,
             Achievement::ColorCoder,
+            Achievement::ForgotFriday,
+            Achievement::PerfectSprint,
         ]
     }
 
     /// Get achievement metadata
     pub fn meta(&self) -> AchievementMeta {
         match self {
-            Achievement::ChroniesApprentice => AchievementMeta {
-                id: *self,
-                name: "Chronie's Apprentice".to_string(),
-                description: "Complete your first wizard run with Chronie".to_string(),
-                icon: "🧙".to_string(),
-                category: AchievementCategory::Wizard,
-                chronie_message: "Well done, apprentice! You've mastered the basics! 🧙"
-                    .to_string(),
-            },
             Achievement::AboutClicker => AchievementMeta {
                 id: *self,
                 name: "Curious Explorer".to_string(),
@@ -55,6 +48,7 @@ impl Achievement {
                 icon: "🔍".to_string(),
                 category: AchievementCategory::Meta,
                 chronie_message: "Curious, aren't we? I like that! Keep exploring! 🔍".to_string(),
+                points: 5,
             },
             Achievement::ChroniesFriend => {
                 // Load from PNG metadata
@@ -68,6 +62,7 @@ impl Achievement {
                 category: AchievementCategory::Meta,
                 chronie_message: "Everyone rewrites history sometimes. That's what I'm here for! 🔙"
                     .to_string(),
+                points: 10,
             },
             Achievement::TimelineFixer => AchievementMeta {
                 id: *self,
@@ -77,16 +72,18 @@ impl Achievement {
                 category: AchievementCategory::Meta,
                 chronie_message: "Fixing old temporal anomalies? Risky, but necessary! ⏰"
                     .to_string(),
+                points: 25,
             },
             Achievement::GitSquashMaster => AchievementMeta {
                 id: *self,
                 name: "Squash? Never Heard of It".to_string(),
                 description: "Push worklogs for the same day 3+ separate times".to_string(),
                 icon: "📚".to_string(),
-                category: AchievementCategory::Meta,
+                category: AchievementCategory::Secret,
                 chronie_message:
                     "Three pushes for the same day? Someone needs to learn about squashing! 📚"
                         .to_string(),
+                points: 0,
             },
             Achievement::AutoLinkMaster => AchievementMeta {
                 id: *self,
@@ -97,25 +94,28 @@ impl Achievement {
                 chronie_message:
                     "Perfect automation! Your meeting names are so good, I don't even need to think! 🤖"
                         .to_string(),
+                points: 50,
             },
             Achievement::DeclinedButLogged => AchievementMeta {
                 id: *self,
                 name: "Still Committed".to_string(),
                 description: "Log time for a meeting you declined".to_string(),
                 icon: "🙅".to_string(),
-                category: AchievementCategory::Ironic,
+                category: AchievementCategory::Secret,
                 chronie_message:
                     "Declined the meeting but worked on it anyway? That's dedication... or poor planning! 🙅"
                         .to_string(),
+                points: 0,
             },
             Achievement::NightOwl => AchievementMeta {
                 id: *self,
                 name: "Night Owl".to_string(),
                 description: "Push worklogs after 10pm or before 6am".to_string(),
                 icon: "🌙".to_string(),
-                category: AchievementCategory::Ironic,
+                category: AchievementCategory::Secret,
                 chronie_message: "Logging work at this hour? Even time anomalies need sleep! 🌙"
                     .to_string(),
+                points: 0,
             },
             Achievement::QuarterCrunch => AchievementMeta {
                 id: *self,
@@ -126,6 +126,7 @@ impl Achievement {
                 chronie_message:
                     "A whole quarter with barely a gap? You're a time-logging machine! 📊"
                         .to_string(),
+                points: 50,
             },
             Achievement::ColorCoder => AchievementMeta {
                 id: *self,
@@ -136,6 +137,26 @@ impl Achievement {
                 chronie_message:
                     "Color-coding your calendar for automatic linking? Chronie is impressed by your organizational genius! 🎨"
                         .to_string(),
+                points: 25,
+            },
+            Achievement::ForgotFriday => AchievementMeta {
+                id: *self,
+                name: "Forgot Friday".to_string(),
+                description: "Push worklogs for a Friday after the fact".to_string(),
+                icon: "📅".to_string(),
+                category: AchievementCategory::Secret,
+                chronie_message: "Friday was great, but apparently you forgot to tell me about it! 📅"
+                    .to_string(),
+                points: 0,
+            },
+            Achievement::PerfectSprint => AchievementMeta {
+                id: *self,
+                name: "Perfect Sprint".to_string(),
+                description: "Log time for every workday in a sprint".to_string(),
+                icon: "🏅".to_string(),
+                category: AchievementCategory::Consistency,
+                chronie_message: "Not a single day missed! I'm genuinely impressed. 🏅".to_string(),
+                points: 50,
             },
         }
     }
@@ -158,6 +179,7 @@ impl Achievement {
                         icon: sa.icon.clone(),
                         category: AchievementCategory::Secret,
                         chronie_message: sa.chronie_message.clone(),
+                        points: sa.points,
                     };
                 }
             }
@@ -171,13 +193,13 @@ impl Achievement {
             icon: "🔒".to_string(),
             category: AchievementCategory::Secret,
             chronie_message: "You found a secret!".to_string(),
+            points: 0,
         }
     }
 
     /// Get unique string identifier for database storage
     pub fn id_string(&self) -> String {
         match self {
-            Achievement::ChroniesApprentice => "chronies_apprentice".to_string(),
             Achievement::AboutClicker => "about_clicker".to_string(),
             Achievement::ChroniesFriend => "chronies_friend".to_string(),
             Achievement::TheUndoer => "the_undoer".to_string(),
@@ -188,6 +210,8 @@ impl Achievement {
             Achievement::NightOwl => "night_owl".to_string(),
             Achievement::QuarterCrunch => "quarter_crunch".to_string(),
             Achievement::ColorCoder => "color_coder".to_string(),
+            Achievement::ForgotFriday => "forgot_friday".to_string(),
+            Achievement::PerfectSprint => "perfect_sprint".to_string(),
         }
     }
 }
@@ -201,12 +225,12 @@ pub struct AchievementMeta {
     pub icon: String,
     pub category: AchievementCategory,
     pub chronie_message: String,
+    pub points: u32,
 }
 
 /// Achievement category for organization
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AchievementCategory {
-    Wizard,
     Consistency,
     Productivity,
     Milestones,

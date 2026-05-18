@@ -113,6 +113,7 @@ pub struct TuiData {
     pub config: Config,
     pub ui_state: TabUiState,
     pub unlocked_achievements: Vec<AchievementUnlock>,
+    pub tiered_progress: std::collections::HashMap<String, u64>,
 }
 
 impl TuiData {
@@ -183,6 +184,7 @@ impl TuiData {
             config,
             ui_state,
             unlocked_achievements,
+            tiered_progress: wtf_lib::services::tiered_achievement_service::TieredAchievementService::production().get_all_progress(),
         }
     }
 

@@ -8,16 +8,11 @@ pub struct AchievementTracker;
 impl AchievementTracker {
     /// Check which achievements should be unlocked based on an event
     /// Returns a list of achievements that meet their unlock conditions
-    fn check_unlock_candidates(event: &AppEvent, has_wizard: bool, tui: &Tui) -> Vec<Achievement> {
+    fn check_unlock_candidates(event: &AppEvent, _has_wizard: bool, tui: &Tui) -> Vec<Achievement> {
         let mut candidates = Vec::new();
 
         match event {
             AppEvent::PushComplete { history_id } => {
-                // Wizard completion achievement
-                if has_wizard {
-                    candidates.push(Achievement::ChroniesApprentice);
-                }
-
                 // Timeline Fixer: Check if any worklog in THIS push is >60 days old
                 if Self::has_old_worklog_in_push(history_id) {
                     candidates.push(Achievement::TimelineFixer);
@@ -41,6 +36,16 @@ impl AchievementTracker {
                 // Quarter Crunch: Check if any full calendar quarter now has ≥90% working days covered
                 if Self::completes_quarter_crunch() {
                     candidates.push(Achievement::QuarterCrunch);
+                }
+
+                // Forgot Friday: any worklog in this push is for a Friday pushed after that day
+                if Self::has_forgotten_friday(history_id) {
+                    candidates.push(Achievement::ForgotFriday);
+                }
+
+                // Perfect Sprint: every workday in a sprint is now covered
+                if Self::completes_perfect_sprint(tui) {
+                    candidates.push(Achievement::PerfectSprint);
                 }
             }
             AppEvent::RevertComplete => {
@@ -233,6 +238,121 @@ impl AchievementTracker {
         false
     }
 
+    /// Check if the push contains a worklog for a Friday that was pushed after that Friday
+    fn has_forgotten_friday(history_id: &str) -> bool {
+        use chrono::{Datelike, Local, Weekday};
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+
+        let today = Local::now().date_naive();
+        let svc = LocalWorklogService::production();
+
+        if let Some(entry) = svc.get_history_by_id(history_id) {
+            for worklog_id in &entry.local_worklogs_id {
+                if let Some(worklog) = svc.get_local_worklog_by_id(worklog_id) {
+                    let worklog_date = worklog.started.date_naive();
+                    if worklog_date.weekday() == Weekday::Fri && today > worklog_date {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if every workday in any followed sprint is covered by a pushed worklog
+    fn completes_perfect_sprint(tui: &Tui) -> bool {
+        use chrono::{Datelike, NaiveDate, Weekday};
+        use std::collections::HashSet;
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+
+        let pushed_dates: HashSet<NaiveDate> = LocalWorklogService::production()
+            .get_all_local_worklogs()
+            .into_iter()
+            .filter(|w| w.status == wtf_lib::models::data::LocalWorklogState::Pushed)
+            .map(|w| w.started.date_naive())
+            .collect();
+
+        if pushed_dates.is_empty() {
+            return false;
+        }
+
+        for sprint in &tui.data.all_sprints {
+            let (Some(start), Some(end)) = (sprint.start, sprint.end) else {
+                continue;
+            };
+            let q_start = start.date_naive();
+            let q_end = end.date_naive();
+
+            let workdays: Vec<NaiveDate> = (0..)
+                .map(|i| q_start + chrono::Duration::days(i))
+                .take_while(|d| *d <= q_end)
+                .filter(|d| !matches!(d.weekday(), Weekday::Sat | Weekday::Sun))
+                .collect();
+
+            if workdays.is_empty() {
+                continue;
+            }
+
+            if workdays.iter().all(|d| pushed_dates.contains(d)) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn handle_tiered(event: &AppEvent, has_wizard: bool, tui: &mut Tui) {
+        let AppEvent::PushComplete { history_id } = event else {
+            return;
+        };
+
+        if has_wizard {
+            let (old, new) = tui.tiered_achievement_service.increment("wizard_runs", 1);
+            Self::check_tier_crossings("wizard_runs", old, new, tui);
+        }
+
+        let hours = Self::hours_in_push(history_id);
+        if hours > 0 {
+            let (old, new) = tui.tiered_achievement_service.increment("hours_logged", hours);
+            Self::check_tier_crossings("hours_logged", old, new, tui);
+        }
+
+        tui.data.tiered_progress = tui.tiered_achievement_service.get_all_progress();
+    }
+
+    fn hours_in_push(history_id: &str) -> u64 {
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+        let svc = LocalWorklogService::production();
+        if let Some(entry) = svc.get_history_by_id(history_id) {
+            let total_secs: i64 = entry
+                .local_worklogs_id
+                .iter()
+                .filter_map(|wid| svc.get_local_worklog_by_id(wid))
+                .map(|wl| wl.time_spent_seconds)
+                .sum();
+            return (total_secs.max(0) as u64) / 3600;
+        }
+        0
+    }
+
+    fn check_tier_crossings(track_id: &str, old: u64, new: u64, _tui: &mut Tui) {
+        use wtf_lib::models::tiered_achievement::TieredAchievementDef;
+        let defs = TieredAchievementDef::all();
+        let Some(def) = defs.iter().find(|d| d.id == track_id) else {
+            return;
+        };
+        for tier in &def.tiers {
+            if old < tier.threshold && new >= tier.threshold {
+                logger::log(format!(
+                    "🏆 {} — {}: {}",
+                    tier.icon,
+                    def.unit.to_uppercase(),
+                    tier.name
+                ));
+                logger::log(format!("   {}", tier.chronie_message));
+            }
+        }
+    }
+
     /// Handle unlocking an achievement (log + publish event)
     fn handle_unlock(achievement: Achievement, tui: &mut Tui) {
         let meta = achievement.meta();
@@ -263,6 +383,9 @@ impl EventSubscriber for AchievementTracker {
                 Self::handle_unlock(achievement, tui);
             }
         }
+
+        // Handle tiered achievement progression
+        Self::handle_tiered(event, has_wizard, tui);
     }
 }
 

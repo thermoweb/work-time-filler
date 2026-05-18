@@ -37,6 +37,8 @@ pub struct SecretAchievement {
     pub description: String,
     pub icon: String,
     pub chronie_message: String,
+    #[serde(default)]
+    pub points: u32,
 }
 
 impl AppBranding {
