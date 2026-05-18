@@ -50,6 +50,8 @@ pub struct TabUiState {
     pub expanded_history_ids: std::collections::HashSet<String>,
     pub filter_unlinked_only: bool,
     pub filter_staged_only: bool,
+    pub meeting_search_query: String,
+    pub meeting_search_active: bool,
     pub achievements_scroll_offset: usize,
     // Settings tab state
     pub settings_selected_field: usize,
@@ -75,6 +77,8 @@ impl Default for TabUiState {
             expanded_history_ids: std::collections::HashSet::new(),
             filter_unlinked_only: false,
             filter_staged_only: false,
+            meeting_search_query: String::new(),
+            meeting_search_active: false,
             achievements_scroll_offset: 0,
             settings_selected_field: 0,
             settings_editing: false,

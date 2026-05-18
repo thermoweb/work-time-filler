@@ -734,6 +734,13 @@ impl Tui {
             return;
         }
 
+        // If we're in meetings search mode, capture all keys before global shortcuts
+        if self.current_tab == Tab::Meetings && self.data.ui_state.meeting_search_active {
+            let meetings_tab = self.meetings_tab;
+            meetings_tab.handle_key(self, key);
+            return;
+        }
+
         // If we're in unlink confirmation mode, handle that
         if self.unlink_confirmation_meeting_id.is_some() {
             self.handle_unlink_confirmation_key(key);

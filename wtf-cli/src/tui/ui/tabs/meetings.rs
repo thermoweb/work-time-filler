@@ -27,10 +27,12 @@ pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
     let mut sorted_meetings = data.all_meetings.clone();
     sorted_meetings.sort_by(|a, b| b.start.cmp(&a.start));
 
-    if data.ui_state.filter_unlinked_only {
-        sorted_meetings
-            .into_iter()
-            .filter(|meeting| {
+    let query = data.ui_state.meeting_search_query.to_lowercase();
+
+    sorted_meetings
+        .into_iter()
+        .filter(|meeting| {
+            if data.ui_state.filter_unlinked_only {
                 let is_unlinked = meeting.jira_link.is_none();
                 let is_not_declined = meeting
                     .my_response_status
@@ -42,13 +44,28 @@ pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
                     &data.config,
                     &data.untracked_meeting_ids,
                 );
+                if !(is_unlinked && is_not_declined && is_not_untracked) {
+                    return false;
+                }
+            }
 
-                is_unlinked && is_not_declined && is_not_untracked
-            })
-            .collect()
-    } else {
-        sorted_meetings
-    }
+            if !query.is_empty() {
+                let title_match = meeting
+                    .title
+                    .as_ref()
+                    .map(|t| t.to_lowercase().contains(&query))
+                    .unwrap_or(false);
+                let jira_match = meeting
+                    .jira_link
+                    .as_ref()
+                    .map(|j| j.to_lowercase().contains(&query))
+                    .unwrap_or(false);
+                return title_match || jira_match;
+            }
+
+            true
+        })
+        .collect()
 }
 
 impl TabController for MeetingsTab {
@@ -57,6 +74,30 @@ impl TabController for MeetingsTab {
     }
 
     fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
+        // Search mode: all input goes to the query, no shortcuts fire
+        if tui.data.ui_state.meeting_search_active {
+            match key.code {
+                KeyCode::Esc => {
+                    tui.data.ui_state.meeting_search_active = false;
+                    tui.data.ui_state.meeting_search_query.clear();
+                    tui.data.ui_state.selected_meeting_index = 0;
+                }
+                KeyCode::Enter => {
+                    tui.data.ui_state.meeting_search_active = false;
+                }
+                KeyCode::Backspace => {
+                    tui.data.ui_state.meeting_search_query.pop();
+                    tui.data.ui_state.selected_meeting_index = 0;
+                }
+                KeyCode::Char(c) => {
+                    tui.data.ui_state.meeting_search_query.push(c);
+                    tui.data.ui_state.selected_meeting_index = 0;
+                }
+                _ => {}
+            }
+            return;
+        }
+
         let meetings = visible_meetings(&tui.data);
         let max_index = meetings.len().saturating_sub(1);
 
@@ -69,6 +110,15 @@ impl TabController for MeetingsTab {
         }
 
         match key.code {
+            KeyCode::Char('/') => {
+                tui.data.ui_state.meeting_search_active = true;
+            }
+            KeyCode::Esc => {
+                if !tui.data.ui_state.meeting_search_query.is_empty() {
+                    tui.data.ui_state.meeting_search_query.clear();
+                    tui.data.ui_state.selected_meeting_index = 0;
+                }
+            }
             KeyCode::Char('r') | KeyCode::Char('R') => {
                 tui.refresh_data();
             }
@@ -299,10 +349,37 @@ fn render_meetings_list(
     title_spans.push(Span::raw(") | "));
     title_spans.extend(shortcuts);
 
+    let search_bottom = if data.ui_state.meeting_search_active {
+        Line::from(vec![
+            Span::styled(" / ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                data.ui_state.meeting_search_query.clone(),
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("█", Style::default().fg(Color::Yellow)),
+            Span::styled("  Esc: cancel  Enter: apply ", Style::default().fg(Color::DarkGray)),
+        ])
+    } else if !data.ui_state.meeting_search_query.is_empty() {
+        Line::from(vec![
+            Span::styled(" / ", Style::default().fg(Color::Yellow)),
+            Span::styled(
+                data.ui_state.meeting_search_query.clone(),
+                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("  Esc: clear ", Style::default().fg(Color::DarkGray)),
+        ])
+    } else {
+        Line::from(vec![
+            Span::styled(" / ", Style::default().fg(Color::DarkGray)),
+            Span::styled("search ", Style::default().fg(Color::DarkGray)),
+        ])
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
         .title(Line::from(title_spans))
         .title_alignment(Alignment::Left)
+        .title_bottom(search_bottom)
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
