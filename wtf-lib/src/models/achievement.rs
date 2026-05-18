@@ -41,19 +41,20 @@ impl Achievement {
         match self {
             Achievement::ChroniesApprentice => AchievementMeta {
                 id: *self,
-                name: "Chronie's Apprentice",
-                description: "Complete your first wizard run with Chronie",
-                icon: "🧙",
+                name: "Chronie's Apprentice".to_string(),
+                description: "Complete your first wizard run with Chronie".to_string(),
+                icon: "🧙".to_string(),
                 category: AchievementCategory::Wizard,
-                chronie_message: "Well done, apprentice! You've mastered the basics! 🧙",
+                chronie_message: "Well done, apprentice! You've mastered the basics! 🧙"
+                    .to_string(),
             },
             Achievement::AboutClicker => AchievementMeta {
                 id: *self,
-                name: "Curious Explorer",
-                description: "Discover the About page",
-                icon: "🔍",
+                name: "Curious Explorer".to_string(),
+                description: "Discover the About page".to_string(),
+                icon: "🔍".to_string(),
                 category: AchievementCategory::Meta,
-                chronie_message: "Curious, aren't we? I like that! Keep exploring! 🔍",
+                chronie_message: "Curious, aren't we? I like that! Keep exploring! 🔍".to_string(),
             },
             Achievement::ChroniesFriend => {
                 // Load from PNG metadata
@@ -61,108 +62,115 @@ impl Achievement {
             }
             Achievement::TheUndoer => AchievementMeta {
                 id: *self,
-                name: "The Undoer",
-                description: "Revert worklogs for the first time",
-                icon: "🔙",
+                name: "The Undoer".to_string(),
+                description: "Revert worklogs for the first time".to_string(),
+                icon: "🔙".to_string(),
                 category: AchievementCategory::Meta,
-                chronie_message: "Everyone rewrites history sometimes. That's what I'm here for! 🔙",
+                chronie_message: "Everyone rewrites history sometimes. That's what I'm here for! 🔙"
+                    .to_string(),
             },
             Achievement::TimelineFixer => AchievementMeta {
                 id: *self,
-                name: "Timeline Fixer",
-                description: "Log work for a day more than 60 days in the past",
-                icon: "⏰",
+                name: "Timeline Fixer".to_string(),
+                description: "Log work for a day more than 60 days in the past".to_string(),
+                icon: "⏰".to_string(),
                 category: AchievementCategory::Meta,
-                chronie_message: "Fixing old temporal anomalies? Risky, but necessary! ⏰",
+                chronie_message: "Fixing old temporal anomalies? Risky, but necessary! ⏰"
+                    .to_string(),
             },
             Achievement::GitSquashMaster => AchievementMeta {
                 id: *self,
-                name: "Squash? Never Heard of It",
-                description: "Push worklogs for the same day 3+ separate times",
-                icon: "📚",
+                name: "Squash? Never Heard of It".to_string(),
+                description: "Push worklogs for the same day 3+ separate times".to_string(),
+                icon: "📚".to_string(),
                 category: AchievementCategory::Meta,
-                chronie_message: "Three pushes for the same day? Someone needs to learn about squashing! 📚",
+                chronie_message:
+                    "Three pushes for the same day? Someone needs to learn about squashing! 📚"
+                        .to_string(),
             },
             Achievement::AutoLinkMaster => AchievementMeta {
                 id: *self,
-                name: "Auto-Link Master",
-                description: "Have 10+ meetings all automatically linked",
-                icon: "🤖",
+                name: "Auto-Link Master".to_string(),
+                description: "Auto-link 10+ meetings in a single wizard run".to_string(),
+                icon: "🤖".to_string(),
                 category: AchievementCategory::Meta,
-                chronie_message: "Perfect automation! Your meeting names are so good, I don't even need to think! 🤖",
+                chronie_message:
+                    "Perfect automation! Your meeting names are so good, I don't even need to think! 🤖"
+                        .to_string(),
             },
             Achievement::DeclinedButLogged => AchievementMeta {
                 id: *self,
-                name: "Still Committed",
-                description: "Log time for a meeting you declined",
-                icon: "🙅",
+                name: "Still Committed".to_string(),
+                description: "Log time for a meeting you declined".to_string(),
+                icon: "🙅".to_string(),
                 category: AchievementCategory::Ironic,
-                chronie_message: "Declined the meeting but worked on it anyway? That's dedication... or poor planning! 🙅",
+                chronie_message:
+                    "Declined the meeting but worked on it anyway? That's dedication... or poor planning! 🙅"
+                        .to_string(),
             },
             Achievement::NightOwl => AchievementMeta {
                 id: *self,
-                name: "Night Owl",
-                description: "Push worklogs after 10pm or before 6am",
-                icon: "🌙",
+                name: "Night Owl".to_string(),
+                description: "Push worklogs after 10pm or before 6am".to_string(),
+                icon: "🌙".to_string(),
                 category: AchievementCategory::Ironic,
-                chronie_message: "Logging work at this hour? Even time anomalies need sleep! 🌙",
+                chronie_message: "Logging work at this hour? Even time anomalies need sleep! 🌙"
+                    .to_string(),
             },
             Achievement::QuarterCrunch => AchievementMeta {
                 id: *self,
-                name: "Quarter Crunch",
-                description: "Cover 90%+ of working days in a full calendar quarter",
-                icon: "📊",
+                name: "Quarter Crunch".to_string(),
+                description: "Cover 90%+ of working days in a full calendar quarter".to_string(),
+                icon: "📊".to_string(),
                 category: AchievementCategory::Consistency,
-                chronie_message: "A whole quarter with barely a gap? You're a time-logging machine! 📊",
+                chronie_message:
+                    "A whole quarter with barely a gap? You're a time-logging machine! 📊"
+                        .to_string(),
             },
             Achievement::ColorCoder => AchievementMeta {
                 id: *self,
-                name: "Color Coder",
-                description: "Auto-link a meeting using a calendar color label",
-                icon: "🎨",
+                name: "Color Coder".to_string(),
+                description: "Auto-link a meeting using a calendar color label".to_string(),
+                icon: "🎨".to_string(),
                 category: AchievementCategory::Productivity,
-                chronie_message: "Color-coding your calendar for automatic linking? Chronie is impressed by your organizational genius! 🎨",
+                chronie_message:
+                    "Color-coding your calendar for automatic linking? Chronie is impressed by your organizational genius! 🎨"
+                        .to_string(),
             },
         }
     }
 
-    /// Load secret achievement metadata from PNG
+    /// Load secret achievement metadata from PNG (result cached after first call)
     fn load_secret_meta(secret_id: &str, achievement: Achievement) -> AchievementMeta {
         use crate::utils::branding::AppBranding;
+        use std::sync::OnceLock;
 
-        if let Ok(branding) = AppBranding::load() {
+        static BRANDING: OnceLock<Option<AppBranding>> = OnceLock::new();
+        let branding = BRANDING.get_or_init(|| AppBranding::load().ok());
+
+        if let Some(branding) = branding {
             if let Some(secrets) = &branding.secrets {
-                if let Some(secret_achievement) = secrets.achievements.get(secret_id) {
-                    // Leak strings to get 'static lifetime (they live for program duration anyway)
-                    let name: &'static str =
-                        Box::leak(secret_achievement.name.clone().into_boxed_str());
-                    let description: &'static str =
-                        Box::leak(secret_achievement.description.clone().into_boxed_str());
-                    let icon: &'static str =
-                        Box::leak(secret_achievement.icon.clone().into_boxed_str());
-                    let chronie_message: &'static str =
-                        Box::leak(secret_achievement.chronie_message.clone().into_boxed_str());
-
+                if let Some(sa) = secrets.achievements.get(secret_id) {
                     return AchievementMeta {
                         id: achievement,
-                        name,
-                        description,
-                        icon,
+                        name: sa.name.clone(),
+                        description: sa.description.clone(),
+                        icon: sa.icon.clone(),
                         category: AchievementCategory::Secret,
-                        chronie_message,
+                        chronie_message: sa.chronie_message.clone(),
                     };
                 }
             }
         }
 
-        // Fallback if PNG not loaded
+        // Fallback if PNG not loaded or secret not found
         AchievementMeta {
             id: achievement,
-            name: "Secret Achievement",
-            description: "???",
-            icon: "🔒",
+            name: "Secret Achievement".to_string(),
+            description: "???".to_string(),
+            icon: "🔒".to_string(),
             category: AchievementCategory::Secret,
-            chronie_message: "You found a secret!",
+            chronie_message: "You found a secret!".to_string(),
         }
     }
 
@@ -188,11 +196,11 @@ impl Achievement {
 #[derive(Debug, Clone)]
 pub struct AchievementMeta {
     pub id: Achievement,
-    pub name: &'static str,
-    pub description: &'static str,
-    pub icon: &'static str,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
     pub category: AchievementCategory,
-    pub chronie_message: &'static str,
+    pub chronie_message: String,
 }
 
 /// Achievement category for organization

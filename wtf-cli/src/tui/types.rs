@@ -51,6 +51,9 @@ pub enum AppEvent {
 
     // Linking events
     MeetingColorLinked,
+    AutoLinkComplete {
+        linked_count: usize,
+    },
 
     // Secret sequence events
     SecretSequenceTriggered {

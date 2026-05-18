@@ -60,9 +60,8 @@ impl AchievementTracker {
                     _ => {}
                 }
             }
-            AppEvent::FetchComplete(_) | AppEvent::DataRefreshed(_) => {
-                // Auto-Link Master: Check if all meetings are linked
-                if Self::has_perfect_auto_linking(tui) {
+            AppEvent::AutoLinkComplete { linked_count } => {
+                if *linked_count >= 10 {
                     candidates.push(Achievement::AutoLinkMaster);
                 }
             }
@@ -168,11 +167,19 @@ impl AchievementTracker {
             return false;
         }
 
+        let today = chrono::Local::now().date_naive();
+
         // Check each of the four calendar quarters in years we have data for
         let years: HashSet<i32> = logged_dates.iter().map(|d| d.year()).collect();
         for year in years {
             for quarter in 1u32..=4 {
                 let (q_start, q_end) = quarter_bounds(year, quarter);
+
+                // Only check quarters that have fully ended
+                if q_end >= today {
+                    continue;
+                }
+
                 let workdays: Vec<NaiveDate> = (0..)
                     .map(|i| q_start + chrono::Duration::days(i))
                     .take_while(|d| *d <= q_end)
@@ -188,26 +195,6 @@ impl AchievementTracker {
             }
         }
         false
-    }
-
-    /// Check if user has 10+ tracked meetings and all are auto-linked (no unlinked tracked meetings)
-    fn has_perfect_auto_linking(tui: &Tui) -> bool {
-        use wtf_lib::utils::meetings::is_untracked;
-
-        let tracked_meetings: Vec<_> = tui
-            .data
-            .all_meetings
-            .iter()
-            .filter(|m| !is_untracked(m, &tui.data.config, &tui.data.untracked_meeting_ids))
-            .collect();
-
-        // Need at least 10 tracked meetings
-        if tracked_meetings.len() < 10 {
-            return false;
-        }
-
-        // Check if ALL tracked meetings are linked
-        tracked_meetings.iter().all(|m| m.jira_link.is_some())
     }
 
     /// Check if the specified push contains a worklog linked to a declined meeting

@@ -304,6 +304,8 @@ impl Tui {
         if color_linked {
             self.event_bus.publish(AppEvent::MeetingColorLinked);
         }
+        self.event_bus
+            .publish(AppEvent::AutoLinkComplete { linked_count });
 
         // Refresh data to show the updates
         self.refresh_data();

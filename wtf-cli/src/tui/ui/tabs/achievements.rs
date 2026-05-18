@@ -244,7 +244,7 @@ pub(in crate::tui) fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
             );
 
             // Rows 1-2: description
-            let (desc_line1, desc_line2) = wrap_text_two_lines(meta.description, text_width);
+            let (desc_line1, desc_line2) = wrap_text_two_lines(&meta.description, text_width);
             frame.render_widget(
                 Paragraph::new(Span::styled(desc_line1, Style::default().fg(Color::Gray))),
                 rows[1],
