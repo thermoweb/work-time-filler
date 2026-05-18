@@ -192,11 +192,15 @@ fn render_worklogs_list(
             let line = Line::from(vec![
                 Span::styled(
                     theme().unselected_selector,
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     status_icon,
-                    Style::default().fg(status_color).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(status_color)
+                        .add_modifier(Modifier::BOLD),
                 ),
                 Span::raw(" "),
                 Span::styled(
@@ -226,9 +230,11 @@ fn render_worklogs_list(
         })
         .collect();
 
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(45, 40, 60))
+            .add_modifier(Modifier::BOLD),
+    );
 
     let mut state = ListState::default();
     state.select(Some(selected_index));

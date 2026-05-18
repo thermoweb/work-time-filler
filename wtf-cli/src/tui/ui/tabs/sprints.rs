@@ -289,95 +289,106 @@ fn render_sprint_list_expanded(
         return;
     }
 
-    let items: Vec<ListItem> = data.all_sprints.iter().map(|sprint| {
-        let icon_color = match sprint.state {
-            SprintState::Active => Color::Green,
-            SprintState::Future => Color::LightBlue,
-            SprintState::Closed => Color::DarkGray,
-        };
+    let items: Vec<ListItem> = data
+        .all_sprints
+        .iter()
+        .map(|sprint| {
+            let icon_color = match sprint.state {
+                SprintState::Active => Color::Green,
+                SprintState::Future => Color::LightBlue,
+                SprintState::Closed => Color::DarkGray,
+            };
 
-        let capacity_hours =
-            calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
-        let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
-        let percentage = if capacity_hours > 0.0 {
-            ((logged_hours / capacity_hours * 100.0).min(100.0).round()) as u16
-        } else {
-            0
-        };
-
-        let status_text = if sprint.state == SprintState::Active {
-            if let Some(end) = sprint.end {
-                let today = Local::now().date_naive();
-                let end_date = end.date_naive();
-                let days_left = (end_date - today).num_days();
-                if days_left > 0 {
-                    format!("{} days left", days_left)
-                } else if days_left == 0 {
-                    "Last day!".to_string()
-                } else {
-                    "Ended".to_string()
-                }
+            let capacity_hours =
+                calculate_sprint_capacity(sprint.id, data) as f64 * data.daily_hours_limit;
+            let logged_hours = calculate_sprint_logged_hours(sprint.id, data);
+            let percentage = if capacity_hours > 0.0 {
+                ((logged_hours / capacity_hours * 100.0).min(100.0).round()) as u16
             } else {
-                "Active".to_string()
-            }
-        } else if sprint.state == SprintState::Future {
-            "Future".to_string()
-        } else {
-            "Closed".to_string()
-        };
+                0
+            };
 
-        let filled_blocks = ((percentage as f64 / 10.0).round() as usize).min(10);
-        let progress_bar = format!(
-            "{}{}",
-            "█".repeat(filled_blocks),
-            "░".repeat(10 - filled_blocks)
-        );
+            let status_text = if sprint.state == SprintState::Active {
+                if let Some(end) = sprint.end {
+                    let today = Local::now().date_naive();
+                    let end_date = end.date_naive();
+                    let days_left = (end_date - today).num_days();
+                    if days_left > 0 {
+                        format!("{} days left", days_left)
+                    } else if days_left == 0 {
+                        "Last day!".to_string()
+                    } else {
+                        "Ended".to_string()
+                    }
+                } else {
+                    "Active".to_string()
+                }
+            } else if sprint.state == SprintState::Future {
+                "Future".to_string()
+            } else {
+                "Closed".to_string()
+            };
 
-        let percentage_color = if percentage >= 80 {
-            Color::Green
-        } else if percentage >= 50 {
-            Color::Yellow
-        } else {
-            Color::Red
-        };
+            let filled_blocks = ((percentage as f64 / 10.0).round() as usize).min(10);
+            let progress_bar = format!(
+                "{}{}",
+                "█".repeat(filled_blocks),
+                "░".repeat(10 - filled_blocks)
+            );
 
-        let line = Line::from(vec![
-            Span::styled(theme().unselected_selector, Style::default().fg(Color::Yellow)),
-            Span::raw(" "),
-            Span::styled("● ", Style::default().fg(icon_color)),
-            Span::styled(
-                format!("{:<24}", truncate_string(&sprint.name, 24)),
-                Style::default().fg(Color::White),
-            ),
-            Span::raw(" "),
-            Span::styled(progress_bar, Style::default().fg(percentage_color)),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:>3}%", percentage),
-                Style::default().fg(percentage_color).add_modifier(Modifier::BOLD),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                format!("{:>5.1}h/{:>5.1}h", logged_hours, capacity_hours),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                status_text,
-                Style::default().fg(match sprint.state {
-                    SprintState::Active => Color::Green,
-                    SprintState::Future => Color::LightBlue,
-                    SprintState::Closed => Color::Gray,
-                }),
-            ),
-        ]);
+            let percentage_color = if percentage >= 80 {
+                Color::Green
+            } else if percentage >= 50 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
 
-        ListItem::new(line)
-    }).collect();
+            let line = Line::from(vec![
+                Span::styled(
+                    theme().unselected_selector,
+                    Style::default().fg(Color::Yellow),
+                ),
+                Span::raw(" "),
+                Span::styled("● ", Style::default().fg(icon_color)),
+                Span::styled(
+                    format!("{:<24}", truncate_string(&sprint.name, 24)),
+                    Style::default().fg(Color::White),
+                ),
+                Span::raw(" "),
+                Span::styled(progress_bar, Style::default().fg(percentage_color)),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:>3}%", percentage),
+                    Style::default()
+                        .fg(percentage_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    format!("{:>5.1}h/{:>5.1}h", logged_hours, capacity_hours),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::raw(" "),
+                Span::styled(
+                    status_text,
+                    Style::default().fg(match sprint.state {
+                        SprintState::Active => Color::Green,
+                        SprintState::Future => Color::LightBlue,
+                        SprintState::Closed => Color::Gray,
+                    }),
+                ),
+            ]);
 
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
+            ListItem::new(line)
+        })
+        .collect();
+
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(45, 40, 60))
+            .add_modifier(Modifier::BOLD),
+    );
 
     let mut state = ListState::default();
     state.select(Some(selected_index));

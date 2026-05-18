@@ -354,17 +354,24 @@ fn render_meetings_list(
             Span::styled(" / ", Style::default().fg(Color::Yellow)),
             Span::styled(
                 data.ui_state.meeting_search_query.clone(),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled("█", Style::default().fg(Color::Yellow)),
-            Span::styled("  Esc: cancel  Enter: apply ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "  Esc: cancel  Enter: apply ",
+                Style::default().fg(Color::DarkGray),
+            ),
         ])
     } else if !data.ui_state.meeting_search_query.is_empty() {
         Line::from(vec![
             Span::styled(" / ", Style::default().fg(Color::Yellow)),
             Span::styled(
                 data.ui_state.meeting_search_query.clone(),
-                Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled("  Esc: clear ", Style::default().fg(Color::DarkGray)),
         ])
@@ -383,9 +390,11 @@ fn render_meetings_list(
         .border_style(Style::default().fg(theme().border))
         .style(Style::default().bg(theme().bg_primary));
 
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::default().bg(Color::Rgb(45, 40, 60)).add_modifier(Modifier::BOLD));
+    let list = List::new(items).block(block).highlight_style(
+        Style::default()
+            .bg(Color::Rgb(45, 40, 60))
+            .add_modifier(Modifier::BOLD),
+    );
 
     let mut state = ListState::default();
     if !meetings.is_empty() {
