@@ -36,7 +36,7 @@ pub(in crate::tui) fn render_unlink_confirmation(
     // Calculate popup size - centered, medium size
     let area = frame.area();
     let popup_width = 60.min(area.width - 4);
-    let popup_height = 8;
+    let popup_height = 9;
 
     let popup_area = Rect {
         x: (area.width - popup_width) / 2,
@@ -45,11 +45,7 @@ pub(in crate::tui) fn render_unlink_confirmation(
         height: popup_height,
     };
 
-    // Clear background
-    frame.render_widget(
-        Block::default().style(Style::default().bg(theme().bg_primary)),
-        popup_area,
-    );
+    frame.render_widget(Clear, popup_area);
 
     // Create message
     let lines = vec![
