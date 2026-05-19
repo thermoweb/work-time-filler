@@ -50,6 +50,8 @@ pub struct JiraConfig {
     pub api_token: SensitiveString,
     #[serde(default)]
     pub auto_follow_sprint_pattern: Option<String>,
+    #[serde(default)]
+    pub project_keys: Vec<String>,
 }
 
 impl Default for JiraConfig {
@@ -59,6 +61,7 @@ impl Default for JiraConfig {
             username: String::new(),
             api_token: SensitiveString::new(String::new()),
             auto_follow_sprint_pattern: None,
+            project_keys: Vec::new(),
         }
     }
 }

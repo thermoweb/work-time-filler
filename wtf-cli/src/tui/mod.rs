@@ -843,15 +843,15 @@ impl Tui {
                 self.needs_full_clear = true;
             }
             KeyCode::Char('3') => {
-                self.current_tab = Tab::Worklogs;
-                self.needs_full_clear = true;
-            }
-            KeyCode::Char('4') => {
                 self.current_tab = Tab::GitHub;
                 self.needs_full_clear = true;
             }
-            KeyCode::Char('5') => {
+            KeyCode::Char('4') => {
                 self.current_tab = Tab::History;
+                self.needs_full_clear = true;
+            }
+            KeyCode::Char('5') => {
+                self.current_tab = Tab::Worklogs;
                 self.needs_full_clear = true;
             }
             KeyCode::Char('6') => {
@@ -1870,8 +1870,15 @@ impl Tui {
                 config.jira.auto_follow_sprint_pattern =
                     if value.is_empty() { None } else { Some(value) }
             }
-            4 => config.github.organisation = if value.is_empty() { None } else { Some(value) },
-            5 => {
+            4 => {
+                config.jira.project_keys = value
+                    .split(',')
+                    .map(|s| s.trim().to_uppercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+            }
+            5 => config.github.organisation = if value.is_empty() { None } else { Some(value) },
+            6 => {
                 if let Some(ref mut g) = config.google {
                     g.credentials_path = value;
                 } else if !value.is_empty() {
@@ -1882,7 +1889,7 @@ impl Tui {
                     });
                 }
             }
-            6 => {
+            7 => {
                 if let Some(ref mut g) = config.google {
                     g.token_cache_path = value;
                 } else if !value.is_empty() {
@@ -1893,14 +1900,14 @@ impl Tui {
                     });
                 }
             }
-            7 => {
+            8 => {
                 if let Ok(hours) = value.parse::<f64>() {
                     config.worklog.daily_hours_limit = hours;
                 }
             }
-            8..=18 => {
+            9..=19 => {
                 use wtf_lib::config::GOOGLE_CALENDAR_EVENT_COLORS;
-                let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 8].to_string();
+                let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 9].to_string();
                 if let Some(ref mut g) = config.google {
                     if value.is_empty() {
                         g.color_labels.remove(&color_name);

@@ -55,9 +55,9 @@ fn render_tab_bar(frame: &mut Frame, area: &Rect, tui: &super::Tui) {
     let mut tabs = vec![
         ("1", "Sprints", Tab::Sprints),
         ("2", "Meetings", Tab::Meetings),
-        ("3", "Worklogs", Tab::Worklogs),
-        ("4", "GitHub", Tab::GitHub),
-        ("5", "History", Tab::History),
+        ("3", "GitHub", Tab::GitHub),
+        ("4", "History", Tab::History),
+        ("5", "Worklogs", Tab::Worklogs),
         ("6", "Settings", Tab::Settings),
     ];
 

@@ -87,8 +87,8 @@ impl TabController for SettingsTab {
 }
 
 /// Number of editable fields in the settings tab (indices 0..FIELD_COUNT-1).
-/// 0-7: standard fields, 8-18: Google Calendar color labels (11 colors)
-pub(in crate::tui) const FIELD_COUNT: usize = 19;
+/// 0-3: Jira basics, 4: Project Keys, 5: GitHub org, 6-7: Google paths, 8: Daily hours, 9-19: Color labels
+pub(in crate::tui) const FIELD_COUNT: usize = 20;
 
 /// Terminal display colors for the 11 Google Calendar event colors (same order as GOOGLE_CALENDAR_EVENT_COLORS).
 pub(super) fn gc_color(color_id: &str) -> Color {
@@ -136,20 +136,21 @@ pub(in crate::tui) fn get_field_value(field_idx: usize, config: &Config) -> Stri
             .auto_follow_sprint_pattern
             .clone()
             .unwrap_or_default(),
-        4 => config.github.organisation.clone().unwrap_or_default(),
-        5 => config
+        4 => config.jira.project_keys.join(", "),
+        5 => config.github.organisation.clone().unwrap_or_default(),
+        6 => config
             .google
             .as_ref()
             .map(|g| g.credentials_path.clone())
             .unwrap_or_default(),
-        6 => config
+        7 => config
             .google
             .as_ref()
             .map(|g| g.token_cache_path.clone())
             .unwrap_or_default(),
-        7 => config.worklog.daily_hours_limit.to_string(),
-        8..=18 => {
-            let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 8];
+        8 => config.worklog.daily_hours_limit.to_string(),
+        9..=19 => {
+            let color_name = GOOGLE_CALENDAR_EVENT_COLORS[field_idx - 9];
             config
                 .google
                 .as_ref()
@@ -171,10 +172,11 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
         (1, None, "Username", false),
         (2, None, "API Token", true),
         (3, None, "Sprint Pattern", false),
-        (4, Some("GitHub"), "Organisation", false),
-        (5, Some("Google"), "Credentials Path", false),
-        (6, None, "Token Cache Path", false),
-        (7, Some("Worklog"), "Daily Hours Limit", false),
+        (4, None, "Project Keys", false),
+        (5, Some("GitHub"), "Organisation", false),
+        (6, Some("Google"), "Credentials Path", false),
+        (7, None, "Token Cache Path", false),
+        (8, Some("Worklog"), "Daily Hours Limit", false),
     ];
 
     let mut lines: Vec<Line> = vec![Line::from("")];
@@ -247,7 +249,7 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
             .add_modifier(Modifier::BOLD),
     )]));
     for (color_idx, color_name) in GOOGLE_CALENDAR_EVENT_COLORS.iter().enumerate() {
-        let field_idx = 8 + color_idx;
+        let field_idx = 9 + color_idx;
         let is_selected = state.settings_selected_field == field_idx;
         let indicator = if is_selected {
             theme().selector

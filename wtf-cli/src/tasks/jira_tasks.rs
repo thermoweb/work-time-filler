@@ -177,6 +177,41 @@ impl Task for FetchJiraIssues {
             }
         }
 
+        let config = wtf_lib::config::Config::load().unwrap_or_default();
+        let start_date = Utc::now().checked_sub_months(Months::new(12));
+        for key in &config.jira.project_keys {
+            match jira_client
+                .get_project_issues(key.as_str(), start_date)
+                .await
+            {
+                Ok(issue_fetcher) => {
+                    let project_total = issue_fetcher.len();
+                    let mut project_done = 0usize;
+                    for issue in issue_fetcher {
+                        issues_to_store.push(Issue {
+                            key: issue.key.clone(),
+                            id: issue.id,
+                            created: issue.fields.created,
+                            status: issue.fields.status.name,
+                            summary: issue.fields.summary,
+                        });
+                        project_done += 1;
+                        emit(project_done, project_total);
+                    }
+                    logger::log(format!(
+                        "✅ Project '{}': {} issues fetched",
+                        key, project_done
+                    ));
+                }
+                Err(e) => {
+                    logger::log(format!(
+                        "⚠️  Project '{}': failed to fetch issues — {}",
+                        key, e
+                    ));
+                }
+            }
+        }
+
         logger::log(format!("📦 {} issues saved total", issues_to_store.len()));
         IssueService::production().save_all_issues(issues_to_store);
         Ok(())

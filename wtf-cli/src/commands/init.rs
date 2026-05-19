@@ -225,6 +225,7 @@ fn step3_configure_jira() -> Result<JiraConfig, Box<dyn Error>> {
         username: jira_email.clone(),
         api_token: SensitiveString::from_str(&jira_token).unwrap(),
         auto_follow_sprint_pattern: None,
+        project_keys: Vec::new(),
     };
 
     // Save temp config so subsequent API calls can pick up credentials

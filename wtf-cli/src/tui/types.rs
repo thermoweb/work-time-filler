@@ -146,9 +146,9 @@ impl Tab {
         let mut tabs = vec![
             Tab::Sprints,
             Tab::Meetings,
-            Tab::Worklogs,
             Tab::GitHub,
             Tab::History,
+            Tab::Worklogs,
             Tab::Settings,
         ];
 
