@@ -30,6 +30,9 @@ impl Command for TuiCommand {
                 eprintln!("❌ Failed to reset tiered achievements: {}", e);
                 return;
             }
+            // TheReset earns itself back immediately
+            use wtf_lib::Achievement;
+            AchievementService::production().unlock(Achievement::TheReset);
             println!("✅ All achievements have been reset!");
             println!();
         }

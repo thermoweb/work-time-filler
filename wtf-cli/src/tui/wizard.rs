@@ -62,6 +62,7 @@ impl Tui {
             sprint_id,
             sprint_name: sprint_name.to_string(),
             current_step: WizardStep::Syncing,
+            started_at: chrono::Utc::now(),
             completed_steps: std::collections::HashSet::new(),
             summary: WizardSummary::default(),
             rollback_log: WizardRollbackLog::default(),

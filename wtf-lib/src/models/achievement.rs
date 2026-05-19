@@ -17,6 +17,12 @@ pub enum Achievement {
     ColorCoder,
     ForgotFriday,
     PerfectSprint,
+    SpeedRunner,
+    NoGaps,
+    Overachiever,
+    TheReset,
+    GitHubWhisperer,
+    RainbowCalendar,
 }
 
 impl Achievement {
@@ -35,6 +41,12 @@ impl Achievement {
             Achievement::ColorCoder,
             Achievement::ForgotFriday,
             Achievement::PerfectSprint,
+            Achievement::SpeedRunner,
+            Achievement::NoGaps,
+            Achievement::Overachiever,
+            Achievement::TheReset,
+            Achievement::GitHubWhisperer,
+            Achievement::RainbowCalendar,
         ]
     }
 
@@ -158,6 +170,64 @@ impl Achievement {
                 chronie_message: "Not a single day missed! I'm genuinely impressed. 🏅".to_string(),
                 points: 50,
             },
+            Achievement::SpeedRunner => AchievementMeta {
+                id: *self,
+                name: "Speed Runner".to_string(),
+                description: "Complete the wizard from start to push in under 3 minutes".to_string(),
+                icon: "⚡".to_string(),
+                category: AchievementCategory::Productivity,
+                chronie_message: "Under 3 minutes?! I can barely process that fast! ⚡".to_string(),
+                points: 25,
+            },
+            Achievement::NoGaps => AchievementMeta {
+                id: *self,
+                name: "No Gaps".to_string(),
+                description: "Complete the wizard with zero gap-fill steps needed".to_string(),
+                icon: "✨".to_string(),
+                category: AchievementCategory::Consistency,
+                chronie_message: "No gaps to fill? Your calendar is a masterpiece! ✨".to_string(),
+                points: 50,
+            },
+            Achievement::Overachiever => AchievementMeta {
+                id: *self,
+                name: "Overachiever".to_string(),
+                description: "Log time for a day that hasn't ended yet".to_string(),
+                icon: "🔮".to_string(),
+                category: AchievementCategory::Ironic,
+                chronie_message: "Logging today's work already? Even I don't know how that ends! 🔮"
+                    .to_string(),
+                points: 0,
+            },
+            Achievement::TheReset => AchievementMeta {
+                id: *self,
+                name: "The Reset".to_string(),
+                description: "Use --reset-achievements (earns itself back immediately)".to_string(),
+                icon: "💀".to_string(),
+                category: AchievementCategory::Meta,
+                chronie_message: "You wiped everything... but some scars remain. 💀".to_string(),
+                points: 0,
+            },
+            Achievement::GitHubWhisperer => AchievementMeta {
+                id: *self,
+                name: "GitHub Whisperer".to_string(),
+                description: "Let GitHub auto-fill at least one sprint worklog".to_string(),
+                icon: "🐙".to_string(),
+                category: AchievementCategory::Productivity,
+                chronie_message: "Your commits speak for themselves! I just had to listen. 🐙"
+                    .to_string(),
+                points: 25,
+            },
+            Achievement::RainbowCalendar => AchievementMeta {
+                id: *self,
+                name: "Rainbow Calendar".to_string(),
+                description: "Push worklogs linked to 3+ different calendar color labels in one sprint"
+                    .to_string(),
+                icon: "🌈".to_string(),
+                category: AchievementCategory::Productivity,
+                chronie_message: "Three colors in a single sprint? Your calendar is fabulous! 🌈"
+                    .to_string(),
+                points: 25,
+            },
         }
     }
 
@@ -212,6 +282,12 @@ impl Achievement {
             Achievement::ColorCoder => "color_coder".to_string(),
             Achievement::ForgotFriday => "forgot_friday".to_string(),
             Achievement::PerfectSprint => "perfect_sprint".to_string(),
+            Achievement::SpeedRunner => "speed_runner".to_string(),
+            Achievement::NoGaps => "no_gaps".to_string(),
+            Achievement::Overachiever => "overachiever".to_string(),
+            Achievement::TheReset => "the_reset".to_string(),
+            Achievement::GitHubWhisperer => "github_whisperer".to_string(),
+            Achievement::RainbowCalendar => "rainbow_calendar".to_string(),
         }
     }
 }

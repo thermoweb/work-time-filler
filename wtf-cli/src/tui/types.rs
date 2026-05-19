@@ -396,6 +396,7 @@ pub struct WizardState {
     pub sprint_id: usize,
     pub sprint_name: String,
     pub current_step: WizardStep,
+    pub started_at: chrono::DateTime<chrono::Utc>,
     pub completed_steps: std::collections::HashSet<usize>, // 1-8
     pub summary: WizardSummary,
     pub rollback_log: WizardRollbackLog,

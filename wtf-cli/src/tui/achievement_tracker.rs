@@ -47,6 +47,40 @@ impl AchievementTracker {
                 if Self::completes_perfect_sprint(tui) {
                     candidates.push(Achievement::PerfectSprint);
                 }
+
+                // Overachiever: any worklog in this push is dated today (local time)
+                if Self::has_today_worklog(history_id) {
+                    candidates.push(Achievement::Overachiever);
+                }
+
+                // Wizard-only achievements
+                if tui.wizard_state.is_some() {
+                    let wizard = tui.wizard_state.as_ref().unwrap();
+
+                    // Speed Runner: wizard start to push in under 3 minutes
+                    if Self::is_speed_run(&wizard.started_at) {
+                        candidates.push(Achievement::SpeedRunner);
+                    }
+
+                    // No Gaps: wizard produced worklogs but none from gap-fill
+                    if wizard.summary.worklogs_from_gaps == 0
+                        && (wizard.summary.worklogs_from_meetings
+                            + wizard.summary.worklogs_from_github)
+                            > 0
+                    {
+                        candidates.push(Achievement::NoGaps);
+                    }
+
+                    // GitHub Whisperer: at least one worklog came from a GitHub session
+                    if wizard.summary.worklogs_from_github >= 1 {
+                        candidates.push(Achievement::GitHubWhisperer);
+                    }
+                }
+
+                // Rainbow Calendar: 3+ distinct color labels among linked meetings in this push
+                if Self::has_rainbow_calendar(history_id, tui) {
+                    candidates.push(Achievement::RainbowCalendar);
+                }
             }
             AppEvent::RevertComplete => {
                 // The Undoer: First time reverting
@@ -298,6 +332,52 @@ impl AchievementTracker {
             }
         }
         false
+    }
+
+    /// Check if any worklog in this push is dated today (local time) — "Overachiever"
+    fn has_today_worklog(history_id: &str) -> bool {
+        use chrono::Local;
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+
+        let today = Local::now().date_naive();
+        let svc = LocalWorklogService::production();
+        if let Some(entry) = svc.get_history_by_id(history_id) {
+            for worklog_id in &entry.local_worklogs_id {
+                if let Some(worklog) = svc.get_local_worklog_by_id(worklog_id) {
+                    if worklog.started.date_naive() == today {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if the wizard completed in under 3 minutes — "Speed Runner"
+    fn is_speed_run(started_at: &chrono::DateTime<chrono::Utc>) -> bool {
+        chrono::Utc::now() - *started_at < chrono::Duration::minutes(3)
+    }
+
+    /// Check if 3+ distinct calendar color labels are among meetings linked in this push
+    fn has_rainbow_calendar(history_id: &str, tui: &Tui) -> bool {
+        use std::collections::HashSet;
+        use wtf_lib::services::worklogs_service::LocalWorklogService;
+
+        let svc = LocalWorklogService::production();
+        let Some(entry) = svc.get_history_by_id(history_id) else {
+            return false;
+        };
+
+        let color_ids: HashSet<String> = entry
+            .local_worklogs_id
+            .iter()
+            .filter_map(|wid| svc.get_local_worklog_by_id(wid))
+            .filter_map(|wl| wl.meeting_id)
+            .filter_map(|mid| tui.data.all_meetings.iter().find(|m| m.id == mid).cloned())
+            .filter_map(|m| m.color_id)
+            .collect();
+
+        color_ids.len() >= 3
     }
 
     fn handle_tiered(event: &AppEvent, has_wizard: bool, tui: &mut Tui) {
