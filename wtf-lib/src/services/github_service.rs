@@ -230,6 +230,22 @@ impl GitHubService {
 
     /// Calculate work sessions from API events and save to database
     fn calculate_and_save_sessions(&self, api_events: &[APIGitHubEvent]) -> usize {
+        // Delete stale sessions for affected dates before recalculating.
+        // Session IDs encode (repo + start + end), so any boundary shift from new events
+        // produces a different ID — leaving the old session orphaned in the DB.
+        let affected_dates: std::collections::HashSet<chrono::NaiveDate> =
+            api_events.iter().map(|e| e.created_at.date_naive()).collect();
+
+        if let Ok(existing) = self.sessions_db.get_all() {
+            for session in existing {
+                if affected_dates.contains(&session.date) {
+                    if let Err(e) = self.sessions_db.remove(&session.id) {
+                        warn!("Failed to remove stale session '{}': {}", session.id, e);
+                    }
+                }
+            }
+        }
+
         let mut sessions_by_day: HashMap<String, Vec<TempSession>> = HashMap::new();
 
         for event in api_events {
@@ -456,5 +472,78 @@ impl WorkSession {
     /// Get the most relevant Jira issue (first one found)
     pub fn primary_jira_issue(&self) -> Option<String> {
         self.jira_issues.first().cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::github_client::{GitHubEvent as APIGitHubEvent, GitHubRepo};
+    use crate::storage::database::{Database, GenericDatabase};
+    use chrono::{TimeZone, Timelike};
+    use serde_json::json;
+
+    fn make_event(id: &str, repo: &str, hour: u32) -> APIGitHubEvent {
+        APIGitHubEvent {
+            id: id.to_string(),
+            event_type: "PushEvent".to_string(),
+            created_at: Utc.with_ymd_and_hms(2024, 1, 15, hour, 0, 0).unwrap(),
+            repo: GitHubRepo {
+                name: repo.to_string(),
+                url: String::new(),
+            },
+            payload: json!({}),
+        }
+    }
+
+    fn make_service() -> GitHubService {
+        let db = Database::temporary();
+        let events_db = GenericDatabase::new(&db, "events").unwrap();
+        let sessions_db = GenericDatabase::new(&db, "sessions").unwrap();
+        GitHubService::new(events_db, sessions_db)
+    }
+
+    #[test]
+    fn test_sessions_within_2h_are_merged() {
+        let svc = make_service();
+        let events = vec![
+            make_event("e1", "org/repo", 9),
+            make_event("e2", "org/repo", 10), // 1h gap → merged
+            make_event("e3", "org/repo", 13), // 3h gap → new session
+        ];
+        svc.calculate_and_save_sessions(&events);
+
+        let sessions = svc.get_all_sessions().unwrap();
+        assert_eq!(sessions.len(), 2);
+    }
+
+    #[test]
+    fn test_resync_removes_stale_sessions() {
+        let svc = make_service();
+
+        // First sync: two events 3h apart → two sessions
+        let first_sync = vec![
+            make_event("e1", "org/repo", 9),
+            make_event("e2", "org/repo", 12),
+        ];
+        svc.calculate_and_save_sessions(&first_sync);
+        assert_eq!(svc.get_all_sessions().unwrap().len(), 2);
+
+        // Second sync: two bridging events fill the gap (each step < 2h apart)
+        let second_sync = vec![
+            make_event("e1", "org/repo", 9),
+            make_event("e3", "org/repo", 10), // 1h after e1 → merged
+            make_event("e4", "org/repo", 11), // 1h after e3 → merged
+            make_event("e2", "org/repo", 12), // 1h after e4 → merged
+        ];
+        svc.calculate_and_save_sessions(&second_sync);
+
+        let sessions = svc.get_all_sessions().unwrap();
+        // Stale sessions from first sync must be gone; only the merged session remains
+        assert_eq!(sessions.len(), 1, "stale sessions from first sync must not survive re-sync");
+
+        let s = &sessions[0];
+        assert_eq!(s.start_time.hour(), 9);
+        assert_eq!(s.end_time.hour(), 12);
     }
 }

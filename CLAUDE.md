@@ -26,6 +26,11 @@ Coverage (lib only):
 cargo tarpaulin --out Lcov --output-dir coverage/ --workspace --exclude-files 'wtf-cli/*'
 ```
 
+To test with an isolated config (won't touch your real data):
+```bash
+WTF_CONFIG_HOME=/tmp/wtf-test cargo run -- init
+```
+
 ## Architecture
 
 The workspace has two crates:
@@ -41,7 +46,7 @@ The workspace has two crates:
 | Services | `src/services/` | Business logic: `MeetingsService`, `WorklogsService`, `JiraService`, `GitHubService`, `GoogleService`, `AchievementService` |
 | Clients | `src/client/` | HTTP clients for Jira and GitHub APIs, with pagination helpers |
 | Storage | `src/storage/database.rs` | `GenericDatabase<T>` wrapper around sled; requires `T: Identifiable + Serialize + Deserialize` |
-| Config | `src/config.rs` | TOML config loading; path via `WTF_CONFIG_HOME` or `~/.local/share/wtf/` |
+| Config | `src/config.rs` | TOML config loading; path via `WTF_CONFIG_HOME` or `~/.config/wtf/config.toml` |
 
 **Services** are stateless structs owning a `GenericDatabase`. They have a `.production()` constructor that opens the default DB path. The test pattern is to construct them with `Database::temporary()`.
 
@@ -53,10 +58,11 @@ The workspace has two crates:
 |---|---|
 | `src/main.rs` | Clap CLI setup, command dispatch |
 | `src/commands/` | One file per CLI subcommand |
-| `src/tui/mod.rs` | `Tui` struct, event loop, keyboard handling (~2000 lines — known violation) |
+| `src/tui/mod.rs` | `Tui` struct, event loop, keyboard handling (~2100 lines — known violation) |
 | `src/tui/data.rs` | `TuiData` — collects all state from services at startup |
 | `src/tui/types.rs` | State enums: `Tab`, `WizardStep`, `WizardState`, `PopupState`, etc. |
 | `src/tui/wizard.rs` | Chronie Wizard steps (state machine) |
+| `src/tui/tab_controller.rs` | `TabController` trait — shared contract each tab implements for rendering and key handling |
 | `src/tui/ui/` | Rendering split by tab: `tabs/sprints.rs`, `tabs/meetings.rs`, `tabs/worklogs.rs`, etc. |
 | `src/tui/operations/` | Async task wrappers that call services and report progress back to the TUI |
 | `src/tasks/` | Background async tasks (implement `Task` trait) |
@@ -83,5 +89,5 @@ The workspace has two crates:
 See `doc/ARCHITECTURE_ISSUES.md` for the full list. The most relevant:
 
 - Each async operation spawns a new `tokio::Runtime` — expensive but pervasive; don't add new instances.
-- Services use `lazy_static` global databases — this prevents unit-testing services in isolation; use `Database::temporary()` for tests.
+- Services use `lazy_static` global databases — this prevents unit-testing services in isolation; use `Database::temporary()` for tests. `AchievementService` is the reference DI implementation — follow its pattern when refactoring other services.
 - `TuiData` is a large god struct — new fields are acceptable for now but consider whether they belong in a sub-struct.
