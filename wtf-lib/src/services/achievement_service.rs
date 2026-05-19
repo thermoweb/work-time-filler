@@ -47,25 +47,48 @@ impl AchievementService {
     /// Unlock an achievement.
     /// Returns true if newly unlocked, false if already unlocked.
     pub fn unlock(&self, achievement: Achievement) -> bool {
-        let mut cache = self.cache.lock().unwrap();
-
-        if cache.iter().any(|u| u.achievement == achievement) {
-            return false;
-        }
-
-        let unlock = AchievementUnlock {
-            achievement,
-            unlocked_at: chrono::Utc::now(),
-            app_version: env!("CARGO_PKG_VERSION").to_string(),
+        let newly_unlocked = {
+            let mut cache = self.cache.lock().unwrap();
+            if cache.iter().any(|u| u.achievement == achievement) {
+                return false;
+            }
+            let unlock = AchievementUnlock {
+                achievement,
+                unlocked_at: chrono::Utc::now(),
+                app_version: env!("CARGO_PKG_VERSION").to_string(),
+            };
+            if let Err(e) = self.db.insert(&unlock) {
+                error!("Failed to save achievement unlock: {}", e);
+                return false;
+            }
+            cache.push(unlock);
+            true
         };
 
-        if let Err(e) = self.db.insert(&unlock) {
-            error!("Failed to save achievement unlock: {}", e);
-            return false;
+        if newly_unlocked && achievement != Achievement::TheCompletionist {
+            self.maybe_unlock_completionist();
         }
+        newly_unlocked
+    }
 
-        cache.push(unlock);
-        true
+    fn maybe_unlock_completionist(&self) {
+        use crate::models::achievement::AchievementCategory;
+        let required: Vec<Achievement> = Achievement::all()
+            .into_iter()
+            .filter(|a| {
+                *a != Achievement::TheCompletionist
+                    && a.meta().category != AchievementCategory::Secret
+            })
+            .collect();
+        let all_earned = {
+            let cache = self.cache.lock().unwrap();
+            required
+                .iter()
+                .all(|a| cache.iter().any(|u| u.achievement == *a))
+        };
+        if all_earned {
+            self.unlock(Achievement::TheCompletionist);
+        }
     }
 
     /// Revoke achievements that were unlocked before a bugfix version.
@@ -213,6 +236,30 @@ mod tests {
         svc.run_revoke_schedule();
 
         assert!(svc.is_unlocked(Achievement::GitSquashMaster));
+    }
+
+    #[test]
+    fn test_completionist_triggers_when_all_non_secret_earned() {
+        use crate::models::achievement::AchievementCategory;
+        let svc = temp_service();
+        let non_secret: Vec<Achievement> = Achievement::all()
+            .into_iter()
+            .filter(|a| {
+                *a != Achievement::TheCompletionist
+                    && a.meta().category != AchievementCategory::Secret
+            })
+            .collect();
+        for a in &non_secret {
+            svc.unlock(*a);
+        }
+        assert!(svc.is_unlocked(Achievement::TheCompletionist));
+    }
+
+    #[test]
+    fn test_completionist_does_not_trigger_early() {
+        let svc = temp_service();
+        svc.unlock(Achievement::AboutClicker);
+        assert!(!svc.is_unlocked(Achievement::TheCompletionist));
     }
 
     #[test]

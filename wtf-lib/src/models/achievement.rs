@@ -23,6 +23,7 @@ pub enum Achievement {
     TheReset,
     GitHubWhisperer,
     RainbowCalendar,
+    TheCompletionist,
 }
 
 impl Achievement {
@@ -47,6 +48,7 @@ impl Achievement {
             Achievement::TheReset,
             Achievement::GitHubWhisperer,
             Achievement::RainbowCalendar,
+            Achievement::TheCompletionist,
         ]
     }
 
@@ -63,7 +65,6 @@ impl Achievement {
                 points: 5,
             },
             Achievement::ChroniesFriend => {
-                // Load from PNG metadata
                 Self::load_secret_meta("secret_chronie_friend", *self)
             }
             Achievement::TheUndoer => AchievementMeta {
@@ -193,7 +194,7 @@ impl Achievement {
                 name: "Overachiever".to_string(),
                 description: "Log time for a day that hasn't ended yet".to_string(),
                 icon: "🔮".to_string(),
-                category: AchievementCategory::Ironic,
+                category: AchievementCategory::Secret,
                 chronie_message: "Logging today's work already? Even I don't know how that ends! 🔮"
                     .to_string(),
                 points: 0,
@@ -203,7 +204,7 @@ impl Achievement {
                 name: "The Reset".to_string(),
                 description: "Use --reset-achievements (earns itself back immediately)".to_string(),
                 icon: "💀".to_string(),
-                category: AchievementCategory::Meta,
+                category: AchievementCategory::Secret,
                 chronie_message: "You wiped everything... but some scars remain. 💀".to_string(),
                 points: 0,
             },
@@ -227,6 +228,16 @@ impl Achievement {
                 chronie_message: "Three colors in a single sprint? Your calendar is fabulous! 🌈"
                     .to_string(),
                 points: 25,
+            },
+            Achievement::TheCompletionist => AchievementMeta {
+                id: *self,
+                name: "The Completionist".to_string(),
+                description: "Earn all non-secret achievements".to_string(),
+                icon: "💎".to_string(),
+                category: AchievementCategory::Meta,
+                chronie_message: "You've earned everything I had to offer. I'm genuinely speechless. 💎"
+                    .to_string(),
+                points: 100,
             },
         }
     }
@@ -288,6 +299,7 @@ impl Achievement {
             Achievement::TheReset => "the_reset".to_string(),
             Achievement::GitHubWhisperer => "github_whisperer".to_string(),
             Achievement::RainbowCalendar => "rainbow_calendar".to_string(),
+            Achievement::TheCompletionist => "the_completionist".to_string(),
         }
     }
 }
@@ -312,7 +324,6 @@ pub enum AchievementCategory {
     Milestones,
     Meta,
     Secret,
-    Ironic,
 }
 
 /// Achievement unlock record
