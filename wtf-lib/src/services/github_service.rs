@@ -233,8 +233,10 @@ impl GitHubService {
         // Delete stale sessions for affected dates before recalculating.
         // Session IDs encode (repo + start + end), so any boundary shift from new events
         // produces a different ID — leaving the old session orphaned in the DB.
-        let affected_dates: std::collections::HashSet<chrono::NaiveDate> =
-            api_events.iter().map(|e| e.created_at.date_naive()).collect();
+        let affected_dates: std::collections::HashSet<chrono::NaiveDate> = api_events
+            .iter()
+            .map(|e| e.created_at.date_naive())
+            .collect();
 
         if let Ok(existing) = self.sessions_db.get_all() {
             for session in existing {
@@ -540,7 +542,11 @@ mod tests {
 
         let sessions = svc.get_all_sessions().unwrap();
         // Stale sessions from first sync must be gone; only the merged session remains
-        assert_eq!(sessions.len(), 1, "stale sessions from first sync must not survive re-sync");
+        assert_eq!(
+            sessions.len(),
+            1,
+            "stale sessions from first sync must not survive re-sync"
+        );
 
         let s = &sessions[0];
         assert_eq!(s.start_time.hour(), 9);
