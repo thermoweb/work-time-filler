@@ -128,10 +128,14 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
         if !line2.ends_with('.') {
             line2.push('.');
         }
-    } else if words.is_empty() && !line1.is_empty() && line2.is_empty() && line1.len() < width
-        && !line1.ends_with('.') {
-            line1.push('.');
-        }
+    } else if words.is_empty()
+        && !line1.is_empty()
+        && line2.is_empty()
+        && line1.len() < width
+        && !line1.ends_with('.')
+    {
+        line1.push('.');
+    }
 
     (line1, line2)
 }

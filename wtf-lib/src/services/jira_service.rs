@@ -93,10 +93,7 @@ impl IssueService {
                 let should_remove_local = match &e {
                     JiraError::ApiError(msg) => {
                         // Parse the leading status code (e.g. "404 Not Found - ...")
-                        let status_code = msg
-                            .split(' ')
-                            .next()
-                            .and_then(|s| s.parse::<u16>().ok());
+                        let status_code = msg.split(' ').next().and_then(|s| s.parse::<u16>().ok());
                         match status_code {
                             // Worklog no longer exists or request is malformed — remove locally
                             Some(404) | Some(400) => true,

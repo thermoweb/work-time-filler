@@ -40,8 +40,7 @@ pub struct MeetingStats {
 }
 
 /// UI state for tabs (selections, filters, expansions)
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TabUiState {
     pub selected_sprint_index: usize,
     pub selected_meeting_index: usize,
@@ -66,7 +65,6 @@ pub struct TabUiState {
     /// Missing from map = not yet requested; "notrack" is never added.
     pub settings_color_issue_titles: HashMap<String, IssueTitleState>,
 }
-
 
 /// All data needed for dashboard display
 #[derive(Debug, Clone)]

@@ -409,8 +409,7 @@ pub struct WizardState {
     pub github_step_intro: Option<GitHubStepIntro>, // Shown before processing GitHub sessions
 }
 
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WizardRollbackLog {
     pub linked_meeting_ids: Vec<String>, // Both auto and manual
     pub created_worklog_ids: Vec<String>,
@@ -441,7 +440,6 @@ impl Default for WizardSummary {
         }
     }
 }
-
 
 pub struct WizardCancelConfirmation;
 

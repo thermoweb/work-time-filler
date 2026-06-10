@@ -643,10 +643,7 @@ impl FetchJiraWorklogs {
 
 impl Task for FetchJiraWorklogs {
     async fn execute(&self) -> Result<(), Box<dyn Error>> {
-        let mp = self
-            .multi_progress
-            .clone()
-            .unwrap_or_default();
+        let mp = self.multi_progress.clone().unwrap_or_default();
         let sprint_progress = mp.add(ProgressBar::new(self.sprints.len() as u64));
         let progress_style = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")

@@ -82,7 +82,6 @@ pub struct GoogleConfig {
     pub color_labels: HashMap<String, String>,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorklogConfig {
     #[serde(default = "default_daily_hours_limit")]

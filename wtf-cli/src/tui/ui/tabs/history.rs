@@ -288,9 +288,7 @@ impl TabController for HistoryTab {
 
 /// Returns one entry per followed sprint that has untracked Jira worklogs,
 /// sorted by sprint start date (most recent first).
-pub(in crate::tui) fn jira_only_by_sprint(
-    data: &TuiData,
-) -> Vec<(&Sprint, Vec<&Worklog>)> {
+pub(in crate::tui) fn jira_only_by_sprint(data: &TuiData) -> Vec<(&Sprint, Vec<&Worklog>)> {
     use std::collections::HashSet;
     let tracked: HashSet<&str> = data
         .all_worklogs

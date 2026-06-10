@@ -81,7 +81,6 @@ impl AchievementTracker {
                 if Self::has_rainbow_calendar(history_id, tui) {
                     candidates.push(Achievement::RainbowCalendar);
                 }
-
             }
             AppEvent::RevertComplete => {
                 // The Undoer: First time reverting

@@ -103,10 +103,7 @@ fn render_github_sessions_list(
         BTreeMap::new();
     for session in sessions {
         let date_str = session.date.to_string();
-        sessions_by_date
-            .entry(date_str)
-            .or_default()
-            .push(session);
+        sessions_by_date.entry(date_str).or_default().push(session);
     }
 
     // Build the content

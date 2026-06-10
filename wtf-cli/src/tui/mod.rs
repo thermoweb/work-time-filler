@@ -2030,7 +2030,13 @@ impl Tui {
             return false;
         }
         let start = self.key_sequence_buffer.len() - length;
-        let joined: String = self.key_sequence_buffer.iter().skip(start).cloned().collect::<Vec<_>>().join("");
+        let joined: String = self
+            .key_sequence_buffer
+            .iter()
+            .skip(start)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("");
         format!("{:016x}", Self::fnv1a_64(&joined)) == expected_hash
     }
 

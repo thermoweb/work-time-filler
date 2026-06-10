@@ -262,10 +262,7 @@ impl GitHubService {
                 Self::get_event_description_from_api(event),
             );
 
-            sessions_by_day
-                .entry(date_key)
-                .or_default()
-                .push(session);
+            sessions_by_day.entry(date_key).or_default().push(session);
         }
 
         // Merge nearby events into sessions (within 2 hours)
@@ -334,10 +331,7 @@ impl GitHubService {
                 description: Self::get_event_description(event),
             };
 
-            sessions_by_day
-                .entry(date_key)
-                .or_default()
-                .push(session);
+            sessions_by_day.entry(date_key).or_default().push(session);
         }
 
         for (_date, sessions) in sessions_by_day.iter_mut() {

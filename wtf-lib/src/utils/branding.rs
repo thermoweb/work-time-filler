@@ -186,7 +186,10 @@ mod tests {
             assert_eq!(key, &seq.hash, "Sequence map key must equal its hash");
             assert!(seq.length > 0, "Sequence length must be positive");
             assert!(!seq.hash.is_empty(), "Sequence hash must not be empty");
-            assert!(!seq.achievement.is_empty(), "Sequence must reference an achievement");
+            assert!(
+                !seq.achievement.is_empty(),
+                "Sequence must reference an achievement"
+            );
 
             // Verify the referenced achievement exists
             assert!(
@@ -196,7 +199,10 @@ mod tests {
         }
 
         // Verify achievements are well-formed
-        assert!(!secrets.achievements.is_empty(), "No secret achievements found in PNG");
+        assert!(
+            !secrets.achievements.is_empty(),
+            "No secret achievements found in PNG"
+        );
         for achievement in secrets.achievements.values() {
             assert!(!achievement.name.is_empty());
             assert!(!achievement.icon.is_empty());
