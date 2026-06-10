@@ -15,7 +15,7 @@ use std::fmt::Display;
 use tabled::settings::object::Columns;
 use tabled::settings::{Alignment, Color, Modify, Style};
 use tabled::{Table, Tabled};
-use wtf_lib::common::common::Common;
+use wtf_lib::common::Common;
 use wtf_lib::models::data::{Issue, Meeting, Sprint};
 use wtf_lib::services::jira_service::{IssueService, JiraService, SprintService};
 use wtf_lib::services::meetings_service::MeetingsService;
@@ -90,7 +90,7 @@ impl Command for ListMeetingCommand {
         meetings.sort_by(|a, b| a.start.cmp(&b.start));
         let meetings_data = meetings
             .iter()
-            .map(|m| MeetingInfo::from_meeting(&m))
+            .map(MeetingInfo::from_meeting)
             .collect::<Vec<_>>();
         let mut table = Table::new(meetings_data);
         table.with(Style::modern().remove_horizontal());
@@ -254,7 +254,7 @@ impl LinkGoogleMeetingsCommand {
                     }
                 }
             } else {
-                let issue_to_link = candidates.get(0).unwrap();
+                let issue_to_link = candidates.first().unwrap();
                 let question = format!(
                     "Link meeting '{}' to issue '[{}]{}'",
                     title.magenta(),
@@ -353,7 +353,7 @@ struct IssueChoice {
 
 impl Display for IssueChoice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("[{}] {}", self.key, self.title))
+        write!(f, "[{}] {}", self.key, self.title)
     }
 }
 

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use tabled::settings::object::Columns;
 use tabled::settings::{Alignment, Color, Modify, Style};
 use tabled::{Table, Tabled};
-use wtf_lib::common::common::Common;
+use wtf_lib::common::Common;
 use wtf_lib::models::data::{LocalWorklog, LocalWorklogHistory, LocalWorklogState};
 use wtf_lib::services::jira_service::IssueService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;

@@ -81,6 +81,7 @@ impl AchievementTracker {
                 if Self::has_rainbow_calendar(history_id, tui) {
                     candidates.push(Achievement::RainbowCalendar);
                 }
+
             }
             AppEvent::RevertComplete => {
                 // The Undoer: First time reverting
@@ -90,13 +91,9 @@ impl AchievementTracker {
                 // About popup achievement
                 candidates.push(Achievement::AboutClicker);
             }
-            AppEvent::SecretSequenceTriggered { sequence_name } => {
-                // Map sequence name to achievement
-                match sequence_name.as_str() {
-                    "chronie" => {
-                        candidates.push(Achievement::ChroniesFriend);
-                    }
-                    _ => {}
+            AppEvent::SecretSequenceTriggered { achievement_id } => {
+                if let Some(achievement) = Achievement::from_branding_id(achievement_id) {
+                    candidates.push(achievement);
                 }
             }
             AppEvent::AutoLinkComplete { linked_count } => {
@@ -106,6 +103,12 @@ impl AchievementTracker {
             }
             AppEvent::MeetingColorLinked => {
                 candidates.push(Achievement::ColorCoder);
+            }
+            AppEvent::FetchComplete(data) | AppEvent::DataRefreshed(data) => {
+                // Off the Books: fetched meetings contain at least one excluded by a notrack color label
+                if Self::has_notrack_color_meeting(data) {
+                    candidates.push(Achievement::DoNotDisturb);
+                }
             }
             _ => {}
         }
@@ -185,7 +188,7 @@ impl AchievementTracker {
     fn has_night_worklog() -> bool {
         use chrono::Timelike;
         let hour = chrono::Local::now().hour();
-        hour >= 22 || hour < 6
+        !(6..22).contains(&hour)
     }
 
     /// Check if any full calendar quarter has ≥90% of its Mon–Fri days covered by pushed worklogs
@@ -378,6 +381,14 @@ impl AchievementTracker {
             .collect();
 
         color_ids.len() >= 3
+    }
+
+    /// Check if any meeting in the fetched data is excluded by a notrack color label
+    fn has_notrack_color_meeting(data: &super::data::TuiData) -> bool {
+        use wtf_lib::utils::meetings::is_notrack_color;
+        data.all_meetings
+            .iter()
+            .any(|m| is_notrack_color(m, &data.config))
     }
 
     fn handle_tiered(event: &AppEvent, has_wizard: bool, tui: &mut Tui) {

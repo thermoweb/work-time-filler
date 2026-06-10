@@ -5,6 +5,25 @@ use std::collections::HashSet;
 const UNTRACK_KEYWORD: &str = "#untrack";
 const NOTRACK_COLOR_VALUE: &str = "notrack";
 
+/// Returns true if the meeting's color is explicitly mapped to "notrack" in config.
+pub fn is_notrack_color(meeting: &Meeting, config: &Config) -> bool {
+    if let Some(color_id) = &meeting.color_id {
+        if let Ok(idx) = color_id.parse::<usize>() {
+            if (1..=11).contains(&idx) {
+                use crate::config::GOOGLE_CALENDAR_EVENT_COLORS;
+                let color_name = GOOGLE_CALENDAR_EVENT_COLORS[idx - 1];
+                return config
+                    .google
+                    .as_ref()
+                    .and_then(|g| g.color_labels.get(color_name))
+                    .map(|v| v == NOTRACK_COLOR_VALUE)
+                    .unwrap_or(false);
+            }
+        }
+    }
+    false
+}
+
 /// Returns true if a meeting should be treated as untracked, based on:
 /// - Manual opt-out (meeting ID in `manual_ids`)
 /// - `#untrack` keyword in title or description
@@ -29,7 +48,7 @@ pub fn is_untracked(meeting: &Meeting, config: &Config, manual_ids: &HashSet<Str
 
     if let Some(color_id) = &meeting.color_id {
         if let Ok(idx) = color_id.parse::<usize>() {
-            if idx >= 1 && idx <= 11 {
+            if (1..=11).contains(&idx) {
                 use crate::config::GOOGLE_CALENDAR_EVENT_COLORS;
                 let color_name = GOOGLE_CALENDAR_EVENT_COLORS[idx - 1];
                 if config

@@ -109,7 +109,7 @@ impl Command for IssueLogTimeCommand {
         };
         let issue_key = matches.get_one::<String>("issue-key").unwrap();
 
-        match IssueService::production().get_by_key(&issue_key) {
+        match IssueService::production().get_by_key(issue_key) {
             Some(issue) => {
                 match IssueService::production()
                     .add_time(issue.key.as_str(), duration, Utc::now(), None)

@@ -75,7 +75,7 @@ impl Command for FetchCommand {
 
 async fn fetch_boards(multi_progress: Option<MultiProgress>) {
     FetchJiraBoard::new()
-        .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
+        .with_progress(multi_progress.unwrap_or_default())
         .execute()
         .await
         .unwrap();
@@ -83,15 +83,15 @@ async fn fetch_boards(multi_progress: Option<MultiProgress>) {
 
 async fn fetch_sprints(multi_progress: Option<MultiProgress>) {
     let _ = FetchJiraSprint::new()
-        .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
+        .with_progress(multi_progress.unwrap_or_default())
         .execute()
         .await;
 }
 
 async fn fetch_issues(multi_progress: Option<MultiProgress>) {
     let sprints = JiraService::production().get_followed_sprint();
-    let _ = FetchJiraIssues::new(sprints)
-        .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
+    FetchJiraIssues::new(sprints)
+        .with_progress(multi_progress.unwrap_or_default())
         .execute()
         .await
         .unwrap();
@@ -100,7 +100,7 @@ async fn fetch_issues(multi_progress: Option<MultiProgress>) {
 async fn fetch_worklogs(multi_progress: Option<MultiProgress>) {
     let sprints = JiraService::production().get_followed_sprint();
     FetchJiraWorklogs::new(sprints)
-        .with_progress(multi_progress.unwrap_or(MultiProgress::new()))
+        .with_progress(multi_progress.unwrap_or_default())
         .execute()
         .await
         .unwrap();

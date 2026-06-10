@@ -269,7 +269,7 @@ impl Command for SprintClearWorklogsCommand {
 
     async fn execute(&self, matches: &ArgMatches) {
         use std::collections::HashMap;
-        use wtf_lib::common::common::Common;
+        use wtf_lib::common::Common;
         use wtf_lib::services::jira_service::IssueService;
         use wtf_lib::services::worklogs_service::LocalWorklogService;
 

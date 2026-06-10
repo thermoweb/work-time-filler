@@ -139,9 +139,9 @@ fn render_worklog_wall(frame: &mut Frame, area: &Rect, data: &TuiData) {
                     // Pad rows BEFORE the current weekday to align properly
                     // If year changes on Thursday, pad Mon-Wed with empty cells
                     let max_len_after_sep = grid.iter().map(|row| row.len()).max().unwrap_or(0);
-                    for row_idx in 0..weekday {
-                        while grid[row_idx].len() < max_len_after_sep + 1 {
-                            grid[row_idx].push((0.0, false, false));
+                    for row in grid.iter_mut().take(weekday) {
+                        while row.len() < max_len_after_sep + 1 {
+                            row.push((0.0, false, false));
                         }
                     }
                 }
@@ -213,8 +213,6 @@ fn hours_to_braille(hours: f64, daily_limit: f64) -> &'static str {
         }
     }
 }
-
-/// Convert hours to color
 
 /// Sprints tab - Two-column layout: (sprint list / worklog wall) | sprint details
 pub(in crate::tui) fn render_sprints_tab(frame: &mut Frame, area: &Rect, data: &TuiData) {
@@ -624,7 +622,7 @@ fn render_sprint_activity_compact(frame: &mut Frame, area: &Rect, sprint: &Sprin
     }
 
     // Split activities into two columns for better space utilization
-    let midpoint = (activities.len() + 1) / 2;
+    let midpoint = activities.len().div_ceil(2);
     let left_activities = &activities[..midpoint];
     let right_activities = if activities.len() > midpoint {
         &activities[midpoint..]

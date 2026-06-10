@@ -247,7 +247,7 @@ impl Tui {
             // Priority 1: color_id mapped to a Jira key in config
             if let Some(color_id) = &meeting.color_id {
                 if let Ok(idx) = color_id.parse::<usize>() {
-                    if idx >= 1 && idx <= 11 {
+                    if (1..=11).contains(&idx) {
                         let color_name = GOOGLE_CALENDAR_EVENT_COLORS[idx - 1];
                         if let Some(jira_key) = self
                             .data

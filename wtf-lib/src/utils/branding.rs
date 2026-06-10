@@ -27,7 +27,8 @@ pub struct Secrets {
 #[derive(Debug, Deserialize)]
 pub struct SecretSequence {
     pub achievement: String,
-    pub keys: Vec<String>,
+    pub length: usize,
+    pub hash: String,
 }
 
 /// A secret achievement definition
@@ -179,23 +180,27 @@ mod tests {
 
         let secrets = branding.secrets.as_ref().unwrap();
 
-        // Verify chronie sequence exists
-        assert!(
-            secrets.sequences.contains_key("chronie"),
-            "Chronie sequence not found"
-        );
-        let chronie_seq = &secrets.sequences["chronie"];
-        assert_eq!(chronie_seq.keys, vec!["c", "h", "r", "o", "n", "i", "e"]);
-        assert_eq!(chronie_seq.achievement, "secret_chronie_friend");
+        // Verify sequences are present and well-formed
+        assert!(!secrets.sequences.is_empty(), "No sequences found in PNG");
+        for (key, seq) in &secrets.sequences {
+            assert_eq!(key, &seq.hash, "Sequence map key must equal its hash");
+            assert!(seq.length > 0, "Sequence length must be positive");
+            assert!(!seq.hash.is_empty(), "Sequence hash must not be empty");
+            assert!(!seq.achievement.is_empty(), "Sequence must reference an achievement");
 
-        // Verify achievement exists
-        assert!(
-            secrets.achievements.contains_key("secret_chronie_friend"),
-            "Chronie achievement not found"
-        );
-        let achievement = &secrets.achievements["secret_chronie_friend"];
-        assert_eq!(achievement.name, "Chronie's Friend");
-        assert_eq!(achievement.icon, "🧙");
-        assert!(!achievement.chronie_message.is_empty());
+            // Verify the referenced achievement exists
+            assert!(
+                secrets.achievements.contains_key(&seq.achievement),
+                "Sequence references unknown achievement"
+            );
+        }
+
+        // Verify achievements are well-formed
+        assert!(!secrets.achievements.is_empty(), "No secret achievements found in PNG");
+        for achievement in secrets.achievements.values() {
+            assert!(!achievement.name.is_empty());
+            assert!(!achievement.icon.is_empty());
+            assert!(!achievement.chronie_message.is_empty());
+        }
     }
 }

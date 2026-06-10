@@ -24,6 +24,7 @@ pub enum Achievement {
     GitHubWhisperer,
     RainbowCalendar,
     TheCompletionist,
+    DoNotDisturb,
 }
 
 impl Achievement {
@@ -49,6 +50,7 @@ impl Achievement {
             Achievement::GitHubWhisperer,
             Achievement::RainbowCalendar,
             Achievement::TheCompletionist,
+            Achievement::DoNotDisturb,
         ]
     }
 
@@ -239,6 +241,16 @@ impl Achievement {
                     .to_string(),
                 points: 100,
             },
+            Achievement::DoNotDisturb => AchievementMeta {
+                id: *self,
+                name: "Off the Books".to_string(),
+                description: "Exclude calendar events that don't belong in Jira".to_string(),
+                icon: "📵".to_string(),
+                category: AchievementCategory::Productivity,
+                chronie_message: "Not everything on your calendar is billable. Smart! 📵"
+                    .to_string(),
+                points: 25,
+            },
         }
     }
 
@@ -300,6 +312,16 @@ impl Achievement {
             Achievement::GitHubWhisperer => "github_whisperer".to_string(),
             Achievement::RainbowCalendar => "rainbow_calendar".to_string(),
             Achievement::TheCompletionist => "the_completionist".to_string(),
+            Achievement::DoNotDisturb => "do_not_disturb".to_string(),
+        }
+    }
+
+    /// Resolve an achievement from a branding ID (as stored in PNG metadata).
+    /// Only secret achievements have branding IDs; non-secret ones return None.
+    pub fn from_branding_id(id: &str) -> Option<Achievement> {
+        match id {
+            "secret_chronie_friend" => Some(Achievement::ChroniesFriend),
+            _ => None,
         }
     }
 }

@@ -161,7 +161,7 @@ where
             let fetch_result = tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(self.fetch_page())
             });
-            if let Err(_) = fetch_result {
+            if fetch_result.is_err() {
                 return None;
             }
         }
@@ -173,7 +173,7 @@ where
                 let fetch_result = tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(self.fetch_page())
                 });
-                if let Err(_) = fetch_result {
+                if fetch_result.is_err() {
                     return None;
                 }
                 return self.next();

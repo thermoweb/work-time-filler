@@ -57,7 +57,7 @@ pub enum AppEvent {
 
     // Secret sequence events
     SecretSequenceTriggered {
-        sequence_name: String,
+        achievement_id: String,
     },
 }
 
@@ -410,6 +410,7 @@ pub struct WizardState {
 }
 
 #[derive(Clone)]
+#[derive(Default)]
 pub struct WizardRollbackLog {
     pub linked_meeting_ids: Vec<String>, // Both auto and manual
     pub created_worklog_ids: Vec<String>,
@@ -441,15 +442,6 @@ impl Default for WizardSummary {
     }
 }
 
-impl Default for WizardRollbackLog {
-    fn default() -> Self {
-        Self {
-            linked_meeting_ids: Vec::new(),
-            created_worklog_ids: Vec::new(),
-            original_meeting_links: HashMap::new(),
-        }
-    }
-}
 
 pub struct WizardCancelConfirmation;
 

@@ -212,7 +212,7 @@ impl Tui {
         self.trigger_color_label_title_lookups();
 
         // Process EventBus events (temporarily take ownership to avoid borrow issues)
-        let mut event_bus = std::mem::replace(&mut self.event_bus, EventBus::new());
+        let mut event_bus = std::mem::take(&mut self.event_bus);
         event_bus.process_events(self);
         self.event_bus = event_bus;
     }
@@ -1206,10 +1206,8 @@ impl Tui {
                                             wizard.current_step =
                                                 WizardStep::CreatingMeetingWorklogs;
                                             self.wizard_step_create_meeting_worklogs();
-                                        } else {
-                                            if *selected_index >= unlinked_meetings.len() {
-                                                *selected_index = unlinked_meetings.len() - 1;
-                                            }
+                                        } else if *selected_index >= unlinked_meetings.len() {
+                                            *selected_index = unlinked_meetings.len() - 1;
                                         }
                                     }
                                 }
@@ -2005,17 +2003,14 @@ impl Tui {
         };
 
         // Check each sequence from PNG
-        for (name, sequence_def) in &secrets.sequences {
-            let keys: Vec<&str> = sequence_def.keys.iter().map(|s| s.as_str()).collect();
-
-            if self.matches_sequence(&keys) {
-                // Publish event
+        for (_name, sequence_def) in &secrets.sequences {
+            if self.matches_sequence_hash(sequence_def.length, &sequence_def.hash) {
+                // Publish event — carry the achievement ID from the PNG, not the sequence key
                 self.event_bus.publish(AppEvent::SecretSequenceTriggered {
-                    sequence_name: name.clone(),
+                    achievement_id: sequence_def.achievement.clone(),
                 });
 
-                // Log for debugging
-                logger::log(format!("🔓 Secret sequence detected: {}", name));
+                logger::log("🔓 Secret sequence detected".to_string());
 
                 // Clear buffer to avoid re-triggering
                 self.key_sequence_buffer.clear();
@@ -2030,21 +2025,22 @@ impl Tui {
         }
     }
 
-    fn matches_sequence(&self, sequence: &[&str]) -> bool {
-        if self.key_sequence_buffer.len() < sequence.len() {
+    fn matches_sequence_hash(&self, length: usize, expected_hash: &str) -> bool {
+        if self.key_sequence_buffer.len() < length {
             return false;
         }
+        let start = self.key_sequence_buffer.len() - length;
+        let joined: String = self.key_sequence_buffer.iter().skip(start).cloned().collect::<Vec<_>>().join("");
+        format!("{:016x}", Self::fnv1a_64(&joined)) == expected_hash
+    }
 
-        // Check if last N keys match the sequence
-        let start = self.key_sequence_buffer.len() - sequence.len();
-        let recent_keys: Vec<String> = self
-            .key_sequence_buffer
-            .iter()
-            .skip(start)
-            .cloned()
-            .collect();
-
-        recent_keys.iter().zip(sequence.iter()).all(|(a, b)| a == b)
+    fn fnv1a_64(s: &str) -> u64 {
+        let mut h: u64 = 14695981039346656037;
+        for byte in s.bytes() {
+            h ^= byte as u64;
+            h = h.wrapping_mul(1099511628211);
+        }
+        h
     }
 
     fn load_logo_image() -> Option<image::DynamicImage> {

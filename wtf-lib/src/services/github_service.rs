@@ -116,7 +116,7 @@ impl GitHubService {
                 _ => continue,
             };
 
-            let sprint_end = sprint.end.unwrap_or_else(|| Utc::now());
+            let sprint_end = sprint.end.unwrap_or_else(Utc::now);
 
             match GitHubClient::fetch_events(&username, sprint_start, sprint_end) {
                 Ok(events) => {
@@ -166,7 +166,7 @@ impl GitHubService {
                 _ => continue,
             };
 
-            let sprint_end = sprint.end.unwrap_or_else(|| Utc::now());
+            let sprint_end = sprint.end.unwrap_or_else(Utc::now);
 
             debug!(
                 "Fetching events for sprint {} ({} to {})",
@@ -264,7 +264,7 @@ impl GitHubService {
 
             sessions_by_day
                 .entry(date_key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(session);
         }
 
@@ -336,7 +336,7 @@ impl GitHubService {
 
             sessions_by_day
                 .entry(date_key)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(session);
         }
 

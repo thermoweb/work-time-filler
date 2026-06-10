@@ -49,7 +49,7 @@ impl JiraClient {
         let jql = format!(
             "project='{}' and createdDate >= '{}'",
             project_name,
-            start.format("%Y-%m-%d").to_string()
+            start.format("%Y-%m-%d")
         );
         let fetcher = self.get_issue_fetcher(jql).await?;
         Ok(fetcher)
@@ -64,7 +64,7 @@ impl JiraClient {
         let jql = format!(
             "project='{}' and sprint is EMPTY and createdDate >= '{}'",
             project_name,
-            start.format("%Y-%m-%d").to_string()
+            start.format("%Y-%m-%d")
         );
         let fetcher = self.get_issue_fetcher(jql).await?;
         Ok(fetcher)

@@ -105,7 +105,7 @@ fn render_github_sessions_list(
         let date_str = session.date.to_string();
         sessions_by_date
             .entry(date_str)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(session);
     }
 

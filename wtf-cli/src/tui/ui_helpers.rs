@@ -165,7 +165,7 @@ pub(super) fn parse_html_styled_text(html: &str) -> Vec<StyledSegment> {
                 current.text.push_str(&html[last_end..m.start()]);
             }
 
-            let is_closing = cap.get(1).map_or(false, |m| m.as_str() == "/");
+            let is_closing = cap.get(1).is_some_and(|m| m.as_str() == "/");
             let tag_name = cap.get(2).map_or("", |m| m.as_str()).to_lowercase();
 
             match tag_name.as_str() {

@@ -72,7 +72,7 @@ pub struct GithubConfig {
     pub organisation: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct GoogleConfig {
     pub credentials_path: String,
     pub token_cache_path: String,
@@ -82,15 +82,6 @@ pub struct GoogleConfig {
     pub color_labels: HashMap<String, String>,
 }
 
-impl Default for GoogleConfig {
-    fn default() -> Self {
-        Self {
-            credentials_path: String::new(),
-            token_cache_path: String::new(),
-            color_labels: HashMap::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorklogConfig {

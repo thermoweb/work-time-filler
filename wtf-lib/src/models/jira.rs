@@ -84,7 +84,7 @@ impl JiraWorklog {
             author: self.author.email_address.clone(),
             created: self.created,
             time_spent: self.time_spent.clone(),
-            time_spent_seconds: self.time_spent_seconds.clone(),
+            time_spent_seconds: self.time_spent_seconds,
             comment: self.comment.clone().map(|jc| format_comment(&jc)),
             issue_id: self.issue_id.to_string(),
             started: self.started,

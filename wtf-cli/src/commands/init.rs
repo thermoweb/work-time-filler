@@ -104,9 +104,9 @@ fn copy_dir_all(src: &PathBuf, dst: &PathBuf) -> Result<(), Box<dyn Error>> {
 // Autocomplete helpers
 // ============================================================================
 
-fn board_autocomplete(
-    boards: Vec<Board>,
-) -> Box<dyn Fn(&str) -> Result<Vec<String>, CustomUserError>> {
+type AutocompleteFn = Box<dyn Fn(&str) -> Result<Vec<String>, CustomUserError>>;
+
+fn board_autocomplete(boards: Vec<Board>) -> AutocompleteFn {
     Box::new(move |input: &str| {
         let input_lower = input.to_lowercase();
         Ok(boards
@@ -122,9 +122,7 @@ fn board_autocomplete(
     })
 }
 
-fn sprint_autocomplete(
-    sprints: Vec<Sprint>,
-) -> Box<dyn Fn(&str) -> Result<Vec<String>, CustomUserError>> {
+fn sprint_autocomplete(sprints: Vec<Sprint>) -> AutocompleteFn {
     Box::new(move |input: &str| {
         let input_lower = input.to_lowercase();
         Ok(sprints

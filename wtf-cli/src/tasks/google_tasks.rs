@@ -52,7 +52,7 @@ impl Task for FetchGoogleCalendarTask {
                             }
                             Meeting(meeting) => {
                                 fetched_meeting_ids.insert(meeting.id.clone());
-                                upsert_meetings(meeting);
+                                upsert_meetings(*meeting);
                                 meeting_count += 1;
                             }
                             Unknown => {
@@ -123,7 +123,7 @@ fn upsert_meetings(mut meeting: MeetingEntity) {
 }
 pub enum GoogleEvent {
     Absence(AbsenceEntity),
-    Meeting(MeetingEntity),
+    Meeting(Box<MeetingEntity>),
     Unknown,
 }
 
@@ -177,7 +177,7 @@ impl GoogleEvent {
         // Try to parse as meeting
         if let Some(meeting) = from_google(event.clone()) {
             debug!("Meeting[{:?}]: {:?}", event.event_type, meeting);
-            return Meeting(meeting);
+            return Meeting(Box::new(meeting));
         } else {
             debug!(
                 "Event: {} [{:?}] | Start: {:?} End: {:?} | {:?}",
@@ -207,7 +207,7 @@ fn from_google(event: Event) -> Option<wtf_lib::models::data::Meeting> {
 
         let attendees = event.attendees.clone().map(|v| {
             v.iter()
-                .map(|a| Attendee::from_google(a))
+                .map(Attendee::from_google)
                 .collect::<Vec<Attendee>>()
         });
 

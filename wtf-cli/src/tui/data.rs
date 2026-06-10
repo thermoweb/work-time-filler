@@ -41,6 +41,7 @@ pub struct MeetingStats {
 
 /// UI state for tabs (selections, filters, expansions)
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct TabUiState {
     pub selected_sprint_index: usize,
     pub selected_meeting_index: usize,
@@ -66,30 +67,6 @@ pub struct TabUiState {
     pub settings_color_issue_titles: HashMap<String, IssueTitleState>,
 }
 
-impl Default for TabUiState {
-    fn default() -> Self {
-        Self {
-            selected_sprint_index: 0,
-            selected_meeting_index: 0,
-            selected_worklog_index: 0,
-            selected_github_session_index: 0,
-            selected_history_index: 0,
-            expanded_history_ids: std::collections::HashSet::new(),
-            filter_unlinked_only: false,
-            filter_staged_only: false,
-            meeting_search_query: String::new(),
-            meeting_search_active: false,
-            achievements_scroll_offset: 0,
-            settings_selected_field: 0,
-            settings_editing: false,
-            settings_input_buffer: String::new(),
-            settings_show_sensitive: std::collections::HashSet::new(),
-            settings_dirty: false,
-            settings_status: None,
-            settings_color_issue_titles: HashMap::new(),
-        }
-    }
-}
 
 /// All data needed for dashboard display
 #[derive(Debug, Clone)]

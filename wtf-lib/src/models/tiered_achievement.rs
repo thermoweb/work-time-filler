@@ -129,12 +129,7 @@ impl TieredAchievementDef {
 
     /// Index of the highest tier reached for this count, if any.
     pub fn current_tier_index(&self, count: u64) -> Option<usize> {
-        self.tiers
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| count >= t.threshold)
-            .map(|(i, _)| i)
-            .last()
+        self.tiers.iter().rposition(|t| count >= t.threshold)
     }
 
     /// Next tier not yet reached.

@@ -128,11 +128,10 @@ fn wrap_text_two_lines(text: &str, width: usize) -> (String, String) {
         if !line2.ends_with('.') {
             line2.push('.');
         }
-    } else if words.is_empty() && !line1.is_empty() && line2.is_empty() && line1.len() < width {
-        if !line1.ends_with('.') {
+    } else if words.is_empty() && !line1.is_empty() && line2.is_empty() && line1.len() < width
+        && !line1.ends_with('.') {
             line1.push('.');
         }
-    }
 
     (line1, line2)
 }
@@ -620,7 +619,7 @@ pub(in crate::tui) fn render(frame: &mut Frame, area: &Rect, data: &TuiData) {
     let footer_area = chunks[2];
     if all_slots.len() > total_visible && total_visible > 0 {
         let current_page = (clamped_scroll_offset / total_visible) + 1;
-        let total_pages = (all_slots.len() + total_visible - 1) / total_visible;
+        let total_pages = all_slots.len().div_ceil(total_visible);
 
         let footer_text = format!(
             "Page {}/{} | Showing {}-{} of {} | ←→ to scroll",

@@ -47,7 +47,7 @@ pub(in crate::tui) fn render_wizard(
         .unwrap_or(0) as u16;
     // Two-column layout: ceil(days / 2) rows, no border overhead
     let max_panel_height = popup_height.saturating_sub(1 + header_height + 1);
-    let activity_panel_height = ((activity_count + 1) / 2).min(max_panel_height);
+    let activity_panel_height = activity_count.div_ceil(2).min(max_panel_height);
     let activity_area = Rect {
         x: popup_area.x + popup_width - activity_width,
         y: popup_area.y + 1 + header_height,
@@ -105,7 +105,7 @@ pub(in crate::tui) fn render_wizard(
         (7, "7. Push to Jira"),
     ];
 
-    for (_display_num, (internal_num, name)) in step_mapping.iter().enumerate() {
+    for (internal_num, name) in step_mapping.iter() {
         let (symbol, color, status_text) = if wizard.completed_steps.contains(internal_num) {
             // Check if this step was skipped (has a skip reason)
             if let Some(reason) = wizard.skip_reasons.get(internal_num) {
@@ -164,9 +164,7 @@ pub(in crate::tui) fn render_wizard(
             let total = unlinked_meetings.len();
 
             // Calculate scroll window
-            let start_idx = if total <= max_visible {
-                0
-            } else if *selected_index < max_visible / 2 {
+            let start_idx = if total <= max_visible || *selected_index < max_visible / 2 {
                 0
             } else if *selected_index >= total - max_visible / 2 {
                 total.saturating_sub(max_visible)
@@ -607,7 +605,7 @@ fn render_activity_panel(frame: &mut Frame, area: Rect, sprint_id: usize, data: 
         return;
     }
 
-    let midpoint = (activities.len() + 1) / 2;
+    let midpoint = activities.len().div_ceil(2);
     let lines: Vec<Line> = (0..midpoint)
         .map(|i| {
             let mut spans = wizard_activity_spans(&activities[i], data.daily_hours_limit);
@@ -662,17 +660,18 @@ fn wizard_activity_spans(activity: &DayActivity, daily_limit: f64) -> Vec<Span<'
 
 pub(in crate::tui) fn matches_current_step(step_num: usize, current_step: &WizardStep) -> bool {
     use WizardStep;
-    match (step_num, current_step) {
-        (1, WizardStep::Syncing) => true,
-        (2, WizardStep::AutoLinking) | (2, WizardStep::ManualLinking { .. }) => true,
-        (3, WizardStep::CreatingMeetingWorklogs) => true,
-        (4, WizardStep::CreatingGitHubWorklogs { .. }) => true,
-        (5, WizardStep::FillingGaps { .. }) => true,
-        (6, WizardStep::ReviewingWorklogs { .. }) => true,
-        (7, WizardStep::Pushing) => true,
-        (8, WizardStep::Complete) => true,
-        _ => false,
-    }
+    matches!(
+        (step_num, current_step),
+        (1, WizardStep::Syncing)
+            | (2, WizardStep::AutoLinking)
+            | (2, WizardStep::ManualLinking { .. })
+            | (3, WizardStep::CreatingMeetingWorklogs)
+            | (4, WizardStep::CreatingGitHubWorklogs { .. })
+            | (5, WizardStep::FillingGaps { .. })
+            | (6, WizardStep::ReviewingWorklogs { .. })
+            | (7, WizardStep::Pushing)
+            | (8, WizardStep::Complete)
+    )
 }
 
 pub(in crate::tui) fn render_wizard_cancel_confirmation(frame: &mut Frame) {

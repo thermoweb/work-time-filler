@@ -68,9 +68,9 @@ pub struct Board {
 impl Board {
     pub fn from_jira(jira_board: JiraBoard) -> Self {
         Self {
-            id: jira_board.id.clone(),
+            id: jira_board.id,
             name: jira_board.name.clone(),
-            board_type: BoardType::from_str(&jira_board.r#type),
+            board_type: BoardType::from(jira_board.r#type.as_str()),
             followed: false,
             project_name: jira_board.location.map(|l| l.project_name),
         }
@@ -85,9 +85,9 @@ pub enum BoardType {
     Unknown,
 }
 
-impl BoardType {
-    pub fn from_str(str: &str) -> BoardType {
-        match str {
+impl From<&str> for BoardType {
+    fn from(s: &str) -> BoardType {
+        match s {
             "scrum" => BoardType::Scrum,
             "kanban" => BoardType::Kanban,
             "simple" => BoardType::Simple,
@@ -203,9 +203,7 @@ impl Meeting {
     }
 
     fn get_recurrence_rule(&self) -> Option<RRuleSet> {
-        let Some(rules) = self.recurrence.clone() else {
-            return None;
-        };
+        let rules = self.recurrence.clone()?;
         let rrule_str = format!(
             "DTSTART:{}\n{}",
             self.start.format("%Y%m%dT%H%M%SZ"),

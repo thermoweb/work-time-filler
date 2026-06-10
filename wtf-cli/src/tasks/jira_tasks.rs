@@ -364,7 +364,7 @@ impl Task for FetchJiraSprint {
                     let sprints: Vec<Sprint> = fetch_board_sprints(mb.clone(), board.id)
                         .await?
                         .iter()
-                        .map(|s| into_sprint(s))
+                        .map(into_sprint)
                         .map(|mut spr| {
                             if let Some(db_sprint) = SprintService::production()
                                 .get_sprint_by_id(spr.id.to_string().as_str())
@@ -529,8 +529,8 @@ impl Task for ListJiraSprints {
                     .iter()
                     .filter(|wl| {
                         let worklog_date = wl.started;
-                        let is_after_start = s.start.map_or(false, |start| worklog_date >= start);
-                        let is_before_end = s.end.map_or(false, |end| worklog_date <= end);
+                        let is_after_start = s.start.is_some_and(|start| worklog_date >= start);
+                        let is_before_end = s.end.is_some_and(|end| worklog_date <= end);
                         is_after_start && is_before_end
                     })
                     .map(|wl| wl.time_spent_seconds)
@@ -588,7 +588,7 @@ impl SprintInfo {
         let format_date = |date: &DateTime<Utc>| date.format("%d-%m-%Y").to_string();
         let time_spent = Self::get_time_spent(sprint_info, time_spent_seconds);
         Self {
-            id: sprint_info.id.clone(),
+            id: sprint_info.id,
             name: sprint_info.name.clone(),
             followed: sprint_info.followed,
             status: match sprint_info.state {
@@ -646,7 +646,7 @@ impl Task for FetchJiraWorklogs {
         let mp = self
             .multi_progress
             .clone()
-            .unwrap_or_else(MultiProgress::new);
+            .unwrap_or_default();
         let sprint_progress = mp.add(ProgressBar::new(self.sprints.len() as u64));
         let progress_style = ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
@@ -694,7 +694,7 @@ impl Task for FetchJiraWorklogs {
                             author: wl.author.email_address.clone(),
                             created: wl.created,
                             time_spent: wl.time_spent.clone(),
-                            time_spent_seconds: wl.time_spent_seconds.clone(),
+                            time_spent_seconds: wl.time_spent_seconds,
                             comment: wl.comment.clone().map(|c| format_comment(&c)),
                             issue_id: wl.issue_id.clone(), // Use the issue_id from JiraWorklog (set by get_issue_worklogs)
                             started: wl.started,

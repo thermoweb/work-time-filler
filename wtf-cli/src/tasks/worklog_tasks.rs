@@ -22,7 +22,7 @@ impl MeetingWorklogTask {
         if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
             let meetings_to_log = Self::get_meeting_to_logs(start, end);
             meetings_to_log.par_iter().for_each(|(day, meeting)| {
-                Self::log_meeting_for_day(day.clone(), meeting.clone());
+                Self::log_meeting_for_day(*day, meeting.clone());
             });
         }
     }
@@ -66,7 +66,7 @@ impl MeetingWorklogTask {
                     start_date,
                     meeting_time_spent,
                     jira_link.as_str(),
-                    Some(format!("{}", meeting_title).as_str()),
+                    Some(meeting_title.to_string().as_str()),
                     Some(meeting.id),
                 );
                 logger::log(format!(

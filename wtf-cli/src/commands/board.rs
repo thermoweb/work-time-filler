@@ -58,7 +58,7 @@ impl Command for BoardListCommand {
             println!("No board found.");
             return;
         }
-        let board_data = boards.iter().map(|b| BoardInfo::new(b)).collect::<Vec<_>>();
+        let board_data = boards.iter().map(BoardInfo::new).collect::<Vec<_>>();
         let mut table = Table::new(board_data);
         table.with(Style::modern().remove_horizontal());
         table.with(
@@ -96,7 +96,7 @@ impl BoardInfo {
             _ => "Unknown",
         };
         Self {
-            id: board.id.clone(),
+            id: board.id,
             name: board.name.clone(),
             board_type: board_type.to_string(),
         }

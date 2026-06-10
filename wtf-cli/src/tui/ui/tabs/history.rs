@@ -288,9 +288,9 @@ impl TabController for HistoryTab {
 
 /// Returns one entry per followed sprint that has untracked Jira worklogs,
 /// sorted by sprint start date (most recent first).
-pub(in crate::tui) fn jira_only_by_sprint<'a>(
-    data: &'a TuiData,
-) -> Vec<(&'a Sprint, Vec<&'a Worklog>)> {
+pub(in crate::tui) fn jira_only_by_sprint(
+    data: &TuiData,
+) -> Vec<(&Sprint, Vec<&Worklog>)> {
     use std::collections::HashSet;
     let tracked: HashSet<&str> = data
         .all_worklogs
@@ -862,7 +862,7 @@ fn render_revert_preview(
         // Sort by time descending, then by date descending for stable ordering
         daily_sorted.sort_by(|a, b| {
             match b.1 .0.cmp(&a.1 .0) {
-                std::cmp::Ordering::Equal => b.0.cmp(&a.0), // If same time, newer date first
+                std::cmp::Ordering::Equal => b.0.cmp(a.0), // If same time, newer date first
                 other => other,
             }
         });
@@ -911,7 +911,7 @@ fn render_revert_preview(
         // Sort by time descending, then by issue_id alphabetically for stable ordering
         issue_sorted.sort_by(|a, b| {
             match b.1 .0.cmp(&a.1 .0) {
-                std::cmp::Ordering::Equal => a.0.cmp(&b.0), // If same time, alphabetical order
+                std::cmp::Ordering::Equal => a.0.cmp(b.0), // If same time, alphabetical order
                 other => other,
             }
         });
