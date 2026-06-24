@@ -432,9 +432,15 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
         0.0
     };
 
+    // Start dates are localized: future sprints store their planned start as
+    // midnight in the board timezone, which falls on the previous day in UTC
+    // (e.g. midnight CET -> 23:00Z). Rendering in local time shows the date
+    // Jira itself displays. End dates stay in UTC: they are the exclusive
+    // boundary shared with the next sprint's start, and UTC already shows the
+    // intended last day for ended/ongoing sprints.
     let start_str = sprint
         .start
-        .map(|d| d.format("%d %b").to_string())
+        .map(|d| d.with_timezone(&Local).format("%d %b").to_string())
         .unwrap_or_else(|| "?".to_string());
     let end_str = sprint
         .end

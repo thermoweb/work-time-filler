@@ -337,16 +337,23 @@ impl TuiData {
     }
 
     fn calculate_sprint_activity(sprint: &Sprint) -> Vec<DayActivity> {
-        use chrono::Datelike;
+        use chrono::{Datelike, Local};
         use std::collections::HashSet;
 
         // Get both local worklogs AND Jira worklogs
         let local_worklogs = LocalWorklogService::production().get_all_local_worklogs();
         let jira_worklogs = WorklogsService::production().get_all_worklogs();
 
-        // Get sprint date range
+        // Get sprint date range. The start boundary is taken in local time: a
+        // future sprint stores its planned start as midnight in the board
+        // timezone, which falls on the previous day in UTC and is the exact
+        // same instant as the previous sprint's end. Using the UTC date would
+        // pull that shared day's worklogs into both sprints. The end stays in
+        // UTC so the previous (ended) sprint keeps that day as its last day.
         let (start_date, end_date) = match (sprint.start, sprint.end) {
-            (Some(start), Some(end)) => (start.date_naive(), end.date_naive()),
+            (Some(start), Some(end)) => {
+                (start.with_timezone(&Local).date_naive(), end.date_naive())
+            }
             _ => return vec![],
         };
 
