@@ -480,18 +480,51 @@ impl Tui {
     pub(super) fn wizard_step_fill_gaps(&mut self) {
         logger::log("🔧 Step 5/7: Fill gaps with default task...".to_string());
 
+        let sprint_id = match &self.wizard_state {
+            Some(wizard) => wizard.sprint_id,
+            None => return,
+        };
+
+        // Nothing to fill: skip the step entirely instead of asking for an issue
+        let gaps = self.sprint_gap_days(sprint_id);
+        if gaps.is_empty() {
+            self.wizard_skip_gap_fill("no gaps to fill");
+            return;
+        }
+
         // Show issue selection popup
         let mut all_issues: Vec<_> = self.data.issues_by_key.values().cloned().collect();
         all_issues.sort_by(|a, b| a.key.cmp(&b.key));
 
-        if let Some(wizard) = &self.wizard_state {
-            self.gap_fill_state = Some(GapFillState {
-                sprint_id: wizard.sprint_id,
-                all_issues,
-                selected_issue_index: 0,
-                search_query: String::new(),
-            });
+        // Without issues the picker would have nothing to select and would trap the wizard
+        if all_issues.is_empty() {
+            self.wizard_skip_gap_fill("no issues available to charge the gaps to");
+            return;
         }
+
+        self.gap_fill_state = Some(GapFillState {
+            sprint_id,
+            all_issues,
+            selected_issue_index: 0,
+            search_query: String::new(),
+        });
+    }
+
+    /// Mark the gap fill step as done (skipped) and move on to the review step.
+    pub(super) fn wizard_skip_gap_fill(&mut self, reason: &str) {
+        self.gap_fill_state = None;
+        self.gap_fill_confirmation = None;
+
+        if let Some(wizard) = &mut self.wizard_state {
+            wizard.completed_steps.insert(5); // Step 5 complete (skipped)
+            wizard.skip_reasons.insert(5, reason.to_string());
+        }
+
+        logger::log(format!(
+            "⏭️  Wizard: Skipping gap filling ({}), advancing to review...",
+            reason
+        ));
+        self.wizard_step_review();
     }
 
     pub(super) fn wizard_step_review(&mut self) {

@@ -1544,50 +1544,16 @@ impl Tui {
                         // Remove gap fill state
                         self.gap_fill_state = None;
 
-                        // Calculate gaps for the sprint
-                        if let Some(sprint) =
-                            self.data.all_sprints.iter().find(|s| s.id == sprint_id)
-                        {
-                            if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                                let meetings_svc = MeetingsService::production();
-                                let gaps = LocalWorklogService::production().find_gap_days(
-                                    start.date_naive(),
-                                    end.date_naive(),
-                                    self.data.daily_hours_limit,
-                                    6.0, // Skip days already over 6h
-                                    &|date| meetings_svc.is_absent(date),
-                                    &self.data.jira_worklogs,
-                                );
-
-                                if gaps.is_empty() {
-                                    logger::log(
-                                        "✓ No gaps to fill - all workdays are substantially logged"
-                                            .to_string(),
-                                    );
-                                    return;
-                                }
-
-                                // Show confirmation popup
-                                self.gap_fill_confirmation = Some(GapFillConfirmation {
-                                    _sprint_id: sprint_id,
-                                    sprint_name: sprint.name.clone(),
-                                    issue_id,
-                                    gaps,
-                                });
-                            }
-                        }
+                        // Recompute gaps and show the confirmation popup
+                        self.open_gap_fill_confirmation(sprint_id, issue_id);
                     }
                 }
                 KeyCode::Esc => {
                     self.gap_fill_state = None;
 
                     // Esc skips gap filling; use wizard cancel from other steps to abort entirely
-                    if let Some(wizard) = &mut self.wizard_state {
-                        wizard.completed_steps.insert(5); // Step 5 complete (skipped)
-                        logger::log(
-                            "⏭️  Wizard: Skipping gap filling, advancing to review...".to_string(),
-                        );
-                        self.wizard_step_review();
+                    if self.wizard_state.is_some() {
+                        self.wizard_skip_gap_fill("user skipped gap filling");
                     } else {
                         logger::log("⏭️  Gap filling cancelled".to_string());
                     }
@@ -1661,12 +1627,8 @@ impl Tui {
                 // Skip gap filling, advance to review
                 self.gap_fill_confirmation = None;
 
-                if let Some(wizard) = &mut self.wizard_state {
-                    wizard.completed_steps.insert(5); // Step 5 complete (skipped)
-                    logger::log(
-                        "⏭️  Wizard: Skipping gap filling, advancing to review...".to_string(),
-                    );
-                    self.wizard_step_review();
+                if self.wizard_state.is_some() {
+                    self.wizard_skip_gap_fill("user skipped gap filling");
                 } else {
                     logger::log("⏭️  Gap filling cancelled".to_string());
                 }
