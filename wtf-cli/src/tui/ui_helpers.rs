@@ -5,6 +5,8 @@ use ratatui::{
     Frame,
 };
 
+use super::tab_controller::TabAction;
+
 /// Render a tab with list on left (60%) and details on right (40%)
 /// This is a common pattern used across multiple tabs
 pub(super) fn render_list_detail_layout<L, D>(
@@ -59,6 +61,35 @@ pub(super) fn build_shortcut_help(shortcuts: &[(&str, &str)]) -> Vec<Span<'stati
         ));
     }
     spans
+}
+
+/// Build the title shortcut hints from a tab's actions (only those flagged `in_title`).
+/// When the action name starts with its key, the key is merged into it (`[W]izard`).
+pub(super) fn build_action_hints<'a>(
+    actions: impl IntoIterator<Item = &'a TabAction>,
+) -> Vec<Span<'static>> {
+    let hints: Vec<(&str, String)> = actions
+        .into_iter()
+        .filter(|action| action.in_title)
+        .map(|action| (action.key, action_hint_label(action)))
+        .collect();
+    let refs: Vec<(&str, &str)> = hints
+        .iter()
+        .map(|(key, label)| (*key, label.as_str()))
+        .collect();
+    build_shortcut_help(&refs)
+}
+
+fn action_hint_label(action: &TabAction) -> String {
+    let key_len = action.key.len();
+    let merges_with_key = action.name.len() > key_len
+        && action.name.is_char_boundary(key_len)
+        && action.name[..key_len].eq_ignore_ascii_case(action.key);
+    if merges_with_key {
+        action.name[key_len..].to_string()
+    } else {
+        format!(" {}", action.name)
+    }
 }
 
 /// Helper function to wrap text to a maximum width

@@ -11,7 +11,7 @@ use ratatui::{
 use crate::tui::data::GitHubIssueValidation;
 use crate::tui::data::TuiData;
 use crate::tui::helpers;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::Tui;
@@ -19,7 +19,21 @@ use crate::tui::Tui;
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct GitHubTab;
 
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "C",
+        "Create Worklog",
+        "Create a worklog from the selected session, on the Jira issue found in its branches or PRs. You choose to log the full or a partial duration, or skip.",
+    ),
+    TabAction::title("↑↓", "Navigate", "Select a session."),
+    TabAction::help_only("U", "Update", "Fetch your recent GitHub activity."),
+];
+
 impl TabController for GitHubTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_github_tab(frame, area, data);
     }
@@ -207,7 +221,7 @@ fn render_github_sessions_list(
     };
 
     // Build help text
-    let shortcuts = build_shortcut_help(&[("C", " Create Worklog"), ("↑↓", " Navigate")]);
+    let shortcuts = build_action_hints(ACTIONS);
     let mut title_spans = vec![
         Span::raw("💻 GitHub Sessions ("),
         Span::raw(sessions.len().to_string()),

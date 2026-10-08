@@ -278,6 +278,7 @@ pub(in crate::tui) fn render_about_popup(
         Line::from("  • 1-5: Switch tabs"),
         Line::from("  • W: Launch Chronie wizard (Sprints tab)"),
         Line::from("  • R: Refresh data"),
+        Line::from("  • ?: Explain the actions of the current tab"),
         Line::from("  • H: Show this about screen"),
         Line::from("  • Q: Quit"),
         Line::from(""),

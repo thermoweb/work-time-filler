@@ -43,6 +43,7 @@ pub enum AppEvent {
 
     // UI events
     AboutPopupOpened,
+    HelpPopupOpened,
 
     // Achievement events
     AchievementUnlocked {
@@ -129,7 +130,7 @@ pub enum FetchStatus {
     Error(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tab {
     Sprints,
     Meetings,
@@ -231,6 +232,32 @@ impl Tab {
         }
     }
 
+    pub(in crate::tui) fn actions(self, tui: &Tui) -> &'static [super::tab_controller::TabAction] {
+        use super::tab_controller::TabController;
+
+        match self {
+            Tab::Sprints => tui.sprints_tab.actions(),
+            Tab::Meetings => tui.meetings_tab.actions(),
+            Tab::Worklogs => tui.worklogs_tab.actions(),
+            Tab::GitHub => tui.github_tab.actions(),
+            Tab::History => tui.history_tab.actions(),
+            Tab::Achievements => tui.achievements_tab.actions(),
+            Tab::Settings => tui.settings_tab.actions(),
+        }
+    }
+
+    pub(in crate::tui) fn label(self) -> &'static str {
+        match self {
+            Tab::Sprints => "Sprints",
+            Tab::Meetings => "Meetings",
+            Tab::Worklogs => "Worklogs",
+            Tab::GitHub => "GitHub",
+            Tab::History => "History",
+            Tab::Achievements => "Achievements",
+            Tab::Settings => "Settings",
+        }
+    }
+
     pub(in crate::tui) fn handle_scroll(self, tui: &mut Tui, scroll_up: bool) {
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         let key = if scroll_up {
@@ -266,6 +293,10 @@ pub struct Tui {
     pub(crate) issue_selection_state: Option<IssueSelectionState>,
     pub(crate) unlink_confirmation_meeting_id: Option<String>,
     pub(crate) show_about_popup: bool,
+    /// Help popup scroll offset; `None` when the popup is closed
+    pub(crate) help_popup_scroll: Option<u16>,
+    /// Tabs on which the help popup was opened this session ("Read The Fine Manual" achievement)
+    pub(crate) help_viewed_tabs: std::collections::HashSet<Tab>,
     pub(crate) about_image: Option<image::DynamicImage>,
     pub(crate) image_picker: Option<ratatui_image::picker::Picker>,
     pub(crate) fetch_status: FetchStatus,

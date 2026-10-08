@@ -9,7 +9,7 @@ use ratatui::{
 
 use crate::tui::data::TuiData;
 use crate::tui::helpers;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::Tui;
@@ -18,6 +18,42 @@ use wtf_lib::models::data::LocalWorklogState;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct WorklogsTab;
+
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "A",
+        "Stage/Unstage",
+        "Mark the selected worklog as ready to push (staged), or put it back to draft.",
+    ),
+    TabAction::title("Ctrl+A", "Stage All", "Stage every draft worklog."),
+    TabAction::title(
+        "P",
+        "Push",
+        "Send all staged worklogs to Jira. Each push is recorded in the History tab, where it can be reverted.",
+    ),
+    TabAction::title(
+        "Del",
+        "Delete",
+        "Delete the selected worklog from wtf. A worklog already pushed stays in Jira.",
+    ),
+    TabAction::title(
+        "X",
+        "Reset",
+        "Delete ALL unpushed worklogs (drafts and staged) at once. No confirmation, cannot be undone.",
+    ),
+    TabAction::title(
+        "F",
+        "Filter",
+        "Toggle between all worklogs and unpushed worklogs only.",
+    ),
+    TabAction::help_only(
+        "R",
+        "Refresh",
+        "Reload the screen from the local database (no network call).",
+    ),
+    TabAction::help_only("U", "Update", "Fetch your worklogs from Jira."),
+    TabAction::help_only("↑↓ / j k", "Navigate", "Select a worklog."),
+];
 
 pub(in crate::tui) fn visible_worklogs(data: &TuiData) -> Vec<LocalWorklog> {
     let mut sorted_worklogs = data.all_worklogs.clone();
@@ -37,6 +73,10 @@ pub(in crate::tui) fn visible_worklogs(data: &TuiData) -> Vec<LocalWorklog> {
 }
 
 impl TabController for WorklogsTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_worklogs_tab(frame, area, data);
     }
@@ -120,15 +160,7 @@ fn render_worklogs_list(
         ""
     };
 
-    let shortcuts_data = vec![
-        ("A", " Stage/Unstage"),
-        ("Ctrl+A", " Stage All"),
-        ("P", "ush"),
-        ("Del", " Delete"),
-        ("X", " Reset"),
-        ("F", "ilter"),
-    ];
-    let shortcuts = build_shortcut_help(&shortcuts_data);
+    let shortcuts = build_action_hints(ACTIONS);
 
     let mut title_spans = vec![
         Span::raw("📊 Worklogs ("),

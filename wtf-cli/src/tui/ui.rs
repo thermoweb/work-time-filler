@@ -11,7 +11,7 @@ use super::data::TuiData;
 use super::theme::theme;
 use super::{FetchStatus, Tab};
 
-mod popups;
+pub(in crate::tui) mod popups;
 pub(in crate::tui) mod tabs;
 
 /// Render the main UI based on current tab
@@ -263,6 +263,13 @@ fn render_status_bar(frame: &mut Frame, area: &Rect, data: &TuiData, fetch_statu
                 Span::raw("Last sync: "),
                 Span::styled(time_ago, Style::default().fg(theme().fg_muted)),
                 Span::raw("   "),
+                Span::styled(
+                    "[?]",
+                    Style::default()
+                        .fg(theme().highlight)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" Help  "),
                 Span::styled(
                     "[Q]",
                     Style::default()
