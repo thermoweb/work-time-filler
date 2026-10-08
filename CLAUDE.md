@@ -50,7 +50,7 @@ The workspace has two crates:
 
 **Services** are stateless structs owning a `GenericDatabase`. They have a `.production()` constructor that opens the default DB path. The test pattern is to construct them with `Database::temporary()`.
 
-**`Sprint::contains_meeting(&self, meeting: &Meeting) -> bool`** is the canonical way to check if a meeting belongs to a sprint — it expands sprint boundaries to full UTC days (00:00–23:59:59) so meetings aren't missed due to sprint hour offsets. Do not inline this logic elsewhere.
+**`Sprint::days()`** is the canonical sprint day range (first/last day inclusive, local time). Jira stores the end as the next sprint's start (Wednesday midnight or morning), so an end before noon is exclusive and the boundary day belongs to the next sprint only. Use `days()`, `contains_date()` and `contains_meeting()` instead of `start.date_naive()`/`end.date_naive()`. Do not inline this logic elsewhere.
 
 ### wtf-cli structure
 

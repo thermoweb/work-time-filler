@@ -334,10 +334,7 @@ pub(in crate::tui) fn jira_only_by_sprint(data: &TuiData) -> Vec<(&Sprint, Vec<&
         .all_sprints
         .iter()
         .filter_map(|sprint| {
-            let (start, end) = match (sprint.start, sprint.end) {
-                (Some(s), Some(e)) => (s.date_naive(), e.date_naive()),
-                _ => return None,
-            };
+            let (start, end) = sprint.days()?;
             let sprint_wls: Vec<&Worklog> = untracked
                 .iter()
                 .filter(|w| {

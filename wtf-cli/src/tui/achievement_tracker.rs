@@ -323,11 +323,9 @@ impl AchievementTracker {
         }
 
         for sprint in &tui.data.all_sprints {
-            let (Some(start), Some(end)) = (sprint.start, sprint.end) else {
+            let Some((q_start, q_end)) = sprint.days() else {
                 continue;
             };
-            let q_start = start.date_naive();
-            let q_end = end.date_naive();
 
             let workdays: Vec<NaiveDate> = (0..)
                 .map(|i| q_start + chrono::Duration::days(i))

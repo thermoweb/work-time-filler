@@ -285,9 +285,9 @@ impl Command for SprintClearWorklogsCommand {
             }
         };
 
-        let (start_date, end_date) = match (sprint.start, sprint.end) {
-            (Some(start), Some(end)) => (start.date_naive(), end.date_naive()),
-            _ => {
+        let (start_date, end_date) = match sprint.days() {
+            Some(days) => days,
+            None => {
                 eprintln!("Sprint {} has no start/end dates", sprint.name);
                 return;
             }

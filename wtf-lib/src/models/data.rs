@@ -1,7 +1,7 @@
 use crate::models::jira::JiraBoard;
 use crate::services::jira_service::get_jira_identifiers;
 use crate::storage::database::Identifiable;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Timelike, Utc};
 use google_calendar3::api::EventAttendee;
 use log::warn;
 use rrule::{RRuleSet, Tz};
@@ -34,17 +34,57 @@ impl Identifiable for Sprint {
 }
 
 impl Sprint {
-    /// Returns true if the meeting falls within this sprint, expanding sprint
-    /// boundaries to full UTC days so meetings at the start/end of the day
-    /// are not missed due to the sprint's configured hour offsets.
-    pub fn contains_meeting(&self, meeting: &Meeting) -> bool {
-        if let (Some(start), Some(end)) = (self.start, self.end) {
-            let day_start =
-                Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-            let day_end = Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
-            meeting.is_between(day_start, day_end)
+    /// First and last calendar days of the sprint (both inclusive), in local time.
+    ///
+    /// Sprints run Wednesday to Tuesday evening, but Jira stores the end as the
+    /// instant the next sprint starts: Wednesday around midnight or Wednesday
+    /// morning. An end before noon is therefore treated as exclusive, so the
+    /// boundary day belongs to the next sprint only.
+    pub fn days(&self) -> Option<(NaiveDate, NaiveDate)> {
+        self.days_in(&Local)
+    }
+
+    fn days_in<Tz: TimeZone>(&self, tz: &Tz) -> Option<(NaiveDate, NaiveDate)> {
+        let (start, end) = (self.start?, self.end?);
+        let first = start.with_timezone(tz).date_naive();
+        let end_local = end.with_timezone(tz);
+        let last = if end_local.hour() < 12 {
+            end_local.date_naive().pred_opt()?
         } else {
-            false
+            end_local.date_naive()
+        };
+        Some((first, last.max(first)))
+    }
+
+    /// Returns true if the date is one of the sprint's days (see [`Sprint::days`]).
+    pub fn contains_date(&self, date: NaiveDate) -> bool {
+        self.days()
+            .is_some_and(|(first, last)| date >= first && date <= last)
+    }
+
+    /// Returns true if the meeting falls on one of the sprint's days, so meetings
+    /// at the start/end of the day are not missed due to the sprint's hour offsets.
+    pub fn contains_meeting(&self, meeting: &Meeting) -> bool {
+        self.contains_meeting_in(meeting, &Local)
+    }
+
+    fn contains_meeting_in<Tz: TimeZone>(&self, meeting: &Meeting, tz: &Tz) -> bool {
+        let Some((first, last)) = self.days_in(tz) else {
+            return false;
+        };
+        let local_midnight = |date: NaiveDate| {
+            tz.from_local_datetime(&date.and_hms_opt(0, 0, 0).unwrap())
+                .earliest()
+                .map(|d| d.with_timezone(&Utc))
+        };
+        match (
+            local_midnight(first),
+            last.succ_opt().and_then(local_midnight),
+        ) {
+            (Some(day_start), Some(next_day)) => {
+                meeting.is_between(day_start, next_day - chrono::Duration::seconds(1))
+            }
+            _ => false,
         }
     }
 }
@@ -478,7 +518,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 11, 10, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 11, 11, 0, 0).unwrap(),
         );
-        assert!(sprint.contains_meeting(&m));
+        assert!(sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -488,7 +528,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 20, 10, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 20, 11, 0, 0).unwrap(),
         );
-        assert!(!sprint.contains_meeting(&m));
+        assert!(!sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -500,7 +540,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 10, 8, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 10, 8, 30, 0).unwrap(),
         );
-        assert!(sprint.contains_meeting(&m));
+        assert!(sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -512,7 +552,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 14, 18, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 14, 19, 0, 0).unwrap(),
         );
-        assert!(sprint.contains_meeting(&m));
+        assert!(sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -523,7 +563,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 9, 23, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 10, 1, 0, 0).unwrap(),
         );
-        assert!(sprint.contains_meeting(&m));
+        assert!(sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -533,7 +573,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 9, 10, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 9, 11, 0, 0).unwrap(),
         );
-        assert!(!sprint.contains_meeting(&m));
+        assert!(!sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -551,7 +591,7 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 10, 9, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 10, 10, 0, 0).unwrap(),
         );
-        assert!(!sprint.contains_meeting(&m));
+        assert!(!sprint.contains_meeting_in(&m, &Utc));
     }
 
     #[test]
@@ -561,6 +601,72 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 1, 15, 9, 0, 0).unwrap(),
             Utc.with_ymd_and_hms(2024, 1, 15, 10, 0, 0).unwrap(),
         );
-        assert!(!sprint.contains_meeting(&m));
+        assert!(!sprint.contains_meeting_in(&m, &Utc));
+    }
+
+    fn paris() -> chrono::FixedOffset {
+        chrono::FixedOffset::east_opt(2 * 3600).unwrap()
+    }
+
+    fn day(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    #[test]
+    fn sprint_ending_wednesday_morning_ends_on_tuesday() {
+        // Wed 30 Sep 10:36 -> Wed 14 Oct 10:00 (Paris): the second Wednesday
+        // belongs to the next sprint.
+        let sprint = make_sprint(
+            Utc.with_ymd_and_hms(2026, 9, 30, 8, 36, 0).unwrap(),
+            Utc.with_ymd_and_hms(2026, 10, 14, 8, 0, 0).unwrap(),
+        );
+        assert_eq!(
+            sprint.days_in(&paris()),
+            Some((day(2026, 9, 30), day(2026, 10, 13)))
+        );
+    }
+
+    #[test]
+    fn sprint_ending_wednesday_midnight_ends_on_tuesday() {
+        // Ends Wed 00:16 Paris (Tue 22:16 UTC)
+        let sprint = make_sprint(
+            Utc.with_ymd_and_hms(2026, 2, 18, 8, 39, 0).unwrap(),
+            Utc.with_ymd_and_hms(2026, 3, 3, 22, 16, 0).unwrap(),
+        );
+        assert_eq!(
+            sprint.days_in(&paris()),
+            Some((day(2026, 2, 18), day(2026, 3, 3)))
+        );
+    }
+
+    #[test]
+    fn sprint_ending_tuesday_evening_ends_on_tuesday() {
+        let sprint = make_sprint(
+            Utc.with_ymd_and_hms(2026, 7, 22, 9, 32, 0).unwrap(),
+            Utc.with_ymd_and_hms(2026, 8, 4, 15, 30, 0).unwrap(),
+        );
+        assert_eq!(
+            sprint.days_in(&paris()),
+            Some((day(2026, 7, 22), day(2026, 8, 4)))
+        );
+    }
+
+    #[test]
+    fn consecutive_sprints_do_not_share_the_boundary_day() {
+        let boundary = Utc.with_ymd_and_hms(2026, 10, 14, 8, 0, 0).unwrap();
+        let current = make_sprint(
+            Utc.with_ymd_and_hms(2026, 9, 30, 8, 36, 0).unwrap(),
+            boundary,
+        );
+        let next = make_sprint(
+            boundary,
+            Utc.with_ymd_and_hms(2026, 10, 28, 8, 0, 0).unwrap(),
+        );
+        let m = make_meeting(
+            Utc.with_ymd_and_hms(2026, 10, 14, 12, 0, 0).unwrap(),
+            Utc.with_ymd_and_hms(2026, 10, 14, 13, 0, 0).unwrap(),
+        );
+        assert!(!current.contains_meeting_in(&m, &paris()));
+        assert!(next.contains_meeting_in(&m, &paris()));
     }
 }
