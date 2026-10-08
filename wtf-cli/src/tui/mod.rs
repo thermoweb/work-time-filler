@@ -1706,10 +1706,9 @@ impl Tui {
                     .all_sprints
                     .iter()
                     .find(|s| s.id == prompt.sprint_id)
-                    .and_then(|s| s.start.zip(s.end))
-                    .map(|(start, end)| {
-                        LocalWorklogService::production()
-                            .get_unpushed_in_range(start.date_naive(), end.date_naive())
+                    .and_then(|s| s.days())
+                    .map(|(first, last)| {
+                        LocalWorklogService::production().get_unpushed_in_range(first, last)
                     })
                     .unwrap_or_default();
                 for wl in &to_delete {

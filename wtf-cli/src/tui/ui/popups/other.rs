@@ -94,8 +94,8 @@ pub(in crate::tui) fn render_sprint_follow_popup(frame: &mut Frame, state: &Spri
             };
 
             // Format dates
-            let date_str = if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                format!("{} → {}", start.format("%d/%m"), end.format("%d/%m"))
+            let date_str = if let Some((first, last)) = sprint.days() {
+                format!("{} → {}", first.format("%d/%m"), last.format("%d/%m"))
             } else {
                 "No dates".to_string()
             };

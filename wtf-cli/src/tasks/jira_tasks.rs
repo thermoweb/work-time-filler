@@ -2,7 +2,7 @@ use crate::logger;
 use crate::tasks::Task;
 use crate::tui::FetchStatus;
 use anyhow::Result;
-use chrono::{DateTime, Datelike, Months, NaiveDate, Utc, Weekday};
+use chrono::{Datelike, Local, Months, NaiveDate, Utc, Weekday};
 use colored::Colorize;
 use futures::future::join_all;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -404,31 +404,7 @@ impl Task for FetchJiraSprint {
 }
 
 fn into_sprint(sprint: &JiraSprint) -> Sprint {
-    let bind = MeetingsService::production().get_absences();
-    let absences = bind
-        .iter()
-        .filter(|a| {
-            // Check if absence overlaps with sprint period
-            let sprint_start = sprint.start_date.map(|d| d.date_naive());
-            let sprint_end = sprint.end_date.map(|d| d.date_naive());
-            let absence_start = a.start.date_naive();
-            let absence_end = a.end.date_naive();
-
-            // Overlap if: absence_start <= sprint_end AND absence_end >= sprint_start
-            match (sprint_start, sprint_end) {
-                (Some(s_start), Some(s_end)) => absence_start <= s_end && absence_end >= s_start,
-                _ => false,
-            }
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    let workdays = sprint
-        .start_date
-        .zip(sprint.end_date)
-        .map_or(0, |(start, end)| {
-            count_workdays(start.date_naive(), end.date_naive(), absences)
-        });
-    Sprint {
+    let mut result = Sprint {
         id: sprint.id,
         state: match sprint.state.as_str() {
             "active" => Active,
@@ -443,8 +419,20 @@ fn into_sprint(sprint: &JiraSprint) -> Sprint {
         start: sprint.start_date,
         end: sprint.end_date,
         followed: false,
-        workdays,
-    }
+        workdays: 0,
+    };
+    let Some((first, last)) = result.days() else {
+        return result;
+    };
+    let bind = MeetingsService::production().get_absences();
+    let absences = bind
+        .iter()
+        // Overlap if: absence_start <= sprint_last AND absence_end >= sprint_first
+        .filter(|a| a.start.date_naive() <= last && a.end.date_naive() >= first)
+        .cloned()
+        .collect::<Vec<_>>();
+    result.workdays = count_workdays(first, last, absences);
+    result
 }
 
 fn count_workdays(start: NaiveDate, end: NaiveDate, absences: Vec<Absence>) -> i64 {
@@ -527,12 +515,7 @@ impl Task for ListJiraSprints {
                 let time_spent = WorklogsService::production()
                     .get_all_worklogs()
                     .iter()
-                    .filter(|wl| {
-                        let worklog_date = wl.started;
-                        let is_after_start = s.start.is_some_and(|start| worklog_date >= start);
-                        let is_before_end = s.end.is_some_and(|end| worklog_date <= end);
-                        is_after_start && is_before_end
-                    })
+                    .filter(|wl| s.contains_date(wl.started.with_timezone(&Local).date_naive()))
                     .map(|wl| wl.time_spent_seconds)
                     .sum::<u64>();
 
@@ -585,7 +568,8 @@ struct SprintInfo {
 
 impl SprintInfo {
     fn from_data(sprint_info: &Sprint, time_spent_seconds: u64) -> Self {
-        let format_date = |date: &DateTime<Utc>| date.format("%d-%m-%Y").to_string();
+        let days = sprint_info.days();
+        let format_date = |date: NaiveDate| date.format("%d-%m-%Y").to_string();
         let time_spent = Self::get_time_spent(sprint_info, time_spent_seconds);
         Self {
             id: sprint_info.id,
@@ -596,13 +580,11 @@ impl SprintInfo {
                 Closed => SprintStatus::Closed,
                 Future => SprintStatus::Future,
             },
-            start: sprint_info
-                .start
-                .map(|s| format_date(&s))
+            start: days
+                .map(|(first, _)| format_date(first))
                 .unwrap_or("".to_string()),
-            end: sprint_info
-                .end
-                .map(|s| format_date(&s))
+            end: days
+                .map(|(_, last)| format_date(last))
                 .unwrap_or("".to_string()),
             hours_spent: time_spent,
             workdays: sprint_info.workdays,

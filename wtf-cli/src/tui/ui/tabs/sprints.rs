@@ -340,9 +340,8 @@ fn render_sprint_list_expanded(
             };
 
             let status_text = if sprint.state == SprintState::Active {
-                if let Some(end) = sprint.end {
+                if let Some((_, end_date)) = sprint.days() {
                     let today = Local::now().date_naive();
-                    let end_date = end.date_naive();
                     let days_left = (end_date - today).num_days();
                     if days_left > 0 {
                         format!("{} days left", days_left)
@@ -465,81 +464,73 @@ fn render_sprint_details(frame: &mut Frame, area: &Rect, sprint: &Sprint, data: 
         0.0
     };
 
-    // Start dates are localized: future sprints store their planned start as
-    // midnight in the board timezone, which falls on the previous day in UTC
-    // (e.g. midnight CET -> 23:00Z). Rendering in local time shows the date
-    // Jira itself displays. End dates stay in UTC: they are the exclusive
-    // boundary shared with the next sprint's start, and UTC already shows the
-    // intended last day for ended/ongoing sprints.
-    let start_str = sprint
-        .start
-        .map(|d| d.with_timezone(&Local).format("%d %b").to_string())
+    let days = sprint.days();
+    let start_str = days
+        .map(|(first, _)| first.format("%d %b").to_string())
         .unwrap_or_else(|| "?".to_string());
-    let end_str = sprint
-        .end
-        .map(|d| d.format("%d %b %Y").to_string())
+    let end_str = days
+        .map(|(_, last)| last.format("%d %b %Y").to_string())
         .unwrap_or_else(|| "?".to_string());
 
     // Calculate burn rate
-    let (avg_per_day, need_per_day, status_text, status_color) =
-        if let (Some(_start), Some(end)) = (sprint.start, sprint.end) {
-            let today = Local::now().date_naive();
-            let end_date = end.date_naive();
-            let remaining_days = (end_date - today).num_days().max(0);
+    let (avg_per_day, need_per_day, status_text, status_color) = if let Some((_, end_date)) = days {
+        let today = Local::now().date_naive();
+        // Today counts as remaining while it is still one of the sprint days
+        let remaining_days = ((end_date - today).num_days() + 1).max(0);
 
-            // Count distinct days where work was actually logged (excludes weekends/absences)
-            let worked_days = data
-                .sprint_activities
-                .get(&sprint.id)
-                .map(|activities| {
-                    activities
-                        .iter()
-                        .filter(|a| {
-                            use chrono::Datelike;
-                            !a.is_absence
-                                && a.date.weekday().num_days_from_monday() < 5
-                                && a.hours > 0.0
-                                && a.date <= today
-                        })
-                        .map(|a| a.date)
-                        .collect::<std::collections::HashSet<_>>()
-                        .len()
-                })
-                .unwrap_or(0);
+        // Count distinct days where work was actually logged (excludes weekends/absences)
+        let worked_days = data
+            .sprint_activities
+            .get(&sprint.id)
+            .map(|activities| {
+                activities
+                    .iter()
+                    .filter(|a| {
+                        use chrono::Datelike;
+                        !a.is_absence
+                            && a.date.weekday().num_days_from_monday() < 5
+                            && a.hours > 0.0
+                            && a.date <= today
+                    })
+                    .map(|a| a.date)
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+            })
+            .unwrap_or(0);
 
-            let avg = if worked_days > 0 {
-                logged_hours / worked_days as f64
-            } else {
-                0.0
-            };
-
-            let total_workdays = calculate_sprint_capacity(sprint.id, data) as i64;
-            let need = if total_workdays > 0 {
-                remaining_hours / total_workdays as f64
-            } else {
-                0.0
-            };
-
-            let diff = need - avg;
-            let status = if remaining_days == 0 {
-                ("Sprint ended".to_string(), Color::Gray)
-            } else if diff > 1.0 {
-                (format!("⚠ Behind schedule (-{:.1}h/day)", diff), Color::Red)
-            } else if diff > 0.3 {
-                (
-                    format!("⚡ Slightly behind (-{:.1}h/day)", diff),
-                    Color::Yellow,
-                )
-            } else if diff < -0.5 {
-                ("✨ Ahead of schedule".to_string(), Color::Green)
-            } else {
-                ("✓ On track".to_string(), Color::Green)
-            };
-
-            (avg, need, status.0, status.1)
+        let avg = if worked_days > 0 {
+            logged_hours / worked_days as f64
         } else {
-            (0.0, 0.0, "No dates".to_string(), Color::Gray)
+            0.0
         };
+
+        let total_workdays = calculate_sprint_capacity(sprint.id, data) as i64;
+        let need = if total_workdays > 0 {
+            remaining_hours / total_workdays as f64
+        } else {
+            0.0
+        };
+
+        let diff = need - avg;
+        let status = if remaining_days == 0 {
+            ("Sprint ended".to_string(), Color::Gray)
+        } else if diff > 1.0 {
+            (format!("⚠ Behind schedule (-{:.1}h/day)", diff), Color::Red)
+        } else if diff > 0.3 {
+            (
+                format!("⚡ Slightly behind (-{:.1}h/day)", diff),
+                Color::Yellow,
+            )
+        } else if diff < -0.5 {
+            ("✨ Ahead of schedule".to_string(), Color::Green)
+        } else {
+            ("✓ On track".to_string(), Color::Green)
+        };
+
+        (avg, need, status.0, status.1)
+    } else {
+        (0.0, 0.0, "No dates".to_string(), Color::Gray)
+    };
 
     let mut lines = vec![
         Line::from(""),

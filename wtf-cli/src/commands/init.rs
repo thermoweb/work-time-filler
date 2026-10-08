@@ -133,8 +133,8 @@ fn sprint_autocomplete(sprints: Vec<Sprint>) -> AutocompleteFn {
                     || s.id.to_string().contains(&input_lower)
             })
             .map(|s| {
-                let dates = if let (Some(start), Some(end)) = (&s.start, &s.end) {
-                    format!(" ({} - {})", start.format("%b %d"), end.format("%b %d"))
+                let dates = if let Some((first, last)) = s.days() {
+                    format!(" ({} - {})", first.format("%b %d"), last.format("%b %d"))
                 } else {
                     String::new()
                 };

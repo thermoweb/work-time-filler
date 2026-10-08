@@ -22,15 +22,14 @@ impl Tui {
             Some(sprint) => sprint,
             None => return Vec::new(),
         };
-        let (start, end) = match (sprint.start, sprint.end) {
-            (Some(start), Some(end)) => (start, end),
-            _ => return Vec::new(),
+        let Some((first, last)) = sprint.days() else {
+            return Vec::new();
         };
 
         let meetings_svc = MeetingsService::production();
         LocalWorklogService::production().find_gap_days(
-            start.date_naive(),
-            end.date_naive(),
+            first,
+            last,
             self.data.daily_hours_limit,
             GAP_FILL_MIN_THRESHOLD,
             &|date| meetings_svc.is_absent(date),

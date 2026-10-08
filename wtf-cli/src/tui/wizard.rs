@@ -2,8 +2,7 @@
 
 use std::collections::HashMap;
 
-use chrono::TimeZone;
-use chrono::Utc;
+use chrono::Local;
 use wtf_lib::models::data::LocalWorklogState;
 use wtf_lib::services::meetings_service::MeetingsService;
 use wtf_lib::services::worklogs_service::LocalWorklogService;
@@ -28,9 +27,8 @@ impl Tui {
             }
 
             // Check for existing unpushed worklogs within this sprint's date range
-            let existing_unpushed = if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                LocalWorklogService::production()
-                    .get_unpushed_in_range(start.date_naive(), end.date_naive())
+            let existing_unpushed = if let Some((first, last)) = sprint.days() {
+                LocalWorklogService::production().get_unpushed_in_range(first, last)
             } else {
                 vec![]
             };
@@ -317,16 +315,15 @@ impl Tui {
                     .iter()
                     .find(|s| s.id == wizard.sprint_id)
                 {
-                    if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
+                    if sprint.days().is_some() {
                         // Filter GitHub sessions to this sprint's date range
                         let sprint_sessions: Vec<_> = self
                             .data
                             .github_sessions
                             .iter()
                             .filter(|s| {
-                                let session_date = s.start_time.date_naive();
-                                session_date >= start.date_naive()
-                                    && session_date <= end.date_naive()
+                                sprint
+                                    .contains_date(s.start_time.with_timezone(&Local).date_naive())
                                     && !self.data.valid_github_issues_for_session(s).is_empty()
                             })
                             .cloned()
@@ -542,11 +539,7 @@ impl Tui {
                 .find(|s| s.id == wizard.sprint_id);
 
             if let Some(sprint) = sprint {
-                if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                    let day_start =
-                        Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-                    let day_end =
-                        Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+                if sprint.days().is_some() {
                     // Count worklogs in "Created" state for this sprint
                     let worklogs_to_push: Vec<_> = self
                         .data
@@ -554,8 +547,8 @@ impl Tui {
                         .iter()
                         .filter(|w| {
                             w.status == LocalWorklogState::Created
-                                && w.started >= day_start
-                                && w.started <= day_end
+                                && sprint
+                                    .contains_date(w.started.with_timezone(&Local).date_naive())
                         })
                         .collect();
 
@@ -611,11 +604,7 @@ impl Tui {
             .cloned();
 
         if let Some(sprint) = sprint {
-            if let (Some(start), Some(end)) = (sprint.start, sprint.end) {
-                let day_start =
-                    Utc.from_utc_datetime(&start.date_naive().and_hms_opt(0, 0, 0).unwrap());
-                let day_end =
-                    Utc.from_utc_datetime(&end.date_naive().and_hms_opt(23, 59, 59).unwrap());
+            if sprint.days().is_some() {
                 // Get all Created worklogs in sprint date range
                 let worklogs_to_stage: Vec<_> = self
                     .data
@@ -623,8 +612,7 @@ impl Tui {
                     .iter()
                     .filter(|w| {
                         w.status == LocalWorklogState::Created
-                            && w.started >= day_start
-                            && w.started <= day_end
+                            && sprint.contains_date(w.started.with_timezone(&Local).date_naive())
                     })
                     .cloned()
                     .collect();
