@@ -25,6 +25,7 @@ pub enum Achievement {
     RainbowCalendar,
     TheCompletionist,
     DoNotDisturb,
+    ReadTheFineManual,
 }
 
 impl Achievement {
@@ -51,6 +52,7 @@ impl Achievement {
             Achievement::RainbowCalendar,
             Achievement::TheCompletionist,
             Achievement::DoNotDisturb,
+            Achievement::ReadTheFineManual,
         ]
     }
 
@@ -251,6 +253,17 @@ impl Achievement {
                     .to_string(),
                 points: 25,
             },
+            Achievement::ReadTheFineManual => AchievementMeta {
+                id: *self,
+                name: "Read The Fine Manual".to_string(),
+                description: "Open the help on every tab".to_string(),
+                icon: "📖".to_string(),
+                category: AchievementCategory::Meta,
+                chronie_message:
+                    "Asking what a button does *before* pressing it? A rare and precious wisdom. 📖"
+                        .to_string(),
+                points: 10,
+            },
         }
     }
 
@@ -313,6 +326,7 @@ impl Achievement {
             Achievement::RainbowCalendar => "rainbow_calendar".to_string(),
             Achievement::TheCompletionist => "the_completionist".to_string(),
             Achievement::DoNotDisturb => "do_not_disturb".to_string(),
+            Achievement::ReadTheFineManual => "read_the_fine_manual".to_string(),
         }
     }
 

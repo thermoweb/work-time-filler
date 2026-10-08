@@ -43,6 +43,7 @@ pub enum AppEvent {
 
     // UI events
     AboutPopupOpened,
+    HelpPopupOpened,
 
     // Achievement events
     AchievementUnlocked {
@@ -129,7 +130,7 @@ pub enum FetchStatus {
     Error(String),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tab {
     Sprints,
     Meetings,
@@ -294,6 +295,8 @@ pub struct Tui {
     pub(crate) show_about_popup: bool,
     /// Help popup scroll offset; `None` when the popup is closed
     pub(crate) help_popup_scroll: Option<u16>,
+    /// Tabs on which the help popup was opened this session ("Read The Fine Manual" achievement)
+    pub(crate) help_viewed_tabs: std::collections::HashSet<Tab>,
     pub(crate) about_image: Option<image::DynamicImage>,
     pub(crate) image_picker: Option<ratatui_image::picker::Picker>,
     pub(crate) fetch_status: FetchStatus,

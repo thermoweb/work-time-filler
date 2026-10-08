@@ -22,7 +22,7 @@ pub(in crate::tui) use confirmations::{
     render_worklog_creation_confirmation,
 };
 
-pub(in crate::tui) use help::{handle_help_key, render_help_popup, scroll_help};
+pub(in crate::tui) use help::{handle_help_key, open_help, render_help_popup, scroll_help};
 
 pub(in crate::tui) use other::{render_about_popup, render_sprint_follow_popup};
 

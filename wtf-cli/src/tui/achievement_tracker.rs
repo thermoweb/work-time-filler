@@ -1,5 +1,5 @@
 use crate::logger;
-use crate::tui::types::{AppEvent, EventSubscriber, Tui};
+use crate::tui::types::{AppEvent, EventSubscriber, Tab, Tui};
 use wtf_lib::Achievement;
 
 /// Achievement tracker that listens to app events and unlocks achievements
@@ -89,6 +89,16 @@ impl AchievementTracker {
             AppEvent::AboutPopupOpened => {
                 // About popup achievement
                 candidates.push(Achievement::AboutClicker);
+            }
+            AppEvent::HelpPopupOpened => {
+                // Read The Fine Manual: help opened on every main tab (Achievements excluded,
+                // it only shows up once something is unlocked)
+                if Tab::available_tabs(false)
+                    .iter()
+                    .all(|tab| tui.help_viewed_tabs.contains(tab))
+                {
+                    candidates.push(Achievement::ReadTheFineManual);
+                }
             }
             AppEvent::SecretSequenceTriggered { achievement_id } => {
                 if let Some(achievement) = Achievement::from_branding_id(achievement_id) {

@@ -123,6 +123,7 @@ impl Tui {
             unlink_confirmation_meeting_id: None,
             show_about_popup: false,
             help_popup_scroll: None,
+            help_viewed_tabs: std::collections::HashSet::new(),
             about_image,
             image_picker: None,
             fetch_status: FetchStatus::Idle,
@@ -774,7 +775,7 @@ impl Tui {
             return;
         }
         if key.code == KeyCode::Char('?') && !self.show_about_popup {
-            self.help_popup_scroll = Some(0);
+            ui::popups::open_help(self);
             return;
         }
 

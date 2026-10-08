@@ -9,6 +9,7 @@ use ratatui::{
 
 use crate::tui::tab_controller::TabAction;
 use crate::tui::theme::theme;
+use crate::tui::types::AppEvent;
 use crate::tui::ui_helpers::wrap_text;
 use crate::tui::Tui;
 
@@ -56,6 +57,13 @@ pub(in crate::tui) fn render_help_popup(frame: &mut Frame, tui: &Tui, scroll: u1
             .scroll((scroll.min(max_scroll), 0)),
         popup_area,
     );
+}
+
+/// Open the help popup on the current tab
+pub(in crate::tui) fn open_help(tui: &mut Tui) {
+    tui.help_popup_scroll = Some(0);
+    tui.help_viewed_tabs.insert(tui.current_tab);
+    tui.event_bus.publish(AppEvent::HelpPopupOpened);
 }
 
 /// Keys while the help popup is open: it captures everything so nothing reaches the tab behind
