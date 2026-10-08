@@ -11,7 +11,7 @@ use ratatui::{
 use crate::logger;
 use crate::tui::data::{DayActivity, TuiData};
 use crate::tui::helpers;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::{SprintFollowState, Tui};
@@ -20,9 +20,47 @@ use wtf_lib::models::data::{Sprint, SprintState};
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct SprintsTab;
 
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "W",
+        "Wizard",
+        "Launch the Chronie Wizard: syncs everything, links meetings to issues, creates worklogs and pushes them to Jira, step by step.",
+    ),
+    TabAction::title(
+        "A",
+        "Add/follow",
+        "Pick the Jira sprints to follow. Followed sprints are listed here and used by the wizard, meeting worklogs and gap filling.",
+    ),
+    TabAction::title(
+        "X",
+        "Unfollow",
+        "Stop following the selected sprint. It is only hidden from wtf: nothing is deleted in Jira, your worklogs are kept, and you can follow it again with A.",
+    ),
+    TabAction::title(
+        "F",
+        "Fill",
+        "Fill the gaps of the selected sprint: workdays below your daily hours get a worklog on an issue you pick. Asks for confirmation; worklogs stay local until pushed.",
+    ),
+    TabAction::help_only(
+        "R",
+        "Refresh",
+        "Reload the screen from the local database (no network call).",
+    ),
+    TabAction::help_only(
+        "U",
+        "Update",
+        "Fetch fresh data: Jira boards, sprints, issues and worklogs, Google Calendar meetings and GitHub activity.",
+    ),
+    TabAction::help_only("↑↓ / j k", "Navigate", "Select a sprint."),
+];
+
 impl TabController for SprintsTab {
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_sprints_tab(frame, area, data);
+    }
+
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
     }
 
     fn handle_key(&self, tui: &mut Tui, key: KeyEvent) {
@@ -251,12 +289,7 @@ fn render_sprint_list_expanded(
     data: &TuiData,
     selected_index: usize,
 ) {
-    let shortcuts = build_shortcut_help(&[
-        ("W", "izard"),
-        ("A", "dd/follow"),
-        ("X", " unfollow"),
-        ("F", "ill"),
-    ]);
+    let shortcuts = build_action_hints(ACTIONS);
     let mut title_spans = vec![
         Span::raw("📊 Followed Sprints ("),
         Span::raw(data.all_sprints.len().to_string()),

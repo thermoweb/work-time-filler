@@ -12,7 +12,7 @@ use ratatui::{
 use crate::logger;
 use crate::tui::data::TuiData;
 use crate::tui::helpers;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::Tui;
@@ -22,6 +22,51 @@ use wtf_lib::services::meetings_service::MeetingsService;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct MeetingsTab;
+
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "F",
+        "Filter",
+        "Toggle between all meetings and unlinked meetings only.",
+    ),
+    TabAction::title(
+        "A",
+        "Auto-link",
+        "Link every unlinked meeting automatically, using the calendar color mapped to an issue in Settings, or the Jira key found in its title or description.",
+    ),
+    TabAction::title(
+        "X",
+        "Untrack",
+        "Mark the selected meeting as untracked (or track it again). Untracked meetings are greyed out and skipped by auto-link.",
+    ),
+    TabAction::title(
+        "Del",
+        "Unlink",
+        "Remove the Jira link of the selected meeting (asks for confirmation).",
+    ),
+    TabAction::title(
+        "Enter",
+        "Link",
+        "Link the selected meeting to a Jira issue you search for.",
+    ),
+    TabAction::title(
+        "L",
+        "Log",
+        "Create local worklogs from the linked meetings of your followed sprints. They appear in the Worklogs tab, ready to be staged and pushed.",
+    ),
+    TabAction::help_only(
+        "/",
+        "Search",
+        "Search meetings by title, Jira key or description. Enter keeps the filter, Esc clears it.",
+    ),
+    TabAction::help_only(
+        "R",
+        "Refresh",
+        "Reload the screen from the local database (no network call).",
+    ),
+    TabAction::help_only("U", "Update", "Fetch fresh events from Google Calendar."),
+    TabAction::help_only("↑↓ / j k", "Navigate", "Select a meeting."),
+];
 
 pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
     let mut sorted_meetings = data.all_meetings.clone();
@@ -74,6 +119,10 @@ pub(in crate::tui) fn visible_meetings(data: &TuiData) -> Vec<Meeting> {
 }
 
 impl TabController for MeetingsTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_meetings_tab(frame, area, data);
     }
@@ -332,13 +381,11 @@ fn render_meetings_list(
         ""
     };
 
-    let mut shortcuts_data = vec![("F", "ilter"), ("A", "uto-link"), ("X", " Untrack")];
-    if selected_has_link {
-        shortcuts_data.push(("Del", " Unlink"));
-    }
-    shortcuts_data.push(("Enter", " Link"));
-    shortcuts_data.push(("L", "og"));
-    let shortcuts = build_shortcut_help(&shortcuts_data);
+    let shortcuts = build_action_hints(
+        ACTIONS
+            .iter()
+            .filter(|action| selected_has_link || action.key != "Del"),
+    );
 
     let mut title_spans = vec![Span::raw("📅 Meetings (")];
     if pending_count > 0 {

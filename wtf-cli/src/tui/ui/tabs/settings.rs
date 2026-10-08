@@ -9,16 +9,39 @@ use ratatui::{
 
 use crate::tui::data::IssueTitleState;
 use crate::tui::data::TuiData;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
-use crate::tui::ui_helpers::build_shortcut_help;
+use crate::tui::ui_helpers::{build_action_hints, build_shortcut_help};
 use crate::tui::Tui;
 use wtf_lib::config::{Config, GOOGLE_CALENDAR_EVENT_COLORS};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct SettingsTab;
 
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "Enter",
+        "Edit",
+        "Edit the selected field. Enter confirms, Esc cancels.",
+    ),
+    TabAction::title(
+        "v",
+        "Reveal",
+        "Show or hide the value of a sensitive field (tokens).",
+    ),
+    TabAction::title(
+        "s",
+        "Save",
+        "Write your changes to the config file. Edits are lost on quit until saved.",
+    ),
+    TabAction::title("↑↓", "Navigate", "Select a field."),
+];
+
 impl TabController for SettingsTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_settings_tab(frame, area, data);
     }
@@ -330,12 +353,7 @@ pub(in crate::tui) fn render_settings_tab(frame: &mut Frame, area: &Rect, data: 
     let shortcuts = if state.settings_editing {
         build_shortcut_help(&[("Enter", " Confirm"), ("Esc", " Cancel")])
     } else {
-        build_shortcut_help(&[
-            ("Enter", " Edit"),
-            ("v", " Reveal"),
-            ("s", " Save"),
-            ("↑↓", " Navigate"),
-        ])
+        build_action_hints(ACTIONS)
     };
 
     let mut title_spans = vec![Span::raw("⚙ Settings | ")];

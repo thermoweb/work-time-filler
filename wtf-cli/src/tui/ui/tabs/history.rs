@@ -10,7 +10,7 @@ use ratatui::{
 use crate::logger;
 use crate::tui::data::TuiData;
 use crate::tui::helpers;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::ui_helpers::*;
 use crate::tui::{RevertConfirmationState, Tui};
@@ -19,6 +19,30 @@ use wtf_lib::services::worklogs_service::LocalWorklogService;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct HistoryTab;
+
+const ACTIONS: &[TabAction] = &[
+    TabAction::title(
+        "→",
+        "Expand",
+        "Show the worklogs of the selected push, day by day (← or Enter to collapse).",
+    ),
+    TabAction::title(
+        "Del",
+        "Revert",
+        "Undo the selected push: its worklogs are deleted from Jira and from wtf. You must type the total hours to confirm.",
+    ),
+    TabAction::title(
+        "C",
+        "Create recovery / import",
+        "On a \"Jira only\" row: import the Jira worklogs wtf doesn't know about into a new history entry. Elsewhere: rebuild history entries for pushed worklogs missing from it.",
+    ),
+    TabAction::help_only(
+        "Shift+D",
+        "Forget",
+        "Remove the selected entry from the history only. Its worklogs stay in Jira.",
+    ),
+    TabAction::help_only("↑↓ / j k", "Navigate", "Select a history entry."),
+];
 
 /// Prefix for virtual entry IDs per sprint: "__jira_only__{sprint_id}"
 pub(in crate::tui) const JIRA_ONLY_VIRTUAL_PREFIX: &str = "__jira_only__";
@@ -31,6 +55,10 @@ enum HistoryRow {
 }
 
 impl TabController for HistoryTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render_history_tab(frame, area, data);
     }
@@ -387,11 +415,7 @@ fn render_history_list(
     let sprint_entries = jira_only_by_sprint(data);
     let has_jira_only = !sprint_entries.is_empty();
 
-    let shortcuts = build_shortcut_help(&[
-        ("→", " Expand"),
-        ("Del", "ete"),
-        ("C", "reate recovery / import"),
-    ]);
+    let shortcuts = build_action_hints(ACTIONS);
     let mut title_spans = vec![
         Span::raw("📜 History ("),
         Span::raw(history.len().to_string()),

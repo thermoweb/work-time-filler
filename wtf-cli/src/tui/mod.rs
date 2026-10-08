@@ -122,6 +122,7 @@ impl Tui {
             issue_selection_state: None,
             unlink_confirmation_meeting_id: None,
             show_about_popup: false,
+            help_popup_scroll: None,
             about_image,
             image_picker: None,
             fetch_status: FetchStatus::Idle,
@@ -767,6 +768,16 @@ impl Tui {
             return;
         }
 
+        // Help popup - explains what each action of the current tab does
+        if self.help_popup_scroll.is_some() {
+            ui::popups::handle_help_key(self, key);
+            return;
+        }
+        if key.code == KeyCode::Char('?') && !self.show_about_popup {
+            self.help_popup_scroll = Some(0);
+            return;
+        }
+
         // About popup - global key that works anywhere
         if key.code == KeyCode::Char('h') || key.code == KeyCode::Char('H') {
             self.show_about_popup = !self.show_about_popup;
@@ -885,6 +896,10 @@ impl Tui {
             MouseEventKind::ScrollDown => false,
             _ => return,
         };
+        if self.help_popup_scroll.is_some() {
+            ui::popups::scroll_help(self, scroll_up);
+            return;
+        }
         self.current_tab.handle_scroll(self, scroll_up);
     }
 

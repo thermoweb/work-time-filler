@@ -1,6 +1,7 @@
 // Popup rendering modules organized by functionality
 
 mod confirmations;
+mod help;
 mod issue_selection;
 mod other;
 mod wizard;
@@ -20,6 +21,8 @@ pub(in crate::tui) use confirmations::{
     render_gap_fill_confirmation, render_revert_confirmation, render_unlink_confirmation,
     render_worklog_creation_confirmation,
 };
+
+pub(in crate::tui) use help::{handle_help_key, render_help_popup, scroll_help};
 
 pub(in crate::tui) use other::{render_about_popup, render_sprint_follow_popup};
 
@@ -81,6 +84,11 @@ pub(in crate::tui) fn render_all(frame: &mut Frame, tui: &crate::tui::Tui) {
     // Render sprint follow popup if active
     if let Some(state) = &tui.sprint_follow_state {
         render_sprint_follow_popup(frame, state);
+    }
+
+    // Render help popup if active
+    if let Some(scroll) = tui.help_popup_scroll {
+        render_help_popup(frame, tui, scroll);
     }
 
     // Render about popup if active (should be on top of everything)

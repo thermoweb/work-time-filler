@@ -8,7 +8,7 @@ use ratatui::{
 };
 
 use crate::tui::data::TuiData;
-use crate::tui::tab_controller::TabController;
+use crate::tui::tab_controller::{TabAction, TabController};
 use crate::tui::theme::theme;
 use crate::tui::Tui;
 use wtf_lib::models::achievement::AchievementCategory;
@@ -45,7 +45,16 @@ fn progress_bar(current: u64, max: u64, bar_width: usize) -> String {
 #[derive(Debug, Clone, Copy, Default)]
 pub(in crate::tui) struct AchievementsTab;
 
+const ACTIONS: &[TabAction] = &[
+    TabAction::help_only("← →", "Scroll", "Browse your achievements."),
+    TabAction::help_only("Home / End", "Jump", "Go to the first or last achievement."),
+];
+
 impl TabController for AchievementsTab {
+    fn actions(&self) -> &'static [TabAction] {
+        ACTIONS
+    }
+
     fn render(&self, frame: &mut Frame, area: &Rect, data: &TuiData) {
         render(frame, area, data);
     }
