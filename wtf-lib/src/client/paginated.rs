@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, error};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -57,7 +57,7 @@ where
             tokio::runtime::Handle::current().block_on(fetcher.fetch_page())
         })
         .unwrap_or_else(|err| {
-            eprintln!("Failed to fetch paginated items: {}", err);
+            error!("Failed to fetch paginated items: {}", err);
         });
 
         fetcher
@@ -102,7 +102,7 @@ where
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            eprintln!("HTTP {} error fetching {}: {}", status, url, body.trim());
+            error!("HTTP {} error fetching {}: {}", status, url, body.trim());
             self.current_items = Some(vec![]);
             self.is_last = true;
             return Ok(());
@@ -114,15 +114,11 @@ where
         let page: PaginatedResponse<T> = match serde_json::from_str::<PaginatedResponse<T>>(&text) {
             Ok(page) => page,
             Err(err) => {
-                eprintln!(
-                    "Failed to deserialize paginated response: {:?}\nBody: {}",
-                    err,
-                    if text.len() > 500 {
-                        &text[..500]
-                    } else {
-                        &text
-                    }
+                error!(
+                    "Failed to deserialize response of {}: {}",
+                    self.endpoint, err
                 );
+                debug!("Body: {}", text.chars().take(500).collect::<String>());
                 // Treat as empty last page — let the caller handle "no results" gracefully
                 self.current_items = Some(vec![]);
                 self.is_last = true;

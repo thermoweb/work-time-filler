@@ -90,7 +90,7 @@ impl MeetingsService {
         match SprintService::production().get_sprint(spring_id) {
             Ok(Some(sprint)) => self.get_meetings_for_sprint(&sprint),
             _ => {
-                eprintln!("Sprint '{}' not found!", spring_id);
+                log::warn!("Sprint '{}' not found!", spring_id);
                 vec![]
             }
         }

@@ -81,7 +81,7 @@ impl JiraWorklog {
     pub fn into_worklog(&self) -> Worklog {
         Worklog {
             id: self.id.clone(),
-            author: self.author.email_address.clone(),
+            author: self.author.identifier(),
             created: self.created,
             time_spent: self.time_spent.clone(),
             time_spent_seconds: self.time_spent_seconds,
@@ -154,8 +154,32 @@ pub struct JiraUpdatedWorklog {
 #[derive(Debug, Serialize, Deserialize, Clone, Hash, Eq, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct JiraAuthor {
+    #[serde(default)]
+    pub account_id: Option<String>,
+    #[serde(default)]
     pub display_name: String,
-    pub email_address: String,
+    /// Jira Cloud hides the email when the user's profile visibility forbids it,
+    /// so it must not be required. Use `account_id` to identify users.
+    #[serde(default)]
+    pub email_address: Option<String>,
+}
+
+impl JiraAuthor {
+    /// Best identifier for display/storage: email when visible, account id otherwise.
+    pub fn identifier(&self) -> String {
+        self.email_address
+            .clone()
+            .or_else(|| self.account_id.clone())
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct JiraMyself {
+    pub account_id: String,
+    #[serde(default)]
+    pub email_address: Option<String>,
 }
 
 #[derive(Debug)]
@@ -224,5 +248,38 @@ pub struct JiraBoardLocation {
 impl fmt::Display for JiraBoard {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}] {} - ({})", self.id, self.name, self.r#type)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const WORKLOG_WITHOUT_EMAIL: &str = r#"{
+        "id": "42",
+        "author": { "accountId": "abc-123", "displayName": "Jane Doe", "active": true },
+        "created": "2026-10-28T09:00:00.000+0000",
+        "timeSpent": "1h",
+        "timeSpentSeconds": 3600,
+        "issueId": "1001",
+        "started": "2026-10-28T09:00:00.000+0000"
+    }"#;
+
+    #[test]
+    fn worklog_deserializes_when_jira_hides_email() {
+        let worklog: JiraWorklog = serde_json::from_str(WORKLOG_WITHOUT_EMAIL).unwrap();
+        assert_eq!(worklog.author.email_address, None);
+        assert_eq!(worklog.author.account_id.as_deref(), Some("abc-123"));
+        assert_eq!(worklog.into_worklog().author, "abc-123");
+    }
+
+    #[test]
+    fn author_identifier_prefers_email() {
+        let author = JiraAuthor {
+            account_id: Some("abc-123".to_string()),
+            display_name: "Jane".to_string(),
+            email_address: Some("jane@example.com".to_string()),
+        };
+        assert_eq!(author.identifier(), "jane@example.com");
     }
 }

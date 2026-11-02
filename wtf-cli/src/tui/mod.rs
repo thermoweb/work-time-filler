@@ -151,7 +151,14 @@ impl Tui {
         // Install a panic hook that restores the terminal before printing the panic message.
         // Without this, any crash leaves the terminal in raw/alternate-screen mode.
         let original_hook = std::panic::take_hook();
+        // Panics in background threads (fetch, push, ...) must not tear down the UI:
+        // the main loop keeps running and reports the failure through the channel,
+        // so only log them instead of leaving the alternate screen.
         std::panic::set_hook(Box::new(move |info| {
+            if std::thread::current().name() != Some("main") {
+                log::error!("Background task crashed: {}", info);
+                return;
+            }
             let _ = disable_raw_mode();
             let _ = execute!(
                 io::stdout(),

@@ -670,7 +670,7 @@ impl Task for FetchJiraWorklogs {
                         .iter()
                         .map(|wl| Worklog {
                             id: wl.id.clone(),
-                            author: wl.author.email_address.clone(),
+                            author: wl.author.identifier(),
                             created: wl.created,
                             time_spent: wl.time_spent.clone(),
                             time_spent_seconds: wl.time_spent_seconds,

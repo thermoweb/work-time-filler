@@ -2,11 +2,14 @@ use crate::client::paginated::PaginatedFetcher;
 use crate::client::paginated_issues::PaginatedIssues;
 use crate::config::{Config, JiraConfig};
 use crate::models::jira::JiraError::ApiError;
-use crate::models::jira::{JiraBoard, JiraError, JiraIssue, JiraSprint, JiraWorklog};
+use crate::models::jira::{
+    JiraAuthor, JiraBoard, JiraError, JiraIssue, JiraMyself, JiraSprint, JiraWorklog,
+};
 use base64::engine::general_purpose;
 use base64::Engine;
 use chrono::{DateTime, Duration, Utc};
 use log::{debug, error, trace};
+use once_cell::sync::OnceCell;
 use reqwest::Client;
 use serde::Serialize;
 
@@ -106,7 +109,7 @@ impl JiraClient {
         {
             Ok(f) => f,
             Err(e) => {
-                eprintln!("Error fetching worklogs: {}", e);
+                error!("Error fetching worklogs of {}: {}", issue.key, e);
                 return vec![];
             }
         };
@@ -122,8 +125,25 @@ impl JiraClient {
             }
         };
 
-        // Filter to only include worklogs by current user
-        worklogs.retain(|w| w.author.email_address == current_user_email);
+        // Filter to only include worklogs by current user. Jira Cloud may hide
+        // `emailAddress` (profile visibility), so match on accountId as well.
+        let current_account_id = self.current_account_id().await;
+        worklogs.retain(|w| {
+            is_current_user(
+                &w.author,
+                &current_user_email,
+                current_account_id.as_deref(),
+            )
+        });
+
+        // Normalize the author email so downstream code (stored `Worklog.author`)
+        // keeps matching the configured username even when Jira hides it.
+        for worklog in &mut worklogs {
+            worklog
+                .author
+                .email_address
+                .get_or_insert_with(|| current_user_email.clone());
+        }
 
         // IMPORTANT: Set the issue_id to the issue key for each worklog
         // Jira API doesn't always return issue_id, but we need it for deletion
@@ -210,6 +230,37 @@ impl JiraClient {
             error!("DELETE failed with status {}: {}", status, error_body);
             Err(ApiError(format!("{} - {}", status, error_body)))
         }
+    }
+
+    /// Account id of the authenticated user (`/rest/api/3/myself`), cached for the process.
+    pub async fn current_account_id(&self) -> Option<String> {
+        static ACCOUNT_ID: OnceCell<String> = OnceCell::new();
+        if let Some(id) = ACCOUNT_ID.get() {
+            return Some(id.clone());
+        }
+
+        let url = format!("{}/rest/api/3/myself", self.base_url);
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", &self.auth_header)
+            .send()
+            .await
+            .map_err(|e| error!("Error fetching current Jira user: {}", e))
+            .ok()?;
+        if !response.status().is_success() {
+            error!(
+                "Error fetching current Jira user: HTTP {}",
+                response.status()
+            );
+            return None;
+        }
+        let myself: JiraMyself = response
+            .json()
+            .await
+            .map_err(|e| error!("Error deserializing current Jira user: {}", e))
+            .ok()?;
+        Some(ACCOUNT_ID.get_or_init(|| myself.account_id).clone())
     }
 
     pub async fn get_worklog(&self, url: &str) -> Option<JiraWorklog> {
@@ -348,7 +399,48 @@ struct Worklog {
 }
 
 //FIXME: maybe implements a cache here
+fn is_current_user(author: &JiraAuthor, email: &str, account_id: Option<&str>) -> bool {
+    match (account_id, author.account_id.as_deref()) {
+        (Some(expected), Some(actual)) => expected == actual,
+        _ => author.email_address.as_deref() == Some(email),
+    }
+}
+
 pub async fn get_worklogs_for_issue(issue: JiraIssue) -> Vec<JiraWorklog> {
     let client = JiraClient::create();
     client.get_issue_worklogs(issue).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn author(account_id: Option<&str>, email: Option<&str>) -> JiraAuthor {
+        JiraAuthor {
+            account_id: account_id.map(String::from),
+            display_name: "Someone".to_string(),
+            email_address: email.map(String::from),
+        }
+    }
+
+    #[test]
+    fn current_user_matched_by_account_id_when_email_hidden() {
+        let me = author(Some("me"), None);
+        let other = author(Some("other"), None);
+        assert!(is_current_user(&me, "me@example.com", Some("me")));
+        assert!(!is_current_user(&other, "me@example.com", Some("me")));
+    }
+
+    #[test]
+    fn current_user_falls_back_to_email_without_account_id() {
+        let me = author(Some("me"), Some("me@example.com"));
+        let other = author(Some("other"), Some("other@example.com"));
+        assert!(is_current_user(&me, "me@example.com", None));
+        assert!(!is_current_user(&other, "me@example.com", None));
+        assert!(!is_current_user(
+            &author(Some("me"), None),
+            "me@example.com",
+            None
+        ));
+    }
 }
