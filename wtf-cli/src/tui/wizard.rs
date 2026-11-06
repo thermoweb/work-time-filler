@@ -77,6 +77,17 @@ impl Tui {
         self.wizard_step_sync();
     }
 
+    /// Reload `self.data` from the database synchronously.
+    ///
+    /// The wizard reads `self.data` right after writing to the DB (links, worklogs) and
+    /// right after a fetch, so the async `refresh_data()` is not enough: its result lands
+    /// a few ticks later and the step would work on stale meetings/worklogs. Any in-flight
+    /// async refresh is dropped so that its (older) snapshot cannot overwrite this one.
+    pub(super) fn wizard_reload_data(&mut self) {
+        self.data_refresh_receiver = None;
+        self.data = super::data::TuiData::collect_with_ui_state(self.data.ui_state.clone());
+    }
+
     // Wizard step implementations
     pub(super) fn wizard_step_sync(&mut self) {
         const FRESHNESS_SECS: u64 = 300;
@@ -87,6 +98,8 @@ impl Tui {
                     "⏭️  Step 1/7: Skipping sync — last update was {}s ago (< {}s)",
                     elapsed, FRESHNESS_SECS
                 ));
+                self.pending_auto_link = false;
+                self.wizard_reload_data();
                 self.wizard_step_autolink();
                 return;
             }
@@ -169,8 +182,8 @@ impl Tui {
     }
 
     pub(super) fn wizard_advance_to_manual_linking(&mut self) {
-        // Refresh data to see the newly linked meetings
-        self.refresh_data();
+        // Reload data to see the newly linked meetings
+        self.wizard_reload_data();
 
         let sprint_for_filter = self.wizard_state.as_ref().and_then(|w| {
             self.data
@@ -283,8 +296,8 @@ impl Tui {
             }
         }
 
-        // Refresh and advance
-        self.refresh_data();
+        // Reload and advance
+        self.wizard_reload_data();
         if let Some(wizard) = &mut self.wizard_state {
             wizard.completed_steps.insert(3); // Step 3 complete
             wizard.current_step = WizardStep::CreatingGitHubWorklogs {
@@ -527,8 +540,8 @@ impl Tui {
     pub(super) fn wizard_step_review(&mut self) {
         logger::log("📋 Step 6/7: Reviewing created worklogs...".to_string());
 
-        // Refresh data to get latest worklogs
-        self.refresh_data();
+        // Reload data to get latest worklogs
+        self.wizard_reload_data();
 
         if let Some(wizard) = &mut self.wizard_state {
             // Get the sprint to filter worklogs
@@ -721,6 +734,11 @@ impl EventSubscriber for WizardEventHandler {
         match (event, &wizard.current_step) {
             // Fetch completed during sync step - advance to auto-linking
             (AppEvent::FetchComplete(_), WizardStep::Syncing) => {
+                // The post-fetch refresh is async: reload now so auto-linking sees the
+                // freshly fetched meetings. The wizard does its own auto-linking (tracked
+                // for rollback), so the tab-level auto-link must not run behind its back.
+                tui.pending_auto_link = false;
+                tui.wizard_reload_data();
                 tui.wizard_step_autolink();
             }
 
